@@ -1,0 +1,43 @@
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Virtual envs ────────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Secrets & user data (NUNCA commitar!) ───────────────────────────────────
+.env
+.env.local
+.env.*.local
+.streamlit/secrets.toml
+users_db.json
+*.db
+*.sqlite
+*.sqlite3
+
+# ── IDE / OS ────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Streamlit cache ─────────────────────────────────────────────────────────
+.streamlit/cache/
+
+# ── Logs ────────────────────────────────────────────────────────────────────
+*.log
+logs/
