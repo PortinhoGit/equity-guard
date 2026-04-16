@@ -60,10 +60,26 @@ from core.technical import (
 # ─── Page Config ──────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title=f"{APP_NAME} · B3",
-    page_icon=APP_ICON,
+    page_title="Equity Guard — Terminal Financeiro · B3",
+    page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",  # always open on desktop; user can collapse on mobile
+    initial_sidebar_state="expanded",
+)
+
+_OG_IMAGE_URL = "https://raw.githubusercontent.com/PortinhoGit/equity-guard/main/assets/og-image.png"
+st.markdown(
+    f"""<head>
+    <meta property="og:title" content="Equity Guard — Terminal Financeiro"/>
+    <meta property="og:description" content="Análise técnica e fundamentalista de ações da B3 e indicadores macroeconômicos."/>
+    <meta property="og:image" content="{_OG_IMAGE_URL}"/>
+    <meta property="og:url" content="https://equityguard.streamlit.app/"/>
+    <meta property="og:type" content="website"/>
+    <meta name="twitter:card" content="summary_large_image"/>
+    <meta name="twitter:title" content="Equity Guard — Terminal Financeiro"/>
+    <meta name="twitter:description" content="Análise técnica e fundamentalista de ações da B3 e indicadores macroeconômicos."/>
+    <meta name="twitter:image" content="{_OG_IMAGE_URL}"/>
+    </head>""",
+    unsafe_allow_html=True,
 )
 
 # ─── CSS Premium Dark Mode ────────────────────────────────────────────────────
