@@ -534,9 +534,9 @@ def _maybe_pension_alert(T: dict) -> None:
         var bar = doc.createElement('div');
         bar.id = 'eg-pension-alert';
         bar.innerHTML = '🏦 {_msg} — <u>ver agora</u> ✕';
-        bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;'
+        bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999998;'
             + 'background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;'
-            + 'padding:10px 16px;font-size:13px;font-weight:700;text-align:center;'
+            + 'padding:8px 60px 8px 16px;font-size:12px;font-weight:700;text-align:center;'
             + 'cursor:pointer;font-family:Inter,system-ui,sans-serif;';
         bar.onclick = function() {{
             var openBtn = doc.querySelector('[data-testid="collapsedControl"]');
@@ -909,14 +909,17 @@ def _render_macro_panel(T: dict) -> None:
         st.caption(T["macro_unavailable"])
         return
 
-    bid    = fx.get("bid", 0)
-    ask    = fx.get("ask", 0)
-    avg    = fx.get("avg", 0)
+    com_bid = fx.get("com_bid", 0)
+    com_ask = fx.get("com_ask", 0)
+    com_prev = fx.get("com_prev", 0)
+    tur_bid = fx.get("tur_bid", 0)
+    tur_ask = fx.get("tur_ask", 0)
+    tur_prev = fx.get("tur_prev", 0)
     change = fx["change"]
     series = fx.get("series")
     fetched = fx.get("fetched_at")
 
-    def _fx_fmt(v):
+    def _fx(v):
         return f"R${v:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     arrow = "▲" if change > 0 else ("▼" if change < 0 else "■")
@@ -928,34 +931,40 @@ def _render_macro_panel(T: dict) -> None:
             date=fetched.strftime("%d/%m"),
             time=fetched.strftime("%H:%M"),
         )
-        ts_html = (
-            f"<div style='font-size:.66rem;color:#6e7681;margin-top:6px;'>"
-            f"🕒 {_ts}</div>"
-        )
+        ts_html = f"<div style='font-size:.62rem;color:#6e7681;margin-top:6px;'>🕒 {_ts}</div>"
 
-    prev = fx.get("prev", 0)
-    _row_style = "display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;"
+    _hdr = "color:#6e7681;font-size:.62rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;padding-bottom:4px;"
+    _cell = "padding:3px 0;font-size:.82rem;text-align:right;"
+    _lbl = "padding:3px 0;font-size:.72rem;color:#8b949e;"
+    _gold_cell = "padding:3px 0;font-size:.88rem;text-align:right;font-weight:800;color:#d4af37;"
+
     st.markdown(
         f"<div style='background:#161b22;border:1px solid #21262d;"
-        f"border-radius:10px;padding:10px 12px;margin-top:2px;'>"
-        f"<div style='font-size:.7rem;color:#6e7681;margin-bottom:4px;'>"
+        f"border-radius:10px;padding:10px 10px 6px;margin-top:2px;'>"
+        f"<div style='font-size:.7rem;color:#6e7681;margin-bottom:6px;'>"
         f"{T['macro_usdbrl_label']}</div>"
-        f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
-        f"<span style='font-size:.72rem;color:#6e7681;'>{T['fx_prev_close']}</span>"
-        f"<span style='font-size:.85rem;font-weight:600;color:#8b949e;'>{_fx_fmt(prev)}</span></div>"
-        f"<div style='{_row_style}border-bottom:1px solid #21262d;"
-        f"background:rgba(212,175,55,.05);border-radius:4px;padding:5px 4px;margin:2px 0;'>"
-        f"<span style='font-size:.75rem;color:#d4af37;font-weight:700;'>{T['fx_online']}</span>"
-        f"<span style='font-size:1rem;font-weight:800;color:#d4af37;'>{_fx_fmt(ask)}</span></div>"
-        f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
-        f"<span style='font-size:.75rem;color:#8b949e;'>{T['fx_sell']}</span>"
-        f"<span style='font-size:.95rem;font-weight:700;color:#e6edf3;'>{_fx_fmt(ask)}</span></div>"
-        f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
-        f"<span style='font-size:.75rem;color:#8b949e;'>{T['fx_buy']}</span>"
-        f"<span style='font-size:.95rem;font-weight:700;color:#e6edf3;'>{_fx_fmt(bid)}</span></div>"
-        f"<div style='{_row_style}'>"
-        f"<span style='font-size:.75rem;color:#8b949e;'>{T['fx_avg']}</span>"
-        f"<span style='font-size:.95rem;font-weight:700;color:#e6edf3;'>{_fx_fmt(avg)}</span></div>"
+        f"<table style='width:100%;border-collapse:collapse;'>"
+        f"<tr style='border-bottom:1px solid #30363d;'>"
+        f"<td style='{_hdr}'></td>"
+        f"<td style='{_hdr}text-align:right;'>{T['fx_commercial']}</td>"
+        f"<td style='{_hdr}text-align:right;'>{T['fx_tourism']}</td></tr>"
+        f"<tr style='border-bottom:1px solid #21262d;'>"
+        f"<td style='{_lbl}'>{T['fx_prev_close']}</td>"
+        f"<td style='{_cell}color:#6e7681;'>{_fx(com_prev)}</td>"
+        f"<td style='{_cell}color:#6e7681;'>{_fx(tur_prev)}</td></tr>"
+        f"<tr style='border-bottom:1px solid #21262d;background:rgba(212,175,55,.04);'>"
+        f"<td style='{_lbl}color:#d4af37;font-weight:700;'>{T['fx_online']}</td>"
+        f"<td style='{_gold_cell}'>{_fx(com_ask)}</td>"
+        f"<td style='{_gold_cell}'>{_fx(tur_ask)}</td></tr>"
+        f"<tr style='border-bottom:1px solid #21262d;'>"
+        f"<td style='{_lbl}'>{T['fx_sell']}</td>"
+        f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(com_ask)}</td>"
+        f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(tur_ask)}</td></tr>"
+        f"<tr>"
+        f"<td style='{_lbl}'>{T['fx_buy']}</td>"
+        f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(com_bid)}</td>"
+        f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(tur_bid)}</td></tr>"
+        f"</table>"
         f"<div style='text-align:right;margin-top:4px;'>"
         f"<span style='font-size:.78rem;font-weight:700;color:{color};'>"
         f"{arrow} {change:+.2f}%</span></div>"
@@ -963,42 +972,17 @@ def _render_macro_panel(T: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    # Gráfico dólar venda (7 dias)
+    # Gráfico dólar comercial venda (7 dias) — usando st.line_chart para compatibilidade mobile
     if series is not None and len(series) >= 2:
-        try:
-            spark = go.Figure()
-            spark.add_trace(go.Scatter(
-                x=list(series.index), y=list(series.values),
-                mode="lines",
-                line=dict(color=color, width=1.8, shape="spline", smoothing=.5),
-                fill="tozeroy",
-                fillcolor=("rgba(63,185,80,.12)" if change >= 0 else "rgba(248,81,73,.12)"),
-                hovertemplate="%{x|%d %b}<br>R$ %{y:.4f}<extra></extra>",
-            ))
-            y_min = float(series.min())
-            y_max = float(series.max())
-            pad = (y_max - y_min) * 0.15 if y_max > y_min else 0.05
-            spark.update_layout(
-                height=90,
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=0, r=0, t=2, b=14),
-                showlegend=False,
-                xaxis=dict(
-                    visible=True, showgrid=False, zeroline=False, showline=False,
-                    tickfont=dict(color="#6e7681", size=8),
-                    tickformat="%d/%m", nticks=3,
-                ),
-                yaxis=dict(visible=False, range=[y_min - pad, y_max + pad]),
-                hovermode="x unified",
-            )
-            st.caption(T["fx_chart_label"])
-            st.plotly_chart(spark, use_container_width=True,
-                            config={"displayModeBar": False})
-        except Exception:
-            pass
+        st.caption(T["fx_chart_label"])
+        _chart_df = pd.DataFrame({
+            T["fx_commercial"]: series.values,
+        }, index=series.index)
+        _chart_df.index = _chart_df.index.strftime("%d/%m")
+        st.line_chart(_chart_df, height=100)
+
     st.markdown(
-        f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
+        f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:2px;'>"
         f"{T['fx_source']}</div>",
         unsafe_allow_html=True,
     )
@@ -2450,10 +2434,10 @@ def main() -> None:
         var fab = doc.createElement('div');
         fab.id = 'eg-fab-injected';
         fab.innerHTML = '{_fab_hint}<br>{_fab_dollar}<br>{_fab_pension}<br>{_fab_stocks}';
-        fab.style.cssText = 'display:none;position:fixed;top:10px;left:10px;z-index:999999;'
+        fab.style.cssText = 'display:none;position:fixed;top:10px;right:10px;z-index:999999;'
             + 'background:linear-gradient(135deg,#b8941f,#d4af37);color:#0d1117;'
-            + 'border-radius:14px;padding:10px 14px;font-size:12px;font-weight:800;'
-            + 'box-shadow:0 4px 20px rgba(212,175,55,.5);line-height:1.6;text-align:left;'
+            + 'border-radius:14px;padding:8px 12px;font-size:11px;font-weight:800;'
+            + 'box-shadow:0 4px 20px rgba(212,175,55,.5);line-height:1.5;text-align:center;'
             + 'cursor:pointer;font-family:Inter,system-ui,sans-serif;';
         fab.onclick = function() {{
             var openBtn = doc.querySelector('[data-testid="collapsedControl"]');

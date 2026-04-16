@@ -296,13 +296,13 @@ def get_global_indicators() -> list:
 
 def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
     """
-    Cotação USD/BRL compra/venda + histórico de 7 dias (venda) para sparkline.
-    Tenta BCB PTAX primeiro; fallback via yfinance USDBRL=X.
+    Cotação USD/BRL comercial + turismo, histórico 7d do comercial.
+    BCB PTAX para comercial; turismo = comercial * spread (~4%).
     """
     import requests as _req
 
     bid = ask = None
-    # ── BCB PTAX (compra/venda oficial) ──────────────────────────────────────
+    # ── BCB PTAX (comercial) ─────────────────────────────────────────────────
     try:
         _today = pd.Timestamp.now().strftime("%m-%d-%Y")
         _url = (
@@ -319,7 +319,7 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"BCB PTAX falhou: {e}")
 
-    # ── yfinance fallback + sparkline ────────────────────────────────────────
+    # ── yfinance (comercial) + sparkline ─────────────────────────────────────
     try:
         tk = yf.Ticker("USDBRL=X")
         hist = tk.history(period="1mo", interval="1d", auto_adjust=True)
@@ -349,19 +349,22 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
 
     if ask is None:
         return None
-
     if bid is None:
         bid = round(ask * 0.995, 4)
-
-    avg = round((bid + ask) / 2, 4)
 
     prev = float(series.iloc[-2]) if series is not None and len(series) >= 2 else ask
     chg = ((ask - prev) / prev * 100) if prev else 0.0
 
+    TURISMO_SPREAD = 0.04
+    tur_bid = round(bid * (1 + TURISMO_SPREAD), 4)
+    tur_ask = round(ask * (1 + TURISMO_SPREAD), 4)
+    prev_tur = round(prev * (1 + TURISMO_SPREAD), 4)
+
     return {
-        "bid": bid, "ask": ask, "avg": avg,
-        "last": ask, "prev": prev, "change": chg,
-        "series": series,
+        "com_bid": bid, "com_ask": ask, "com_prev": prev,
+        "tur_bid": tur_bid, "tur_ask": tur_ask, "tur_prev": prev_tur,
+        "change": chg, "series": series,
+        "last": ask, "prev": prev,
         "fetched_at": pd.Timestamp.now(tz="America/Sao_Paulo").tz_localize(None),
     }
 
