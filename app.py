@@ -1249,6 +1249,15 @@ def render_sidebar(user: dict, T: dict) -> tuple:
             unsafe_allow_html=True,
         )
 
+        # ── Language selector (top right) ────────────────────────────────────
+        lang_names = [TRANSLATIONS[l]["lang_name"] for l in SUPPORTED_LANGS]
+        cur_idx    = SUPPORTED_LANGS.index(st.session_state.get("lang", "pt"))
+        chosen     = st.selectbox("lang_sb", lang_names, index=cur_idx, label_visibility="collapsed", key="sb_lang")
+        new_lang   = SUPPORTED_LANGS[lang_names.index(chosen)]
+        if new_lang != st.session_state.get("lang", "pt"):
+            st.session_state.lang = new_lang
+            st.rerun()
+
         # Credit badge
         is_admin = user.get("is_admin", False)
         is_anon  = user.get("is_anonymous", False)
@@ -1413,30 +1422,18 @@ def render_sidebar(user: dict, T: dict) -> tuple:
             )
 
         # ══════════════════════════════════════════════════════════════════════
-        # 3. HUB DE PREVIDÊNCIA — Prevdow + Nitro Prev (IFM)
-        # ══════════════════════════════════════════════════════════════════════
-        _render_prevdow_panel(T)
-        _render_nitro_panel(T)
-
-        # ══════════════════════════════════════════════════════════════════════
-        # 4. MACRO PANEL — USD/BRL live rate + 7d sparkline
+        # 3. MACRO PANEL — USD/BRL live rate + 7d sparkline
         # ══════════════════════════════════════════════════════════════════════
         st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
         _render_macro_panel(T)
 
-        st.divider()
+        # ══════════════════════════════════════════════════════════════════════
+        # 4. HUB DE PREVIDÊNCIA — Prevdow + Nitro Prev (IFM)
+        # ══════════════════════════════════════════════════════════════════════
+        _render_prevdow_panel(T)
+        _render_nitro_panel(T)
 
-        # ══════════════════════════════════════════════════════════════════════
-        # 2. LANGUAGE SELECTOR
-        # ══════════════════════════════════════════════════════════════════════
-        st.markdown(f'<div class="eg-section-header">{T["lang_select"]}</div>', unsafe_allow_html=True)
-        lang_names = [TRANSLATIONS[l]["lang_name"] for l in SUPPORTED_LANGS]
-        cur_idx    = SUPPORTED_LANGS.index(st.session_state.get("lang", "pt"))
-        chosen     = st.selectbox("lang_sb", lang_names, index=cur_idx, label_visibility="collapsed", key="sb_lang")
-        new_lang   = SUPPORTED_LANGS[lang_names.index(chosen)]
-        if new_lang != st.session_state.get("lang", "pt"):
-            st.session_state.lang = new_lang
-            st.rerun()
+        st.divider()
 
         # ══════════════════════════════════════════════════════════════════════
         # 3. LAYOUT TOGGLE — right below language
