@@ -541,6 +541,11 @@ def _maybe_pension_alert(T: dict) -> None:
         bar.onclick = function() {{
             var openBtn = doc.querySelector('[data-testid="collapsedControl"]');
             if (openBtn) openBtn.click();
+            setTimeout(function() {{
+                var sidebar = doc.querySelector('[data-testid="stSidebar"]');
+                var anchor = sidebar ? sidebar.querySelector('#sidebar-prevdow') : null;
+                if (anchor) anchor.scrollIntoView({{behavior:'smooth', block:'start'}});
+            }}, 500);
             bar.remove();
         }};
         doc.body.appendChild(bar);
@@ -1453,6 +1458,7 @@ def render_sidebar(user: dict, T: dict) -> tuple:
         # ══════════════════════════════════════════════════════════════════════
         # 2. HUB DE PREVIDÊNCIA — Prevdow + Nitro Prev (IFM)
         # ══════════════════════════════════════════════════════════════════════
+        st.markdown('<div id="sidebar-prevdow"></div>', unsafe_allow_html=True)
         _render_prevdow_panel(T)
         _render_nitro_panel(T)
 
