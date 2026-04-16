@@ -592,6 +592,11 @@ def _render_briefing(T: dict) -> None:
                 f"{T['briefing_copy_btn']}</a>",
                 unsafe_allow_html=True,
             )
+        st.markdown(
+            "<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
+            "Fonte: Yahoo Finance · BCB · Fed</div>",
+            unsafe_allow_html=True,
+        )
 
 
 def _render_global_bar(T: dict) -> None:
@@ -756,8 +761,11 @@ def _render_prevdow_panel(T: dict) -> None:
             unsafe_allow_html=True,
         )
 
-    # ── Footer note ───────────────────────────────────────────────────────────
-    st.caption(T["prevdow_note"])
+    st.markdown(
+        "<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
+        "Fonte: Portal Prevdow</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _render_nitro_panel(T: dict) -> None:
@@ -828,7 +836,11 @@ def _render_nitro_panel(T: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    st.caption(T["nitro_note"])
+    st.markdown(
+        "<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
+        "Fonte: IFM Previdência</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _render_macro_panel(T: dict) -> None:
@@ -925,6 +937,11 @@ def _render_macro_panel(T: dict) -> None:
                             config={"displayModeBar": False})
         except Exception:
             pass
+    st.markdown(
+        "<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
+        "Fonte: BCB PTAX · Yahoo Finance</div>",
+        unsafe_allow_html=True,
+    )
 
 
 @st.fragment
