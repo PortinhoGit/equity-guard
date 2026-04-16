@@ -13,6 +13,7 @@ from analytics import register_visit, get_stats, get_daily_series
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
@@ -79,7 +80,15 @@ st.markdown(
     <meta name="twitter:title" content="Equity Guard — Terminal Financeiro"/>
     <meta name="twitter:description" content="Análise técnica e fundamentalista de ações da B3 e indicadores macroeconômicos."/>
     <meta name="twitter:image" content="{_OG_IMAGE_URL}"/>
-    </head>""",
+    </head>
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-BBKMK9TL6P"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){{dataLayer.push(arguments);}}
+      gtag('js', new Date());
+      gtag('config', 'G-BBKMK9TL6P');
+    </script>""",
     unsafe_allow_html=True,
 )
 
@@ -2459,6 +2468,27 @@ def main() -> None:
         st.session_state.user = _make_anon_user()
 
     T    = get_translator()
+
+    # ── Google Analytics (injeta no parent DOM para garantir execução) ────────
+    if "ga_injected" not in st.session_state:
+        import streamlit.components.v1 as _ga_comp
+        _ga_comp.html("""
+        <script>
+        (function() {
+            var doc = window.parent.document;
+            if (doc.getElementById('eg-ga-script')) return;
+            var s1 = doc.createElement('script');
+            s1.id = 'eg-ga-script';
+            s1.async = true;
+            s1.src = 'https://www.googletagmanager.com/gtag/js?id=G-BBKMK9TL6P';
+            doc.head.appendChild(s1);
+            var s2 = doc.createElement('script');
+            s2.textContent = "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-BBKMK9TL6P');";
+            doc.head.appendChild(s2);
+        })();
+        </script>
+        """, height=0)
+        st.session_state.ga_injected = True
 
     # ── FAB — botão flutuante que abre/fecha sidebar no mobile ─────────────
     _fab_hint = T["mobile_hint"]
