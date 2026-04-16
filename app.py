@@ -229,21 +229,19 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 }
 /* All widths: ensure tables never break layout horizontally */
 [data-testid="stDataFrame"] > div { overflow-x: auto !important; }
-/* FAB — floating action button to open sidebar on mobile */
-.eg-fab {
-    position: fixed; top: 60px; left: 12px; z-index: 99999;
-    height: auto; border-radius: 12px;
-    background: linear-gradient(135deg,#b8941f,#d4af37);
-    color: #0d1117; border: none; cursor: pointer;
-    font-size: .7rem; font-weight: 800; letter-spacing: .3px;
-    box-shadow: 0 4px 16px rgba(212,175,55,.4);
-    display: flex; flex-direction: column; align-items: center;
-    gap: 2px; padding: 8px 10px;
-    transition: transform .2s, box-shadow .2s;
+/* Mobile hint banner */
+.eg-mobile-hint {
+    display: none; background: rgba(212,175,55,.12);
+    border: 1px solid #d4af37; border-radius: 10px;
+    padding: 10px 14px; text-align: center;
+    font-size: .82rem; color: #d4af37; font-weight: 700;
+    margin-bottom: 10px; animation: eg-pulse 2s ease-in-out 3;
 }
-.eg-fab:hover { transform: scale(1.05); box-shadow: 0 6px 24px rgba(212,175,55,.6); }
-.eg-fab span { font-size: 1.1rem; line-height: 1; }
-@media (min-width: 769px) { .eg-fab { display: none; } }
+@keyframes eg-pulse {
+    0%, 100% { box-shadow: none; }
+    50% { box-shadow: 0 0 12px rgba(212,175,55,.4); }
+}
+@media (max-width: 768px) { .eg-mobile-hint { display: block; } }
 /* ── Z-index defensivo: radios/headers acima do container Plotly ─────────── */
 [data-testid="stRadio"], .eg-section-header {
     position: relative !important;
@@ -2417,14 +2415,10 @@ def main() -> None:
 
     # ── FAB — botão flutuante para abrir sidebar no mobile ───────────────────
     st.markdown(
-        """<button class="eg-fab" onclick="
-            var btn = window.parent.document.querySelector('[data-testid=\\'collapsedControl\\']');
-            if(btn) btn.click();
-        " title="Abrir menu">
-            <span>💲</span>Dólar
-            <span>🏦</span>Previd.
-            <span>📊</span>Ações
-        </button>""",
+        '<div class="eg-mobile-hint">'
+        '≫ Toque na seta no canto superior para acessar '
+        '💲 Dólar · 🏦 Previdência · 📊 Ações'
+        '</div>',
         unsafe_allow_html=True,
     )
 
