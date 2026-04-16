@@ -2302,7 +2302,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
 
     # ── Glossary expander ─────────────────────────────────────────────────────
     st.markdown('<div class="eg-nav-anchor" id="sec-indicadores"></div>', unsafe_allow_html=True)
-    with st.expander(T["glossary_title"]):
+    with st.expander(T["glossary_title"], expanded=True):
         _g1, _g2 = st.columns(2)
         _gitems = T["glossary_items"]
         _gmid   = len(_gitems) // 2 + len(_gitems) % 2
