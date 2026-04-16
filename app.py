@@ -1805,11 +1805,24 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     if avg_div > 0 and price and price > 0:
         _g1, _g2, _g3 = st.columns([2, 2, 3])
         with _g1:
-            _goal_target = st.number_input(
+            _goal_raw = st.number_input(
                 f"{T['goal_input_label']} ({cs})",
                 min_value=0.0, value=1000.0, step=100.0,
                 key="goal_target", format="%.2f",
+                label_visibility="collapsed",
             )
+            _lang = st.session_state.get("lang", "pt")
+            if _lang in ("pt", "es"):
+                _goal_display = f"{cs}{_goal_raw:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            else:
+                _goal_display = f"{cs}{_goal_raw:,.2f}"
+            st.markdown(
+                f"<div style='background:#161b22;border:1px solid #30363d;border-radius:8px;"
+                f"padding:10px 14px;text-align:right;font-size:1rem;font-weight:700;"
+                f"color:#e6edf3;margin-top:-10px;'>{_goal_display}</div>",
+                unsafe_allow_html=True,
+            )
+            _goal_target = _goal_raw
         with _g2:
             _freq_opts = T["goal_freq_options"]
             _freq_idx  = st.selectbox(
