@@ -2420,31 +2420,34 @@ def main() -> None:
     _fab_stocks = T["mobile_stocks"]
     import streamlit.components.v1 as _components
     _components.html(f"""
-    <style>
-        #eg-fab {{
-            display: none; position: fixed; top: 10px; left: 10px; z-index: 999999;
-            background: linear-gradient(135deg,#b8941f,#d4af37);
-            color: #0d1117; border-radius: 14px; border: none;
-            padding: 10px 14px; font-size: 12px; font-weight: 800;
-            box-shadow: 0 4px 20px rgba(212,175,55,.5);
-            line-height: 1.6; text-align: left; cursor: pointer;
-            font-family: 'Inter', system-ui, sans-serif;
-        }}
-        #eg-fab:active {{ transform: scale(0.95); }}
-        @media (max-width: 768px) {{ #eg-fab {{ display: block; }} }}
-    </style>
-    <button id="eg-fab" onclick="
+    <script>
+    (function() {{
         var doc = window.parent.document;
-        var openBtn = doc.querySelector('[data-testid=\\'collapsedControl\\']');
-        var closeBtn = doc.querySelector('[data-testid=\\'stSidebarCollapseButton\\'] button');
-        if (openBtn) openBtn.click();
-        else if (closeBtn) closeBtn.click();
-    ">
-        {_fab_hint}<br>
-        {_fab_dollar}<br>
-        {_fab_pension}<br>
-        {_fab_stocks}
-    </button>
+        // Inject the FAB directly into the parent document
+        if (doc.getElementById('eg-fab-injected')) return;
+        var fab = doc.createElement('div');
+        fab.id = 'eg-fab-injected';
+        fab.innerHTML = '{_fab_hint}<br>{_fab_dollar}<br>{_fab_pension}<br>{_fab_stocks}';
+        fab.style.cssText = 'display:none;position:fixed;top:10px;left:10px;z-index:999999;'
+            + 'background:linear-gradient(135deg,#b8941f,#d4af37);color:#0d1117;'
+            + 'border-radius:14px;padding:10px 14px;font-size:12px;font-weight:800;'
+            + 'box-shadow:0 4px 20px rgba(212,175,55,.5);line-height:1.6;text-align:left;'
+            + 'cursor:pointer;font-family:Inter,system-ui,sans-serif;';
+        fab.onclick = function() {{
+            var openBtn = doc.querySelector('[data-testid="collapsedControl"]');
+            var closeBtn = doc.querySelector('[data-testid="stSidebarCollapseButton"] button');
+            if (openBtn) openBtn.click();
+            else if (closeBtn) closeBtn.click();
+        }};
+        doc.body.appendChild(fab);
+        // Show only on mobile
+        function checkWidth() {{
+            fab.style.display = window.parent.innerWidth <= 768 ? 'block' : 'none';
+        }}
+        checkWidth();
+        window.parent.addEventListener('resize', checkWidth);
+    }})();
+    </script>
     """, height=0)
     user = st.session_state.user
 
