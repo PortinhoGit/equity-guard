@@ -443,8 +443,9 @@ def _fetch_fx_usdbrl() -> Optional[dict]:
 def _render_share_buttons() -> None:
     """Social share buttons with correct share URLs + email + copy."""
     import urllib.parse as _url
-    _raw_url = "https://equityguard.streamlit.app/"
-    _app_url = _url.quote(_raw_url)
+    _share_url = "https://portinhogit.github.io/equity-guard/"
+    _raw_url = _share_url
+    _app_url = _url.quote(_share_url)
     _title = _url.quote("Equity Guard — Terminal Financeiro de ações da B3")
     _body = _url.quote(f"Confira o Equity Guard, terminal financeiro gratuito para ações da B3:\n{_raw_url}")
 
