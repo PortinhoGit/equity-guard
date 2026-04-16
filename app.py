@@ -980,14 +980,39 @@ def _render_macro_panel(T: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    # Gráfico dólar comercial venda (7 dias) — usando st.line_chart para compatibilidade mobile
+    # Gráfico dólar comercial venda (7 dias)
     if series is not None and len(series) >= 2:
         st.caption(_t_chart)
-        _chart_df = pd.DataFrame({
-            _t_com: series.values,
-        }, index=series.index)
-        _chart_df.index = _chart_df.index.strftime("%d/%m")
-        st.line_chart(_chart_df, height=100)
+        _y_min = float(series.min())
+        _y_max = float(series.max())
+        _pad = (_y_max - _y_min) * 0.3 if _y_max > _y_min else 0.02
+        _fig_fx = go.Figure()
+        _fig_fx.add_trace(go.Scatter(
+            x=[d.strftime("%d/%m") for d in series.index],
+            y=list(series.values),
+            mode="lines+markers",
+            line=dict(color="#d4af37", width=2),
+            marker=dict(size=4, color="#d4af37"),
+            fill="tozeroy",
+            fillcolor="rgba(212,175,55,.08)",
+            hovertemplate="R$ %{y:.4f}<extra></extra>",
+        ))
+        _fig_fx.update_layout(
+            height=120,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=0, t=0, b=0),
+            showlegend=False,
+            xaxis=dict(showgrid=False, tickfont=dict(color="#6e7681", size=9)),
+            yaxis=dict(
+                range=[_y_min - _pad, _y_max + _pad],
+                showgrid=True, gridcolor="#21262d",
+                tickfont=dict(color="#6e7681", size=9),
+                tickformat=".4f",
+            ),
+            hovermode="x unified",
+        )
+        st.plotly_chart(_fig_fx, use_container_width=True, config={"displayModeBar": False})
 
     st.markdown(
         f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:2px;'>"
