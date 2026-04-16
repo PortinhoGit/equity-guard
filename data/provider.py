@@ -450,6 +450,15 @@ def get_dividend_calendar(ticker: str, n: int = 15) -> pd.DataFrame:
         stock = yf.Ticker(ticker_sa)
         divs  = stock.dividends
 
+        if divs is None or divs.empty:
+            logger.warning(f"stock.dividends vazio no calendário para {ticker_sa}, tentando fallback")
+            raw = stock.history(period="5y", auto_adjust=True)
+            if not raw.empty and "Dividends" in raw.columns:
+                divs = raw["Dividends"]
+                divs = divs[divs > 0]
+            else:
+                return pd.DataFrame()
+
         if divs.empty:
             return pd.DataFrame()
 
