@@ -687,32 +687,33 @@ def _render_prevdow_panel(T: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    # ── Returns body (white on dark, red accents) ─────────────────────────────
-    def _row(label: str, m_val: float, y_val: float) -> str:
-        m_c = "#3fb950" if m_val > 0 else ("#f85149" if m_val < 0 else "#8b949e")
-        y_c = "#3fb950" if y_val > 0 else ("#f85149" if y_val < 0 else "#8b949e")
-        return (
-            "<div style='display:flex;justify-content:space-between;"
-            "align-items:baseline;padding:6px 0;border-bottom:1px dashed #21262d;'>"
-            f"<span style='font-size:.76rem;color:#e6edf3;font-weight:600;'>{label}</span>"
-            "<span style='text-align:right;'>"
-            f"<span style='font-size:.82rem;font-weight:800;color:{m_c};'>{m_val:+.2f}%</span>"
-            f"<span style='font-size:.62rem;color:#6e7681;display:block;'>{T['prevdow_month']}</span>"
-            "</span>"
-            "<span style='text-align:right;'>"
-            f"<span style='font-size:.82rem;font-weight:800;color:{y_c};'>{y_val:+.2f}%</span>"
-            f"<span style='font-size:.62rem;color:#6e7681;display:block;'>{T['prevdow_year']}</span>"
-            "</span>"
-            "</div>"
-        )
+    # ── Returns table (Perfil | No mês | No ano) ──────────────────────────────
+    def _val_html(v: float) -> str:
+        c = "#3fb950" if v > 0 else ("#f85149" if v < 0 else "#8b949e")
+        return f"<span style='font-weight:800;color:{c};'>{v:+.2f}%</span>"
 
-    rows_html = _row(T["prevdow_cdi_label"],      d["cdi_month"],      d["cdi_year"])
-    rows_html += _row(T["prevdow_balanced_label"], d["balanced_month"], d["balanced_year"])
+    _hdr = "color:#6e7681;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;"
+    _cell = "padding:6px 0;font-size:.82rem;"
     st.markdown(
         "<div style='background:#161b22;border:1px solid #c0392b;"
-        "border-top:none;border-radius:0 0 10px 10px;padding:4px 14px 10px;'>"
-        f"{rows_html}"
-        "</div>",
+        "border-top:none;border-radius:0 0 10px 10px;padding:8px 14px 10px;'>"
+        "<table style='width:100%;border-collapse:collapse;'>"
+        f"<tr style='border-bottom:1px solid #30363d;'>"
+        f"<td style='{_hdr}padding-bottom:6px;'>Perfil</td>"
+        f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_month']}</td>"
+        f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_year']}</td>"
+        f"</tr>"
+        f"<tr style='border-bottom:1px dashed #21262d;'>"
+        f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_cdi_label']}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d['cdi_month'])}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d['cdi_year'])}</td>"
+        f"</tr>"
+        f"<tr>"
+        f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_balanced_label']}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d['balanced_month'])}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d['balanced_year'])}</td>"
+        f"</tr>"
+        "</table></div>",
         unsafe_allow_html=True,
     )
 
@@ -786,32 +787,33 @@ def _render_nitro_panel(T: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    # ── Returns body (reuses prevdow row labels for consistency) ──────────────
-    def _row(label: str, m_val: float, y_val: float) -> str:
-        m_c = "#3fb950" if m_val > 0 else ("#f85149" if m_val < 0 else "#8b949e")
-        y_c = "#3fb950" if y_val > 0 else ("#f85149" if y_val < 0 else "#8b949e")
-        return (
-            "<div style='display:flex;justify-content:space-between;"
-            "align-items:baseline;padding:6px 0;border-bottom:1px dashed #21262d;'>"
-            f"<span style='font-size:.76rem;color:#e6edf3;font-weight:600;'>{label}</span>"
-            "<span style='text-align:right;'>"
-            f"<span style='font-size:.82rem;font-weight:800;color:{m_c};'>{m_val:+.2f}%</span>"
-            f"<span style='font-size:.62rem;color:#6e7681;display:block;'>{T['prevdow_month']}</span>"
-            "</span>"
-            "<span style='text-align:right;'>"
-            f"<span style='font-size:.82rem;font-weight:800;color:{y_c};'>{y_val:+.2f}%</span>"
-            f"<span style='font-size:.62rem;color:#6e7681;display:block;'>{T['prevdow_year']}</span>"
-            "</span>"
-            "</div>"
-        )
+    # ── Returns table (Perfil | No mês | No ano) ──────────────────────────────
+    def _val_html(v: float) -> str:
+        c = "#3fb950" if v > 0 else ("#f85149" if v < 0 else "#8b949e")
+        return f"<span style='font-weight:800;color:{c};'>{v:+.2f}%</span>"
 
-    rows_html = _row(T["prevdow_cdi_label"],      d["cdi_month"],      d["cdi_year"])
-    rows_html += _row(T["prevdow_balanced_label"], d["balanced_month"], d["balanced_year"])
+    _hdr = "color:#6e7681;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;"
+    _cell = "padding:6px 0;font-size:.82rem;"
     st.markdown(
         f"<div style='background:#161b22;border:1px solid {NAVY};"
-        f"border-top:none;border-radius:0 0 10px 10px;padding:4px 14px 10px;'>"
-        f"{rows_html}"
-        "</div>",
+        f"border-top:none;border-radius:0 0 10px 10px;padding:8px 14px 10px;'>"
+        "<table style='width:100%;border-collapse:collapse;'>"
+        f"<tr style='border-bottom:1px solid #30363d;'>"
+        f"<td style='{_hdr}padding-bottom:6px;'>Perfil</td>"
+        f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_month']}</td>"
+        f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_year']}</td>"
+        f"</tr>"
+        f"<tr style='border-bottom:1px dashed #21262d;'>"
+        f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_cdi_label']}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d['cdi_month'])}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d['cdi_year'])}</td>"
+        f"</tr>"
+        f"<tr>"
+        f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_balanced_label']}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d['balanced_month'])}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d['balanced_year'])}</td>"
+        f"</tr>"
+        "</table></div>",
         unsafe_allow_html=True,
     )
 
