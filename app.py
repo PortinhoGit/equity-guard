@@ -513,10 +513,8 @@ def _fmt_index_value(val: float, locale: str) -> str:
 
 def _maybe_pension_alert(T: dict) -> None:
     """
-    Fires a one-time toast after the 15th of the month notifying the user
-    that new PrevDow / Nitro Prev returns may be available.
-    Uses session_state to avoid spamming on every rerun. Resets when the
-    PREVDOW_DATA["data_base"] string changes (i.e., next month's update).
+    After the 15th, shows a clickable banner that opens the sidebar (pension).
+    Resets when PREVDOW_DATA["data_base"] changes.
     """
     today = pd.Timestamp.now()
     if today.day < 15:
@@ -525,13 +523,31 @@ def _maybe_pension_alert(T: dict) -> None:
     seen_key = f"_pension_seen_{ref}"
     if not ref or st.session_state.get(seen_key):
         return
-    try:
-        st.toast(
-            T["pension_alert_toast"].format(ref=ref),
-            icon="🏦",
-        )
-    except Exception:
-        pass  # st.toast may not be available on very old Streamlit
+
+    import streamlit.components.v1 as _comp
+    _msg = T["pension_alert_toast"].format(ref=ref)
+    _comp.html(f"""
+    <script>
+    (function() {{
+        var doc = window.parent.document;
+        if (doc.getElementById('eg-pension-alert')) return;
+        var bar = doc.createElement('div');
+        bar.id = 'eg-pension-alert';
+        bar.innerHTML = '🏦 {_msg} — <u>ver agora</u> ✕';
+        bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;'
+            + 'background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;'
+            + 'padding:10px 16px;font-size:13px;font-weight:700;text-align:center;'
+            + 'cursor:pointer;font-family:Inter,system-ui,sans-serif;';
+        bar.onclick = function() {{
+            var openBtn = doc.querySelector('[data-testid="collapsedControl"]');
+            if (openBtn) openBtn.click();
+            bar.remove();
+        }};
+        doc.body.appendChild(bar);
+        setTimeout(function() {{ if (bar.parentNode) bar.remove(); }}, 15000);
+    }})();
+    </script>
+    """, height=0)
     st.session_state[seen_key] = True
 
 
