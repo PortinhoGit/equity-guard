@@ -531,8 +531,11 @@ def get_full_data(ticker: str, period: str = "2y") -> Tuple[
     except Exception as e:
         logger.error(f"Erro ao buscar preços para {ticker_sa}: {e}")
 
-    # ── 2. Dividendos (fonte primária: stock.dividends) ──────────────────────
+    # ── 2. Dividendos — tenta stock.dividends e history(5y), usa o mais completo
     dividends = None
+    divs_primary = None
+    divs_fallback = None
+
     try:
         divs = stock.dividends
         if divs is not None and not divs.empty:
@@ -541,24 +544,29 @@ def get_full_data(ticker: str, period: str = "2y") -> Tuple[
             cutoff = datetime.now() - timedelta(days=5 * 365)
             divs = divs[(divs.index >= cutoff) & (divs > 0)]
             if not divs.empty:
-                dividends = divs
+                divs_primary = divs
     except Exception as e:
         logger.warning(f"stock.dividends falhou para {ticker_sa}: {e}")
 
-    # ── 2b. Fallback: coluna "Dividends" do history(5y) ─────────────────────
-    if dividends is None:
-        try:
-            raw_5y = stock.history(period="5y", auto_adjust=True)
-            if not raw_5y.empty and "Dividends" in raw_5y.columns:
-                fb = raw_5y["Dividends"]
-                fb = fb[fb > 0]
-                if fb.index.tz is not None:
-                    fb.index = fb.index.tz_localize(None)
-                if not fb.empty:
-                    dividends = fb
-                    logger.info(f"Dividendos via fallback (history 5y) para {ticker_sa}")
-        except Exception as e:
-            logger.warning(f"Fallback history(5y) falhou para {ticker_sa}: {e}")
+    try:
+        raw_5y = stock.history(period="5y", auto_adjust=True)
+        if not raw_5y.empty and "Dividends" in raw_5y.columns:
+            fb = raw_5y["Dividends"]
+            fb = fb[fb > 0]
+            if fb.index.tz is not None:
+                fb.index = fb.index.tz_localize(None)
+            if not fb.empty:
+                divs_fallback = fb
+    except Exception as e:
+        logger.warning(f"history(5y) falhou para {ticker_sa}: {e}")
+
+    if divs_primary is not None and divs_fallback is not None:
+        dividends = divs_primary if len(divs_primary) >= len(divs_fallback) else divs_fallback
+    else:
+        dividends = divs_primary or divs_fallback
+
+    if dividends is not None:
+        logger.info(f"Dividendos para {ticker_sa}: {len(dividends)} registros, soma={dividends.sum():.2f}")
 
     # ── 3. Fundamentais ──────────────────────────────────────────────────────
     fundamentals = _empty_fundamentals(ticker)
