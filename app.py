@@ -726,44 +726,16 @@ def _render_prevdow_panel(T: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    # ── External link (portal oficial) ────────────────────────────────────────
-    try:
-        st.link_button(
-            T["prevdow_link"], d["url"],
-            use_container_width=True, type="secondary",
-        )
-    except Exception:
-        # Fallback: markdown link styled as button (older Streamlit)
-        st.markdown(
-            f"<a href='{d['url']}' target='_blank' style='display:block;"
-            f"text-align:center;background:#c0392b;color:#fff;"
-            f"padding:8px;border-radius:8px;font-size:.78rem;"
-            f"font-weight:700;text-decoration:none;margin-top:6px;'>"
-            f"{T['prevdow_link']}</a>",
-            unsafe_allow_html=True,
-        )
-
-    # ── WhatsApp share (deep link with pre-filled message) ────────────────────
-    _wa_text = T["prevdow_share_text"].format(
-        ref=d["data_base"],
-        cdi_m=d["cdi_month"], cdi_y=d["cdi_year"],
-        bal_m=d["balanced_month"], bal_y=d["balanced_year"],
-    ).replace("\\n", "\n")
-    _wa_url = f"https://wa.me/?text={_url.quote(_wa_text)}"
-    try:
-        st.link_button(
-            T["prevdow_share"], _wa_url,
-            use_container_width=True, type="primary",
-        )
-    except Exception:
-        st.markdown(
-            f"<a href='{_wa_url}' target='_blank' style='display:block;"
-            f"text-align:center;background:#25d366;color:#fff;"
-            f"padding:8px;border-radius:8px;font-size:.78rem;"
-            f"font-weight:700;text-decoration:none;margin-top:6px;'>"
-            f"{T['prevdow_share']}</a>",
-            unsafe_allow_html=True,
-        )
+    # ── Login button — same style as Nitro ──────────────────────────────────────
+    st.markdown(
+        f"<a href='{d['url']}' target='_blank' style='display:block;"
+        f"text-align:center;background:#c0392b;color:#fff;"
+        f"padding:10px 8px;border-radius:8px;font-size:.78rem;"
+        f"font-weight:800;text-decoration:none;margin-top:6px;"
+        f"border:1px solid #e74c3c;letter-spacing:.3px;'>"
+        f"🔒 Acessar Área do Participante</a>",
+        unsafe_allow_html=True,
+    )
 
     st.markdown(
         "<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
