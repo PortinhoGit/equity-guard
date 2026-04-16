@@ -2323,9 +2323,6 @@ def main() -> None:
     # ── 🗞️ Briefing de Fechamento (expander aberto por default) ────────────
     _render_briefing(T)
 
-    # ── Global indicators ribbon (Bloomberg-style top bar) ───────────────────
-    _render_global_bar(T)
-
     # ── Sidebar + analysis ───────────────────────────────────────────────────
     ticker, period, target_yield, clicked = render_sidebar(user, T)
 
