@@ -545,13 +545,20 @@ def get_full_data(ticker: str, period: str = "2y") -> Tuple[
     except Exception as e:
         logger.warning(f"stock.dividends falhou para {ticker_sa}: {e}")
 
-    # ── 2b. Fallback: coluna "Dividends" do history() ────────────────────────
-    if dividends is None and df is not None and "Dividends" in df.columns:
-        fb = df["Dividends"]
-        fb = fb[fb > 0]
-        if not fb.empty:
-            dividends = fb
-            logger.info(f"Dividendos via fallback (history) para {ticker_sa}")
+    # ── 2b. Fallback: coluna "Dividends" do history(5y) ─────────────────────
+    if dividends is None:
+        try:
+            raw_5y = stock.history(period="5y", auto_adjust=True)
+            if not raw_5y.empty and "Dividends" in raw_5y.columns:
+                fb = raw_5y["Dividends"]
+                fb = fb[fb > 0]
+                if fb.index.tz is not None:
+                    fb.index = fb.index.tz_localize(None)
+                if not fb.empty:
+                    dividends = fb
+                    logger.info(f"Dividendos via fallback (history 5y) para {ticker_sa}")
+        except Exception as e:
+            logger.warning(f"Fallback history(5y) falhou para {ticker_sa}: {e}")
 
     # ── 3. Fundamentais ──────────────────────────────────────────────────────
     fundamentals = _empty_fundamentals(ticker)
