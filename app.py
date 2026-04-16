@@ -439,6 +439,46 @@ def _fetch_fx_usdbrl() -> Optional[dict]:
     return get_fx_usdbrl()
 
 
+def _render_share_buttons() -> None:
+    """Social share buttons — WhatsApp, Facebook, X, LinkedIn, TikTok, Instagram, Truth Social."""
+    import urllib.parse as _url
+    _app_url = _url.quote("https://equityguard.streamlit.app/")
+    _title = _url.quote("Equity Guard — Terminal Financeiro de ações da B3")
+    _icons = [
+        ("WhatsApp", "#25d366", f"https://wa.me/?text={_title}%20{_app_url}",
+         "M.1" ),
+        ("Facebook", "#1877f2", f"https://www.facebook.com/sharer/sharer.php?u={_app_url}",
+         "f"),
+        ("X", "#e6edf3", f"https://twitter.com/intent/tweet?url={_app_url}&text={_title}",
+         "𝕏"),
+        ("LinkedIn", "#0a66c2", f"https://www.linkedin.com/sharing/share-offsite/?url={_app_url}",
+         "in"),
+        ("TikTok", "#e6edf3", f"https://www.tiktok.com/",
+         "♪"),
+        ("Instagram", "#e1306c", f"https://www.instagram.com/",
+         "📷"),
+        ("Truth Social", "#5448ee", f"https://truthsocial.com/",
+         "T"),
+    ]
+    btns = ""
+    for name, color, url, icon in _icons:
+        btns += (
+            f"<a href='{url}' target='_blank' title='{name}' style='"
+            f"display:inline-flex;align-items:center;justify-content:center;"
+            f"width:32px;height:32px;border-radius:50%;background:{color};"
+            f"color:#fff;font-size:.78rem;font-weight:800;text-decoration:none;"
+            f"transition:transform .2s,box-shadow .2s;'  "
+            f"onmouseover=\"this.style.transform='scale(1.15)';this.style.boxShadow='0 0 10px {color}80'\" "
+            f"onmouseout=\"this.style.transform='scale(1)';this.style.boxShadow='none'\">"
+            f"{icon}</a> "
+        )
+    st.markdown(
+        f"<div style='display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"
+        f"padding:6px 0;'>{btns}</div>",
+        unsafe_allow_html=True,
+    )
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _fetch_global_indicators() -> list:
     """Cached wrapper for the global indicators bar (5-min TTL)."""
@@ -2302,6 +2342,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         "</div>",
         unsafe_allow_html=True,
     )
+    _render_share_buttons()
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
@@ -2334,6 +2375,7 @@ def main() -> None:
         "</h1>",
         unsafe_allow_html=True,
     )
+    _render_share_buttons()
 
     # ── Navigation menu (topo da página, logo após o header) ────────────────
     _nav_items = [
