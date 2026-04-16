@@ -513,16 +513,17 @@ def _render_briefing(T: dict) -> None:
         with _bc1:
             brent_val = _fmt_val("Brent")
             wti_val = _fmt_val("WTI")
-            _fomc_html = f"<span style='color:#8b949e;font-size:.75rem;'>FOMC {_fmt_date_br(FED_NEXT_MEETING)}</span>"
-            _copom_html = f"<span style='color:#8b949e;font-size:.75rem;'>COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}</span>"
+            _aa = T.get("rate_annual", "a.a.")
+            _fed_label = f"🇺🇸 Fed Funds · FOMC {_fmt_date_br(FED_NEXT_MEETING)}"
+            _selic_label = f"🇧🇷 Selic · COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}"
             st.markdown(
                 f"<div style='background:#161b22;border:1px solid #30363d;"
                 f"border-radius:10px;padding:14px 16px;'>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
                 f"🏦 Juros</div>"
-                f"{_card('🇺🇸 Fed Funds', f'{FED_FUNDS_RATE:.2f}%', _fomc_html)}"
-                f"{_card('🇧🇷 Selic', f'{SELIC_RATE:.2f}%', _copom_html)}"
+                f"{_card(_fed_label, f'{FED_FUNDS_RATE:.2f}% {_aa}', '')}"
+                f"{_card(_selic_label, f'{SELIC_RATE:.2f}% {_aa}', '')}"
                 f"<div style='height:8px;'></div>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"

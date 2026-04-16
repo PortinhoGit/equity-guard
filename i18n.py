@@ -20,6 +20,7 @@ _PT: dict = {
     # ── Sidebar ─────────────────────────────────────────────────────────────
     "ticker_label": "Ticker",
     "custom_ticker_label": "Outro ticker",
+    "rate_annual": "a.a.",
     "period_label": "Período",
     "yield_slider": "Yield Mínimo Desejado (%)",
     "analyze_btn":  "🔍 Analisar",
@@ -355,6 +356,7 @@ _EN: dict = {
     "tagline":      "Value Analysis · Brazilian Market (B3)",
     "ticker_label": "Ticker",
     "custom_ticker_label": "Other ticker",
+    "rate_annual": "p.a.",
     "period_label": "Period",
     "yield_slider": "Minimum Desired Yield (%)",
     "analyze_btn":  "🔍 Analyze",
@@ -678,6 +680,7 @@ _ES: dict = {
     "tagline":      "Análisis de Valor · Mercado Brasileño (B3)",
     "ticker_label": "Ticker",
     "custom_ticker_label": "Otro ticker",
+    "rate_annual": "anual",
     "period_label": "Período",
     "yield_slider": "Rendimiento Mínimo Deseado (%)",
     "analyze_btn":  "🔍 Analizar",
