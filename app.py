@@ -636,10 +636,10 @@ def _render_global_bar(T: dict) -> None:
         f"border-radius:8px;padding:8px 14px;margin-top:8px;"
         f"font-size:.76rem;color:#8b949e;display:flex;"
         f"justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;'>"
-        f"<span>🇧🇷 <b style='color:#58a6ff;'>SELIC {SELIC_RATE:.2f}%</b> · "
-        f"{T['global_next_meeting']}: <b style='color:#e6edf3;'>{_fmt_date(SELIC_NEXT_MEETING)}</b></span>"
         f"<span>🇺🇸 <b style='color:#58a6ff;'>Fed {FED_FUNDS_RATE:.2f}%</b> · "
         f"{T['global_next_meeting']}: <b style='color:#e6edf3;'>{_fmt_date(FED_NEXT_MEETING)}</b></span>"
+        f"<span>🇧🇷 <b style='color:#58a6ff;'>SELIC {SELIC_RATE:.2f}%</b> · "
+        f"{T['global_next_meeting']}: <b style='color:#e6edf3;'>{_fmt_date(SELIC_NEXT_MEETING)}</b></span>"
         f"<span style='color:#6e7681;font-size:.7rem;'>{T['global_source']}</span>"
         f"</div>",
         unsafe_allow_html=True,
