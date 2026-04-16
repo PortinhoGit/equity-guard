@@ -452,15 +452,17 @@ def _render_share_buttons() -> None:
         "display:inline-flex;align-items:center;justify-content:center;"
         "width:32px;height:32px;border-radius:50%;"
         "color:#fff;font-size:.78rem;font-weight:800;text-decoration:none;"
-        "cursor:pointer;transition:transform .2s,box-shadow .2s;border:none;"
+        "cursor:pointer;transition:transform .2s,box-shadow .2s;"
+        "border:1px solid #30363d;"
     )
 
     _icons = [
         ("WhatsApp", "#25d366", f"https://wa.me/?text={_title}%20{_app_url}", "W"),
         ("Facebook", "#1877f2", f"https://www.facebook.com/sharer/sharer.php?u={_app_url}", "f"),
-        ("X", "#000000", f"https://twitter.com/intent/tweet?url={_app_url}&text={_title}", "𝕏"),
+        ("X", "#1d1d1d", f"https://twitter.com/intent/tweet?url={_app_url}&text={_title}", "𝕏"),
         ("LinkedIn", "#0a66c2", f"https://www.linkedin.com/sharing/share-offsite/?url={_app_url}", "in"),
         ("Telegram", "#0088cc", f"https://t.me/share/url?url={_app_url}&text={_title}", "✈"),
+        ("TikTok", "#010101", f"https://www.tiktok.com/", "♪"),
         ("E-mail", "#8b949e", f"mailto:?subject={_title}&body={_body}", "✉"),
         ("Truth Social", "#5448ee", f"https://truthsocial.com/share?url={_app_url}&title={_title}", "T"),
     ]
