@@ -511,6 +511,29 @@ def _render_briefing(T: dict) -> None:
         _bc1, _bc2 = st.columns(2)
 
         with _bc1:
+            brent_val = _fmt_val("Brent")
+            wti_val = _fmt_val("WTI")
+            _fomc_html = f"<span style='color:#8b949e;font-size:.75rem;'>FOMC {_fmt_date_br(FED_NEXT_MEETING)}</span>"
+            _copom_html = f"<span style='color:#8b949e;font-size:.75rem;'>COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}</span>"
+            st.markdown(
+                f"<div style='background:#161b22;border:1px solid #30363d;"
+                f"border-radius:10px;padding:14px 16px;'>"
+                f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
+                f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
+                f"🏦 Juros</div>"
+                f"{_card('🇺🇸 Fed Funds', f'{FED_FUNDS_RATE:.2f}%', _fomc_html)}"
+                f"{_card('🇧🇷 Selic', f'{SELIC_RATE:.2f}%', _copom_html)}"
+                f"<div style='height:8px;'></div>"
+                f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
+                f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
+                f"🛢️ Commodities</div>"
+                f"{_card('Brent', f'US$ {brent_val}', _fmt_chg('Brent'))}"
+                f"{_card('WTI', f'US$ {wti_val}', _fmt_chg('WTI'))}"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        with _bc2:
             st.markdown(
                 f"<div style='background:#161b22;border:1px solid #30363d;"
                 f"border-radius:10px;padding:14px 16px;'>"
@@ -521,29 +544,6 @@ def _render_briefing(T: dict) -> None:
                 f"{_card('S&P 500', _fmt_val('S&P 500'), _fmt_chg('S&P 500'))}"
                 f"{_card('NASDAQ', _fmt_val('NASDAQ'), _fmt_chg('NASDAQ'))}"
                 f"{_card('FTSE', _fmt_val('FTSE'), _fmt_chg('FTSE'))}"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-        with _bc2:
-            brent_val = _fmt_val("Brent")
-            wti_val = _fmt_val("WTI")
-            _copom_html = f"<span style='color:#8b949e;font-size:.75rem;'>COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}</span>"
-            _fomc_html = f"<span style='color:#8b949e;font-size:.75rem;'>FOMC {_fmt_date_br(FED_NEXT_MEETING)}</span>"
-            st.markdown(
-                f"<div style='background:#161b22;border:1px solid #30363d;"
-                f"border-radius:10px;padding:14px 16px;'>"
-                f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
-                f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
-                f"🛢️ Commodities</div>"
-                f"{_card('Brent', f'US$ {brent_val}', _fmt_chg('Brent'))}"
-                f"{_card('WTI', f'US$ {wti_val}', _fmt_chg('WTI'))}"
-                f"<div style='height:8px;'></div>"
-                f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
-                f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
-                f"🏦 Juros</div>"
-                f"{_card('🇧🇷 Selic', f'{SELIC_RATE:.2f}%', _copom_html)}"
-                f"{_card('🇺🇸 Fed Funds', f'{FED_FUNDS_RATE:.2f}%', _fomc_html)}"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -1711,6 +1711,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         ("Técnico", "sec-tecnico"),
         ("Inteligência", "sec-inteligencia"),
         ("Proventos", "sec-proventos"),
+        ("Previdência", "sec-previdencia"),
         ("Indicadores", "sec-indicadores"),
     ]
     _nav_btns = "".join(
@@ -2253,6 +2254,16 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         st.caption(T["cal_com_hint"])
     else:
         st.info(T["cal_no_data"])
+
+    # ── Previdência — Prevdow + Nitro ────────────────────────────────────────
+    st.markdown('<div class="eg-nav-anchor" id="sec-previdencia"></div>', unsafe_allow_html=True)
+    _prev_col1, _prev_col2 = st.columns(2)
+    with _prev_col1:
+        _render_prevdow_panel(T)
+    with _prev_col2:
+        _render_nitro_panel(T)
+
+    st.divider()
 
     # ── Glossary expander ─────────────────────────────────────────────────────
     st.markdown('<div class="eg-nav-anchor" id="sec-indicadores"></div>', unsafe_allow_html=True)
