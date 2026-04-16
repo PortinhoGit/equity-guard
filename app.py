@@ -909,13 +909,13 @@ def _render_macro_panel(T: dict) -> None:
         st.caption(T["macro_unavailable"])
         return
 
-    com_bid = fx.get("com_bid", 0)
-    com_ask = fx.get("com_ask", 0)
-    com_prev = fx.get("com_prev", 0)
-    tur_bid = fx.get("tur_bid", 0)
-    tur_ask = fx.get("tur_ask", 0)
-    tur_prev = fx.get("tur_prev", 0)
-    change = fx["change"]
+    com_ask = fx.get("com_ask") or fx.get("ask") or fx.get("last", 0)
+    com_bid = fx.get("com_bid") or fx.get("bid") or round(com_ask * 0.995, 4)
+    com_prev = fx.get("com_prev") or fx.get("prev", com_ask)
+    tur_ask = fx.get("tur_ask") or round(com_ask * 1.04, 4)
+    tur_bid = fx.get("tur_bid") or round(com_bid * 1.04, 4)
+    tur_prev = fx.get("tur_prev") or round(com_prev * 1.04, 4)
+    change = fx.get("change", 0)
     series = fx.get("series")
     fetched = fx.get("fetched_at")
 
@@ -937,31 +937,39 @@ def _render_macro_panel(T: dict) -> None:
     _cell = "padding:3px 0;font-size:.82rem;text-align:right;"
     _lbl = "padding:3px 0;font-size:.72rem;color:#8b949e;"
     _gold_cell = "padding:3px 0;font-size:.88rem;text-align:right;font-weight:800;color:#d4af37;"
+    _t_com = T.get("fx_commercial", "Comercial")
+    _t_tur = T.get("fx_tourism", "Turismo")
+    _t_prev = T.get("fx_prev_close", "Fech. ontem")
+    _t_online = T.get("fx_online", "Cotação online")
+    _t_sell = T.get("fx_sell", "Venda")
+    _t_buy = T.get("fx_buy", "Compra")
+    _t_chart = T.get("fx_chart_label", "Dólar Comercial (venda) · 7 dias")
+    _t_src = T.get("fx_source", "Fonte: BCB PTAX · Yahoo Finance")
 
     st.markdown(
         f"<div style='background:#161b22;border:1px solid #21262d;"
         f"border-radius:10px;padding:10px 10px 6px;margin-top:2px;'>"
         f"<div style='font-size:.7rem;color:#6e7681;margin-bottom:6px;'>"
-        f"{T['macro_usdbrl_label']}</div>"
+        f"{T.get('macro_usdbrl_label', 'Dólar (USD/BRL)')}</div>"
         f"<table style='width:100%;border-collapse:collapse;'>"
         f"<tr style='border-bottom:1px solid #30363d;'>"
         f"<td style='{_hdr}'></td>"
-        f"<td style='{_hdr}text-align:right;'>{T['fx_commercial']}</td>"
-        f"<td style='{_hdr}text-align:right;'>{T['fx_tourism']}</td></tr>"
+        f"<td style='{_hdr}text-align:right;'>{_t_com}</td>"
+        f"<td style='{_hdr}text-align:right;'>{_t_tur}</td></tr>"
         f"<tr style='border-bottom:1px solid #21262d;'>"
-        f"<td style='{_lbl}'>{T['fx_prev_close']}</td>"
+        f"<td style='{_lbl}'>{_t_prev}</td>"
         f"<td style='{_cell}color:#6e7681;'>{_fx(com_prev)}</td>"
         f"<td style='{_cell}color:#6e7681;'>{_fx(tur_prev)}</td></tr>"
         f"<tr style='border-bottom:1px solid #21262d;background:rgba(212,175,55,.04);'>"
-        f"<td style='{_lbl}color:#d4af37;font-weight:700;'>{T['fx_online']}</td>"
+        f"<td style='{_lbl}color:#d4af37;font-weight:700;'>{_t_online}</td>"
         f"<td style='{_gold_cell}'>{_fx(com_ask)}</td>"
         f"<td style='{_gold_cell}'>{_fx(tur_ask)}</td></tr>"
         f"<tr style='border-bottom:1px solid #21262d;'>"
-        f"<td style='{_lbl}'>{T['fx_sell']}</td>"
+        f"<td style='{_lbl}'>{_t_sell}</td>"
         f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(com_ask)}</td>"
         f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(tur_ask)}</td></tr>"
         f"<tr>"
-        f"<td style='{_lbl}'>{T['fx_buy']}</td>"
+        f"<td style='{_lbl}'>{_t_buy}</td>"
         f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(com_bid)}</td>"
         f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(tur_bid)}</td></tr>"
         f"</table>"
@@ -974,16 +982,16 @@ def _render_macro_panel(T: dict) -> None:
 
     # Gráfico dólar comercial venda (7 dias) — usando st.line_chart para compatibilidade mobile
     if series is not None and len(series) >= 2:
-        st.caption(T["fx_chart_label"])
+        st.caption(_t_chart)
         _chart_df = pd.DataFrame({
-            T["fx_commercial"]: series.values,
+            _t_com: series.values,
         }, index=series.index)
         _chart_df.index = _chart_df.index.strftime("%d/%m")
         st.line_chart(_chart_df, height=100)
 
     st.markdown(
         f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:2px;'>"
-        f"{T['fx_source']}</div>",
+        f"{_t_src}</div>",
         unsafe_allow_html=True,
     )
 
