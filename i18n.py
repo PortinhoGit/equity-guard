@@ -19,7 +19,6 @@ _PT: dict = {
     "tagline":      "Análise de Valor · Mercado Brasileiro",
     # ── Sidebar ─────────────────────────────────────────────────────────────
     "ticker_label": "Ticker",
-    "custom_ticker_label": "Outro ticker",
     "period_label": "Período",
     "yield_slider": "Yield Mínimo Desejado (%)",
     "analyze_btn":  "🔍 Analisar",
@@ -354,7 +353,6 @@ _EN: dict = {
     "lang_name":    "🇺🇸 English",
     "tagline":      "Value Analysis · Brazilian Market (B3)",
     "ticker_label": "Ticker",
-    "custom_ticker_label": "Other ticker",
     "period_label": "Period",
     "yield_slider": "Minimum Desired Yield (%)",
     "analyze_btn":  "🔍 Analyze",
@@ -677,7 +675,6 @@ _ES: dict = {
     "lang_name":    "🇪🇸 Español",
     "tagline":      "Análisis de Valor · Mercado Brasileño (B3)",
     "ticker_label": "Ticker",
-    "custom_ticker_label": "Otro ticker",
     "period_label": "Período",
     "yield_slider": "Rendimiento Mínimo Deseado (%)",
     "analyze_btn":  "🔍 Analizar",

@@ -50,6 +50,7 @@ def get_stock_data(ticker: str, period: str = "2y") -> Optional[pd.DataFrame]:
             logger.warning(f"Sem dados de preço para {ticker_sa}")
             return None
         df.index = pd.to_datetime(df.index)
+        # Remove timezone para compatibilidade
         if df.index.tz is not None:
             df.index = df.index.tz_localize(None)
         return df
@@ -58,31 +59,24 @@ def get_stock_data(ticker: str, period: str = "2y") -> Optional[pd.DataFrame]:
         return None
 
 
-def _extract_dividends_from_history(ticker_sa: str, years: int) -> Optional[pd.Series]:
-    """Fallback: extrai dividendos da coluna 'Dividends' do history()."""
-    try:
-        stock = yf.Ticker(ticker_sa)
-        df = stock.history(period=f"{years}y", auto_adjust=True)
-        if df.empty or "Dividends" not in df.columns:
-            return None
-        divs = df["Dividends"]
-        divs = divs[divs > 0]
-        if divs.empty:
-            return None
-        if divs.index.tz is not None:
-            divs.index = divs.index.tz_localize(None)
-        return divs
-    except Exception as e:
-        logger.error(f"Fallback dividendos via history() falhou para {ticker_sa}: {e}")
-        return None
-
-
 def get_dividends(ticker: str, years: int = 5) -> Optional[pd.Series]:
     """
     Busca histórico de proventos dos últimos N anos.
-    Usa stock.dividends como fonte primária; se falhar (comum em servidores
-    cloud por rate-limiting do Yahoo), extrai da coluna 'Dividends' do
-    stock.history() como fallback.
+
+    Nota sobre splits: yfinance já retorna os dividendos históricos
+    normalizados para a base acionária atual. Investigação empírica com BBAS3
+    (split 1:2 em abril/2024) confirmou que os valores pré-split em
+    stock.dividends já estão na base da nova ação — aplicar correção manual
+    causaria duplo ajuste. A correção do DY distorcido (ex: 113%) é feita em
+    get_full_data() substituindo info['dividendYield'] pelo cálculo próprio
+    de Trailing-12M Yield.
+
+    Args:
+        ticker: Código da ação (ex: PETR4 ou PETR4.SA)
+        years:  Anos de histórico
+
+    Returns:
+        Series com datas e valores de dividendos, ou None.
     """
     ticker_sa = normalize_ticker(ticker)
     try:
@@ -90,14 +84,14 @@ def get_dividends(ticker: str, years: int = 5) -> Optional[pd.Series]:
         dividends = stock.dividends
 
         if dividends.empty:
-            logger.warning(f"stock.dividends vazio para {ticker_sa}, tentando fallback via history()")
-            dividends = _extract_dividends_from_history(ticker_sa, years)
-            if dividends is None:
-                return None
-        else:
-            if dividends.index.tz is not None:
-                dividends.index = dividends.index.tz_localize(None)
+            logger.warning(f"Sem dados de dividendos para {ticker_sa}")
+            return None
 
+        # Normaliza timezone
+        if dividends.index.tz is not None:
+            dividends.index = dividends.index.tz_localize(None)
+
+        # Filtra os últimos N anos e remove valores inválidos
         cutoff = datetime.now() - timedelta(days=years * 365)
         dividends = dividends[(dividends.index >= cutoff) & (dividends > 0)]
 
@@ -105,8 +99,7 @@ def get_dividends(ticker: str, years: int = 5) -> Optional[pd.Series]:
 
     except Exception as e:
         logger.error(f"Erro ao buscar dividendos para {ticker_sa}: {e}")
-        fallback = _extract_dividends_from_history(ticker_sa, years)
-        return fallback
+        return None
 
 
 def get_fundamentals(ticker: str) -> Dict[str, Any]:
@@ -458,13 +451,10 @@ def get_dividend_calendar(ticker: str, n: int = 15) -> pd.DataFrame:
         divs  = stock.dividends
 
         if divs.empty:
-            logger.warning(f"stock.dividends vazio no calendário para {ticker_sa}, tentando fallback")
-            divs = _extract_dividends_from_history(ticker_sa, years=5)
-            if divs is None:
-                return pd.DataFrame()
-        else:
-            if divs.index.tz is not None:
-                divs.index = divs.index.tz_localize(None)
+            return pd.DataFrame()
+
+        if divs.index.tz is not None:
+            divs.index = divs.index.tz_localize(None)
 
         today = pd.Timestamp.now().normalize()
         rows: list = []
@@ -507,95 +497,28 @@ def get_full_data(ticker: str, period: str = "2y") -> Tuple[
     Dict[str, Any],
 ]:
     """
-    Busca todos os dados necessários para análise em uma única chamada,
-    usando um único yf.Ticker() para evitar rate-limiting no Streamlit Cloud.
+    Busca todos os dados necessários para análise em uma única chamada.
+
+    Inclui correção de Dividend Yield: substitui o valor bugado do
+    info['dividendYield'] (que pode ficar distorcido após splits, como os
+    113% do BBAS3) pelo Trailing-12-Month Yield calculado diretamente dos
+    proventos ajustados:  DY = Σ dividendos (últimos 365 dias) / preço atual.
+
+    Returns:
+        Tupla (df_precos, dividendos_ajustados, fundamentais)
     """
-    ticker_sa = normalize_ticker(ticker)
-    stock = yf.Ticker(ticker_sa)
+    df = get_stock_data(ticker, period=period)
+    dividends = get_dividends(ticker, years=5)
+    fundamentals = get_fundamentals(ticker)
 
-    # ── 1. Preços ────────────────────────────────────────────────────────────
-    df = None
-    try:
-        raw = stock.history(period=period, auto_adjust=True)
-        if not raw.empty:
-            raw.index = pd.to_datetime(raw.index)
-            if raw.index.tz is not None:
-                raw.index = raw.index.tz_localize(None)
-            df = raw
-    except Exception as e:
-        logger.error(f"Erro ao buscar preços para {ticker_sa}: {e}")
-
-    # ── 2. Dividendos (fonte primária: stock.dividends) ──────────────────────
-    dividends = None
-    try:
-        divs = stock.dividends
-        if divs is not None and not divs.empty:
-            if divs.index.tz is not None:
-                divs.index = divs.index.tz_localize(None)
-            cutoff = datetime.now() - timedelta(days=5 * 365)
-            divs = divs[(divs.index >= cutoff) & (divs > 0)]
-            if not divs.empty:
-                dividends = divs
-    except Exception as e:
-        logger.warning(f"stock.dividends falhou para {ticker_sa}: {e}")
-
-    # ── 2b. Fallback: coluna "Dividends" do history() ────────────────────────
-    if dividends is None and df is not None and "Dividends" in df.columns:
-        fb = df["Dividends"]
-        fb = fb[fb > 0]
-        if not fb.empty:
-            dividends = fb
-            logger.info(f"Dividendos via fallback (history) para {ticker_sa}")
-
-    # ── 3. Fundamentais ──────────────────────────────────────────────────────
-    fundamentals = _empty_fundamentals(ticker)
-    try:
-        info = stock.info
-        if info and (info.get("regularMarketPrice") is not None or info.get("currentPrice") is not None):
-            current_price = (
-                info.get("currentPrice")
-                or info.get("regularMarketPrice")
-                or info.get("previousClose")
-            )
-            roe_raw = info.get("returnOnEquity")
-            payout_raw = info.get("payoutRatio")
-            dy_raw = info.get("dividendYield") or info.get("trailingAnnualDividendYield")
-            total_debt = info.get("totalDebt") or 0
-            total_cash = info.get("totalCash") or info.get("cashAndCashEquivalents") or 0
-            ebitda = info.get("ebitda")
-            net_debt = total_debt - total_cash if total_debt else None
-            net_debt_ebitda = None
-            if net_debt is not None and ebitda and ebitda != 0:
-                net_debt_ebitda = net_debt / ebitda
-
-            fundamentals = {
-                "name": info.get("longName") or info.get("shortName") or ticker,
-                "sector": info.get("sector") or "Desconhecido",
-                "industry": info.get("industry") or "",
-                "current_price": current_price,
-                "market_cap": info.get("marketCap"),
-                "pe_ratio": info.get("trailingPE") or info.get("forwardPE"),
-                "pb_ratio": info.get("priceToBook"),
-                "roe": roe_raw,
-                "dividend_yield": dy_raw,
-                "payout_ratio": payout_raw,
-                "net_debt": net_debt,
-                "ebitda": ebitda,
-                "total_debt": total_debt,
-                "total_cash": total_cash,
-                "net_debt_ebitda": net_debt_ebitda,
-                "shares_outstanding": info.get("sharesOutstanding"),
-                "currency": info.get("currency", "BRL"),
-                "exchange": info.get("exchange", "SAO"),
-            }
-    except Exception as e:
-        logger.error(f"Erro ao buscar fundamentais para {ticker_sa}: {e}")
-
-    # ── Preço atual: fallback para último fechamento ─────────────────────────
+    # ── Preço atual: fallback para último fechamento ───────────────────────────
     if fundamentals.get("current_price") is None and df is not None and not df.empty:
         fundamentals["current_price"] = float(df["Close"].iloc[-1])
 
-    # ── Corrige DY com cálculo próprio (Trailing 12 Months) ──────────────────
+    # ── Corrige DY com cálculo próprio (Trailing 12 Months) ───────────────────
+    # Razão: yfinance's info['dividendYield'] usa cálculo interno que fica
+    # incorreto após eventos de split. Calculamos diretamente dos dividendos
+    # ajustados que já buscamos, garantindo consistência com o Preço Teto.
     current_price = fundamentals.get("current_price")
     if dividends is not None and not dividends.empty and current_price and current_price > 0:
         trailing_cutoff = pd.Timestamp.now() - pd.Timedelta(days=365)

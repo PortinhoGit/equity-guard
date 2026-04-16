@@ -28,7 +28,6 @@ from auth.manager import (
     get_favorites, add_favorite, remove_favorite, get_history, add_history,
 )
 from ui.payment import render_payment_page
-from data.tickers_b3 import ALL_TICKERS_B3
 from data.provider import (
     get_full_data,
     normalize_ticker,
@@ -382,12 +381,6 @@ def _main_chart(df: pd.DataFrame, teto: float, ticker: str, T: dict, cs: str = "
     for ann in fig.layout.annotations:
         ann.font = dict(color="#8b949e", size=11)
     return fig
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def _fetch_full_data(ticker: str, period: str):
-    """Cached wrapper for get_full_data (5-min TTL) — reduces Yahoo rate-limiting on cloud."""
-    return get_full_data(ticker, period=period)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -1257,39 +1250,12 @@ def render_sidebar(user: dict, T: dict) -> tuple:
             st.session_state["eg_ticker_input"] = "BBAS3"
 
         st.markdown(f'<div class="eg-section-header">{T["section_analysis"]}</div>', unsafe_allow_html=True)
-
-        _extra_tickers = sorted(set(
-            list(get_favorites(user) or []) + list(get_history(user) or [])
-        ))
-        _all_options = sorted(set(ALL_TICKERS_B3 + _extra_tickers))
-
-        _default = st.session_state.get("eg_ticker_input", "BBAS3").upper().strip()
-        if _default in _all_options:
-            _default_idx = _all_options.index(_default)
-        else:
-            _all_options.append(_default)
-            _all_options.sort()
-            _default_idx = _all_options.index(_default)
-
-        _sel_col, _custom_col = st.columns([3, 2])
-        with _sel_col:
-            ticker = st.selectbox(
-                T["ticker_label"],
-                options=_all_options,
-                index=_default_idx,
-                key="eg_ticker_select",
-            )
-        with _custom_col:
-            _custom = st.text_input(
-                T.get("custom_ticker_label", "Outro ticker"),
-                placeholder="AAPL, HSBA.L…",
-                key="eg_custom_ticker",
-            ).upper().strip()
-        if _custom:
-            ticker = _custom
-            st.session_state["eg_ticker_input"] = _custom
-        else:
-            st.session_state["eg_ticker_input"] = ticker
+        ticker = st.text_input(
+            T["ticker_label"],
+            placeholder="PETR4, AAPL, HSBA.L…",
+            help="B3 (PETR4), EUA (AAPL) ou Londres (HSBA.L)",
+            key="eg_ticker_input",
+        ).upper().strip()
         period = st.selectbox(
             T["period_label"], ["1y", "2y", "3y", "5y"], index=1,
             format_func=lambda x: T["period_opts"][x],
@@ -1324,7 +1290,6 @@ def render_sidebar(user: dict, T: dict) -> tuple:
                         use_container_width=True,
                     ):
                         st.session_state["eg_ticker_input"] = _f
-                        st.session_state["eg_custom_ticker"] = ""
                         st.session_state["_eg_auto_analyze"] = True
                         st.rerun()
             else:
@@ -1342,7 +1307,6 @@ def render_sidebar(user: dict, T: dict) -> tuple:
                         use_container_width=True,
                     ):
                         st.session_state["eg_ticker_input"] = _h
-                        st.session_state["eg_custom_ticker"] = ""
                         st.session_state["_eg_auto_analyze"] = True
                         st.rerun()
             else:
@@ -1529,7 +1493,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         if _is_demo_free:
             _label = f"{T['demo_badge']} — {_label}"
         with st.spinner(_label):
-            df, dividends, fundamentals = _fetch_full_data(ticker, period=period)
+            df, dividends, fundamentals = get_full_data(ticker, period=period)
 
         if df is None or df.empty:
             st.error(T["not_found"].format(t=ticker))
@@ -2181,12 +2145,6 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         unsafe_allow_html=True,
     )
     st.caption(T["data_source"].format(version=APP_VERSION))
-    st.markdown(
-        "<div style='text-align:center;color:#6e7681;font-size:.72rem;margin-top:8px;'>"
-        "App desenvolvido pelo Consórcio YlvorxVHM."
-        "</div>",
-        unsafe_allow_html=True,
-    )
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
