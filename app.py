@@ -229,19 +229,26 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 }
 /* All widths: ensure tables never break layout horizontally */
 [data-testid="stDataFrame"] > div { overflow-x: auto !important; }
-/* Mobile hint banner */
-.eg-mobile-hint {
-    display: none; background: rgba(212,175,55,.12);
-    border: 1px solid #d4af37; border-radius: 10px;
-    padding: 10px 14px; text-align: center;
-    font-size: .82rem; color: #d4af37; font-weight: 700;
-    margin-bottom: 10px; animation: eg-pulse 2s ease-in-out 3;
+/* Mobile balloon + hint */
+.eg-mobile-balloon {
+    display: none; position: fixed; top: 56px; left: 50px; z-index: 99999;
+    background: linear-gradient(135deg,#b8941f,#d4af37);
+    color: #0d1117; border-radius: 14px;
+    padding: 10px 14px; font-size: .72rem; font-weight: 800;
+    box-shadow: 0 4px 20px rgba(212,175,55,.5);
+    line-height: 1.5; text-align: left;
+    animation: eg-bounce 1.5s ease-in-out infinite;
 }
-@keyframes eg-pulse {
-    0%, 100% { box-shadow: none; }
-    50% { box-shadow: 0 0 12px rgba(212,175,55,.4); }
+.eg-mobile-balloon::before {
+    content: ''; position: absolute; left: -8px; top: 14px;
+    border: 8px solid transparent; border-right-color: #d4af37;
 }
-@media (max-width: 768px) { .eg-mobile-hint { display: block; } }
+@keyframes eg-bounce {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(6px); }
+}
+@media (min-width: 769px) { .eg-mobile-balloon { display: none !important; } }
+@media (max-width: 768px) { .eg-mobile-balloon { display: block; } }
 /* ── Z-index defensivo: radios/headers acima do container Plotly ─────────── */
 [data-testid="stRadio"], .eg-section-header {
     position: relative !important;
@@ -2415,9 +2422,11 @@ def main() -> None:
 
     # ── FAB — botão flutuante para abrir sidebar no mobile ───────────────────
     st.markdown(
-        '<div class="eg-mobile-hint">'
-        '≫ Toque na seta no canto superior para acessar '
-        '💲 Dólar · 🏦 Previdência · 📊 Ações'
+        '<div class="eg-mobile-balloon">'
+        '← Toque na seta<br>'
+        '💲 Dólar<br>'
+        '🏦 Previdência<br>'
+        '📊 Ações'
         '</div>',
         unsafe_allow_html=True,
     )
