@@ -507,18 +507,92 @@ def get_full_data(ticker: str, period: str = "2y") -> Tuple[
     Returns:
         Tupla (df_precos, dividendos_ajustados, fundamentais)
     """
-    df = get_stock_data(ticker, period=period)
-    dividends = get_dividends(ticker, years=5)
-    fundamentals = get_fundamentals(ticker)
+    ticker_sa = normalize_ticker(ticker)
+    stock = yf.Ticker(ticker_sa)
 
-    # ── Preço atual: fallback para último fechamento ───────────────────────────
+    # ── 1. Preços ────────────────────────────────────────────────────────────
+    df = None
+    try:
+        raw = stock.history(period=period, auto_adjust=True)
+        if not raw.empty:
+            raw.index = pd.to_datetime(raw.index)
+            if raw.index.tz is not None:
+                raw.index = raw.index.tz_localize(None)
+            df = raw
+    except Exception as e:
+        logger.error(f"Erro ao buscar preços para {ticker_sa}: {e}")
+
+    # ── 2. Dividendos (fonte primária: stock.dividends) ──────────────────────
+    dividends = None
+    try:
+        divs = stock.dividends
+        if divs is not None and not divs.empty:
+            if divs.index.tz is not None:
+                divs.index = divs.index.tz_localize(None)
+            cutoff = datetime.now() - timedelta(days=5 * 365)
+            divs = divs[(divs.index >= cutoff) & (divs > 0)]
+            if not divs.empty:
+                dividends = divs
+    except Exception as e:
+        logger.warning(f"stock.dividends falhou para {ticker_sa}: {e}")
+
+    # ── 2b. Fallback: coluna "Dividends" do history() ────────────────────────
+    if dividends is None and df is not None and "Dividends" in df.columns:
+        fb = df["Dividends"]
+        fb = fb[fb > 0]
+        if not fb.empty:
+            dividends = fb
+            logger.info(f"Dividendos via fallback (history) para {ticker_sa}")
+
+    # ── 3. Fundamentais ──────────────────────────────────────────────────────
+    fundamentals = _empty_fundamentals(ticker)
+    try:
+        info = stock.info
+        if info and (info.get("regularMarketPrice") is not None or info.get("currentPrice") is not None):
+            current_price = (
+                info.get("currentPrice")
+                or info.get("regularMarketPrice")
+                or info.get("previousClose")
+            )
+            roe_raw = info.get("returnOnEquity")
+            payout_raw = info.get("payoutRatio")
+            dy_raw = info.get("dividendYield") or info.get("trailingAnnualDividendYield")
+            total_debt = info.get("totalDebt") or 0
+            total_cash = info.get("totalCash") or info.get("cashAndCashEquivalents") or 0
+            ebitda = info.get("ebitda")
+            net_debt = total_debt - total_cash if total_debt else None
+            net_debt_ebitda = None
+            if net_debt is not None and ebitda and ebitda != 0:
+                net_debt_ebitda = net_debt / ebitda
+
+            fundamentals = {
+                "name": info.get("longName") or info.get("shortName") or ticker,
+                "sector": info.get("sector") or "Desconhecido",
+                "industry": info.get("industry") or "",
+                "current_price": current_price,
+                "market_cap": info.get("marketCap"),
+                "pe_ratio": info.get("trailingPE") or info.get("forwardPE"),
+                "pb_ratio": info.get("priceToBook"),
+                "roe": roe_raw,
+                "dividend_yield": dy_raw,
+                "payout_ratio": payout_raw,
+                "net_debt": net_debt,
+                "ebitda": ebitda,
+                "total_debt": total_debt,
+                "total_cash": total_cash,
+                "net_debt_ebitda": net_debt_ebitda,
+                "shares_outstanding": info.get("sharesOutstanding"),
+                "currency": info.get("currency", "BRL"),
+                "exchange": info.get("exchange", "SAO"),
+            }
+    except Exception as e:
+        logger.error(f"Erro ao buscar fundamentais para {ticker_sa}: {e}")
+
+    # ── Preço atual: fallback para último fechamento ─────────────────────────
     if fundamentals.get("current_price") is None and df is not None and not df.empty:
         fundamentals["current_price"] = float(df["Close"].iloc[-1])
 
-    # ── Corrige DY com cálculo próprio (Trailing 12 Months) ───────────────────
-    # Razão: yfinance's info['dividendYield'] usa cálculo interno que fica
-    # incorreto após eventos de split. Calculamos diretamente dos dividendos
-    # ajustados que já buscamos, garantindo consistência com o Preço Teto.
+    # ── Corrige DY com cálculo próprio (Trailing 12 Months) ──────────────────
     current_price = fundamentals.get("current_price")
     if dividends is not None and not dividends.empty and current_price and current_price > 0:
         trailing_cutoff = pd.Timestamp.now() - pd.Timedelta(days=365)
