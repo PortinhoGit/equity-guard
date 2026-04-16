@@ -541,11 +541,19 @@ def _maybe_pension_alert(T: dict) -> None:
         bar.onclick = function() {{
             var openBtn = doc.querySelector('[data-testid="collapsedControl"]');
             if (openBtn) openBtn.click();
+            var delay = openBtn ? 600 : 50;
             setTimeout(function() {{
                 var sidebar = doc.querySelector('[data-testid="stSidebar"]');
-                var anchor = sidebar ? sidebar.querySelector('#sidebar-prevdow') : null;
-                if (anchor) anchor.scrollIntoView({{behavior:'smooth', block:'start'}});
-            }}, 500);
+                if (!sidebar) return;
+                var anchor = sidebar.querySelector('#sidebar-prevdow');
+                if (anchor) {{
+                    anchor.scrollIntoView({{behavior:'smooth', block:'start'}});
+                }} else {{
+                    var inner = sidebar.querySelector('[data-testid="stSidebarContent"]')
+                             || sidebar.querySelector('section[data-testid="stSidebar"] > div');
+                    if (inner) inner.scrollTo({{top: inner.scrollHeight * 0.4, behavior:'smooth'}});
+                }}
+            }}, delay);
             bar.remove();
         }};
         doc.body.appendChild(bar);
