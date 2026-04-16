@@ -2295,13 +2295,7 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    # ── 🗞️ Briefing de Fechamento (expander aberto por default) ────────────
-    _render_briefing(T)
-
-    # ── Global indicators ribbon (Bloomberg-style top bar) ───────────────────
-    _render_global_bar(T)
-
-    # ── Navigation menu ──────────────────────────────────────────────────────
+    # ── Navigation menu (topo da página, logo após o header) ────────────────
     _nav_items = [
         ("Cotação", "sec-cotacao"),
         ("Projeção", "sec-projecao"),
@@ -2324,6 +2318,12 @@ def main() -> None:
         </div>""",
         unsafe_allow_html=True,
     )
+
+    # ── 🗞️ Briefing de Fechamento (expander aberto por default) ────────────
+    _render_briefing(T)
+
+    # ── Global indicators ribbon (Bloomberg-style top bar) ───────────────────
+    _render_global_bar(T)
 
     # ── Sidebar + analysis ───────────────────────────────────────────────────
     ticker, period, target_yield, clicked = render_sidebar(user, T)
