@@ -229,6 +229,19 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 }
 /* All widths: ensure tables never break layout horizontally */
 [data-testid="stDataFrame"] > div { overflow-x: auto !important; }
+/* FAB — floating action button to open sidebar on mobile */
+.eg-fab {
+    position: fixed; bottom: 24px; right: 24px; z-index: 99999;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: linear-gradient(135deg,#b8941f,#d4af37);
+    color: #0d1117; border: none; cursor: pointer;
+    font-size: 1.3rem; font-weight: 900;
+    box-shadow: 0 4px 16px rgba(212,175,55,.4);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .2s, box-shadow .2s;
+}
+.eg-fab:hover { transform: scale(1.1); box-shadow: 0 6px 24px rgba(212,175,55,.6); }
+@media (min-width: 769px) { .eg-fab { display: none; } }
 /* ── Z-index defensivo: radios/headers acima do container Plotly ─────────── */
 [data-testid="stRadio"], .eg-section-header {
     position: relative !important;
@@ -2399,6 +2412,15 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
 
 def main() -> None:
     _inject_css()
+
+    # ── FAB — botão flutuante para abrir sidebar no mobile ───────────────────
+    st.markdown(
+        """<button class="eg-fab" onclick="
+            var btn = window.parent.document.querySelector('[data-testid=\\'collapsedControl\\']');
+            if(btn) btn.click();
+        " title="Abrir menu">☰</button>""",
+        unsafe_allow_html=True,
+    )
 
     # ── Session defaults ─────────────────────────────────────────────────────
     if "lang" not in st.session_state:

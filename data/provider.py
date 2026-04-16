@@ -362,7 +362,7 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
         "bid": bid, "ask": ask, "avg": avg,
         "last": ask, "prev": prev, "change": chg,
         "series": series,
-        "fetched_at": pd.Timestamp.now(),
+        "fetched_at": pd.Timestamp.now(tz="America/Sao_Paulo").tz_localize(None),
     }
 
 

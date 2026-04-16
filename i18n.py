@@ -302,7 +302,7 @@ _PT: dict = {
     "macro_usdbrl_label":  "Dólar (USD/BRL)",
     "macro_loading":       "Carregando câmbio…",
     "macro_unavailable":   "Câmbio indisponível.",
-    "macro_updated_at":    "Atualizado em {date} às {time}",
+    "macro_updated_at":    "Atualizado em {date} às {time} (Brasília)",
     # ── Painel Global (índices + commodities + juros) ─────────────────────────
     "global_title":        "🌍 Indicadores Globais",
     "global_next_meeting": "Próxima reunião",
@@ -626,7 +626,7 @@ _EN: dict = {
     "macro_usdbrl_label":  "Dollar (USD/BRL)",
     "macro_loading":       "Loading FX…",
     "macro_unavailable":   "FX unavailable.",
-    "macro_updated_at":    "Updated {date} at {time}",
+    "macro_updated_at":    "Updated {date} at {time} (BRT)",
     # ── Global panel (indices + commodities + rates) ──────────────────────────
     "global_title":        "🌍 Global Indicators",
     "global_next_meeting": "Next meeting",
@@ -950,7 +950,7 @@ _ES: dict = {
     "macro_usdbrl_label":  "Dólar (USD/BRL)",
     "macro_loading":       "Cargando cambio…",
     "macro_unavailable":   "Cambio no disponible.",
-    "macro_updated_at":    "Actualizado el {date} a las {time}",
+    "macro_updated_at":    "Actualizado el {date} a las {time} (Brasilia)",
     # ── Panel global (índices + commodities + tasas) ──────────────────────────
     "global_title":        "🌍 Indicadores Globales",
     "global_next_meeting": "Próxima reunión",
