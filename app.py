@@ -2510,17 +2510,49 @@ def main() -> None:
         (T["nav_proventos"], "sec-proventos"),
         (T["nav_indicadores"], "sec-indicadores"),
     ]
-    _nav_btns = "".join(
-        f'<button class="eg-nav-btn" onclick="document.getElementById(\'{aid}\').scrollIntoView({{behavior:\'smooth\',block:\'start\'}})">{label}</button>'
+    _nav_btns_html = "".join(
+        f'<button class="eg-nav-btn" data-target="{aid}">{label}</button>'
         for label, aid in _nav_items
     )
-    st.markdown(
-        f"""<div class="eg-nav-menu">
-        {_nav_btns}
-        <button class="eg-nav-btn eg-nav-topo" onclick="window.scrollTo({{top:0,behavior:'smooth'}})">{T["nav_topo"]}</button>
-        </div>""",
-        unsafe_allow_html=True,
-    )
+
+    import streamlit.components.v1 as _nav_comp
+    _nav_comp.html(f"""
+    <style>
+    .eg-nav-menu {{
+        background: #1c2333; border: 1px solid #d4af37;
+        border-radius: 12px; padding: 8px 12px; display: flex; gap: 4px;
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; justify-content: center; flex-wrap: wrap;
+    }}
+    .eg-nav-menu::-webkit-scrollbar {{ display: none; }}
+    .eg-nav-btn {{
+        background: rgba(212,175,55,0.06); color: #e6edf3;
+        border: 1px solid #30363d; border-radius: 20px;
+        padding: 6px 14px; font-size: 0.78rem; font-weight: 600;
+        white-space: nowrap; cursor: pointer;
+        transition: all 0.2s; font-family: 'Inter', system-ui, sans-serif;
+    }}
+    .eg-nav-btn:hover {{ color: #0d1117; border-color: #d4af37; background: #d4af37; }}
+    .eg-nav-topo {{ color: #d4af37; border-color: #d4af37; margin-left: auto; }}
+    </style>
+    <div class="eg-nav-menu">
+        {_nav_btns_html}
+        <button class="eg-nav-btn eg-nav-topo" data-target="__top__">{T["nav_topo"]}</button>
+    </div>
+    <script>
+    document.querySelectorAll('.eg-nav-btn').forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+            var aid = btn.getAttribute('data-target');
+            if (aid === '__top__') {{
+                window.parent.document.querySelector('section.main').scrollTo({{top:0,behavior:'smooth'}});
+                return;
+            }}
+            var el = window.parent.document.getElementById(aid);
+            if (el) el.scrollIntoView({{behavior:'smooth', block:'start'}});
+        }});
+    }});
+    </script>
+    """, height=52)
 
     # ── 🗞️ Briefing de Fechamento (expander aberto por default) ────────────
     _render_briefing(T)
