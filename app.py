@@ -1319,7 +1319,20 @@ def render_sidebar(user: dict, T: dict) -> tuple:
         st.divider()
 
         # ══════════════════════════════════════════════════════════════════════
-        # 1. ANALYSIS INPUTS — ticker first (highest priority)
+        # 1. MACRO PANEL — USD/BRL (logo após Cadastre-se)
+        # ══════════════════════════════════════════════════════════════════════
+        _render_macro_panel(T)
+
+        # ══════════════════════════════════════════════════════════════════════
+        # 2. HUB DE PREVIDÊNCIA — Prevdow + Nitro Prev (IFM)
+        # ══════════════════════════════════════════════════════════════════════
+        _render_prevdow_panel(T)
+        _render_nitro_panel(T)
+
+        st.divider()
+
+        # ══════════════════════════════════════════════════════════════════════
+        # 3. ANALYSIS INPUTS
         # ══════════════════════════════════════════════════════════════════════
         if "eg_ticker_input" not in st.session_state:
             st.session_state["eg_ticker_input"] = "BBAS3"
@@ -1364,7 +1377,7 @@ def render_sidebar(user: dict, T: dict) -> tuple:
         clicked = _clicked_btn or st.session_state.pop("_eg_auto_analyze", False)
 
         # ══════════════════════════════════════════════════════════════════════
-        # 2. MEU TERMINAL — Watchlist + Recent History (logged-in only)
+        # 4. MEU TERMINAL — Watchlist + Recent History (logged-in only)
         # ══════════════════════════════════════════════════════════════════════
         st.markdown(
             f"<div style='color:#d4af37;font-weight:800;font-size:.92rem;"
@@ -1420,18 +1433,6 @@ def render_sidebar(user: dict, T: dict) -> tuple:
                 f"{T['anon_personal_msg']}</div>",
                 unsafe_allow_html=True,
             )
-
-        # ══════════════════════════════════════════════════════════════════════
-        # 3. MACRO PANEL — USD/BRL live rate + 7d sparkline
-        # ══════════════════════════════════════════════════════════════════════
-        st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
-        _render_macro_panel(T)
-
-        # ══════════════════════════════════════════════════════════════════════
-        # 4. HUB DE PREVIDÊNCIA — Prevdow + Nitro Prev (IFM)
-        # ══════════════════════════════════════════════════════════════════════
-        _render_prevdow_panel(T)
-        _render_nitro_panel(T)
 
         st.divider()
 
