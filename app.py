@@ -8,6 +8,7 @@ import math
 import sys
 import os
 from typing import Optional
+from analytics import register_visit, get_stats, get_daily_series
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -897,12 +898,16 @@ def _render_macro_panel(T: dict) -> None:
             f"🕒 {_ts}</div>"
         )
 
+    prev = fx.get("prev", 0)
     _row_style = "display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;"
     st.markdown(
         f"<div style='background:#161b22;border:1px solid #21262d;"
         f"border-radius:10px;padding:10px 12px;margin-top:2px;'>"
         f"<div style='font-size:.7rem;color:#6e7681;margin-bottom:4px;'>"
         f"{T['macro_usdbrl_label']}</div>"
+        f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
+        f"<span style='font-size:.72rem;color:#6e7681;'>Fech. anterior</span>"
+        f"<span style='font-size:.85rem;font-weight:600;color:#8b949e;'>{_fx_fmt(prev)}</span></div>"
         f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
         f"<span style='font-size:.75rem;color:#8b949e;'>Compra</span>"
         f"<span style='font-size:.95rem;font-weight:700;color:#e6edf3;'>{_fx_fmt(bid)}</span></div>"
@@ -1381,6 +1386,28 @@ def render_sidebar(user: dict, T: dict) -> tuple:
                     )
                 else:
                     st.caption(T["admin_no_users"])
+
+            with st.expander("📊 Acessos", expanded=False):
+                _a_stats = get_stats()
+                st.markdown(
+                    f"<div style='display:flex;gap:12px;margin-bottom:8px;'>"
+                    f"<div style='flex:1;background:#161b22;border:1px solid #30363d;"
+                    f"border-radius:8px;padding:8px;text-align:center;'>"
+                    f"<div style='font-size:.65rem;color:#6e7681;'>TOTAL</div>"
+                    f"<div style='font-size:1.1rem;font-weight:800;color:#d4af37;'>"
+                    f"{_a_stats['total']:,}</div></div>"
+                    f"<div style='flex:1;background:#161b22;border:1px solid #30363d;"
+                    f"border-radius:8px;padding:8px;text-align:center;'>"
+                    f"<div style='font-size:.65rem;color:#6e7681;'>HOJE</div>"
+                    f"<div style='font-size:1.1rem;font-weight:800;color:#3fb950;'>"
+                    f"{_a_stats['today']:,}</div></div></div>",
+                    unsafe_allow_html=True,
+                )
+                _daily = get_daily_series(30)
+                if _daily:
+                    _df_visits = pd.DataFrame(_daily, columns=["Data", "Acessos"])
+                    _df_visits["Data"] = pd.to_datetime(_df_visits["Data"])
+                    st.bar_chart(_df_visits.set_index("Data"), height=150)
 
         st.divider()
 
@@ -2342,6 +2369,13 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         "</div>",
         unsafe_allow_html=True,
     )
+    _footer_stats = get_stats()
+    st.markdown(
+        f"<div style='text-align:center;color:#484f58;font-size:.6rem;margin-top:4px;'>"
+        f"👁 {_footer_stats['total']:,} acessos · {_footer_stats['today']:,} hoje"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
     _render_share_buttons()
 
 
@@ -2359,6 +2393,14 @@ def main() -> None:
 
     T    = get_translator()
     user = st.session_state.user
+
+    # ── Analytics — registrar visita (1x por sessão) ─────────────────────────
+    if "visit_registered" not in st.session_state:
+        _stats = register_visit()
+        st.session_state.visit_registered = True
+        st.session_state.visit_stats = _stats
+    else:
+        _stats = st.session_state.get("visit_stats") or get_stats()
 
     # ── Top-right auth strip + optional inline login form ────────────────────
     _render_top_auth_bar(user, T)
