@@ -229,26 +229,7 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 }
 /* All widths: ensure tables never break layout horizontally */
 [data-testid="stDataFrame"] > div { overflow-x: auto !important; }
-/* Mobile balloon + hint */
-.eg-mobile-balloon {
-    display: none; position: fixed; top: 56px; left: 50px; z-index: 99999;
-    background: linear-gradient(135deg,#b8941f,#d4af37);
-    color: #0d1117; border-radius: 14px;
-    padding: 10px 14px; font-size: .72rem; font-weight: 800;
-    box-shadow: 0 4px 20px rgba(212,175,55,.5);
-    line-height: 1.5; text-align: left;
-    animation: eg-bounce 1.5s ease-in-out infinite;
-}
-.eg-mobile-balloon::before {
-    content: ''; position: absolute; left: -8px; top: 14px;
-    border: 8px solid transparent; border-right-color: #d4af37;
-}
-@keyframes eg-bounce {
-    0%, 100% { transform: translateX(0); }
-    50% { transform: translateX(6px); }
-}
-@media (min-width: 769px) { .eg-mobile-balloon { display: none !important; } }
-@media (max-width: 768px) { .eg-mobile-balloon { display: block; } }
+/* mobile balloon placeholder — rendered via st.components.v1.html */
 /* ── Z-index defensivo: radios/headers acima do container Plotly ─────────── */
 [data-testid="stRadio"], .eg-section-header {
     position: relative !important;
@@ -2432,16 +2413,39 @@ def main() -> None:
 
     T    = get_translator()
 
-    # ── FAB — botão flutuante para abrir sidebar no mobile ───────────────────
-    st.markdown(
-        f'<div class="eg-mobile-balloon">'
-        f'{T["mobile_hint"]}<br>'
-        f'{T["mobile_dollar"]}<br>'
-        f'{T["mobile_pension"]}<br>'
-        f'{T["mobile_stocks"]}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    # ── FAB — botão flutuante que abre/fecha sidebar no mobile ─────────────
+    _fab_hint = T["mobile_hint"]
+    _fab_dollar = T["mobile_dollar"]
+    _fab_pension = T["mobile_pension"]
+    _fab_stocks = T["mobile_stocks"]
+    import streamlit.components.v1 as _components
+    _components.html(f"""
+    <style>
+        #eg-fab {{
+            display: none; position: fixed; top: 10px; left: 10px; z-index: 999999;
+            background: linear-gradient(135deg,#b8941f,#d4af37);
+            color: #0d1117; border-radius: 14px; border: none;
+            padding: 10px 14px; font-size: 12px; font-weight: 800;
+            box-shadow: 0 4px 20px rgba(212,175,55,.5);
+            line-height: 1.6; text-align: left; cursor: pointer;
+            font-family: 'Inter', system-ui, sans-serif;
+        }}
+        #eg-fab:active {{ transform: scale(0.95); }}
+        @media (max-width: 768px) {{ #eg-fab {{ display: block; }} }}
+    </style>
+    <button id="eg-fab" onclick="
+        var doc = window.parent.document;
+        var openBtn = doc.querySelector('[data-testid=\\'collapsedControl\\']');
+        var closeBtn = doc.querySelector('[data-testid=\\'stSidebarCollapseButton\\'] button');
+        if (openBtn) openBtn.click();
+        else if (closeBtn) closeBtn.click();
+    ">
+        {_fab_hint}<br>
+        {_fab_dollar}<br>
+        {_fab_pension}<br>
+        {_fab_stocks}
+    </button>
+    """, height=0)
     user = st.session_state.user
 
     # ── Analytics — registrar visita (1x por sessão) ─────────────────────────
