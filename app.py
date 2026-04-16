@@ -544,6 +544,8 @@ def _render_briefing(T: dict) -> None:
                 f"🛢️ Commodities</div>"
                 f"{_card('Brent', f'US$ {brent_val}', _fmt_chg('Brent'))}"
                 f"{_card('WTI', f'US$ {wti_val}', _fmt_chg('WTI'))}"
+                f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:8px;'>"
+                f"Fonte: BCB · Fed · EIA · Yahoo Finance</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -559,6 +561,8 @@ def _render_briefing(T: dict) -> None:
                 f"{_card('S&P 500', _fmt_val('S&P 500'), _fmt_chg('S&P 500'))}"
                 f"{_card('NASDAQ', _fmt_val('NASDAQ'), _fmt_chg('NASDAQ'))}"
                 f"{_card('FTSE', _fmt_val('FTSE'), _fmt_chg('FTSE'))}"
+                f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:8px;'>"
+                f"Fonte: Yahoo Finance · B3</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
