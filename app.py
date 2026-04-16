@@ -460,14 +460,14 @@ def _fetch_fx_usdbrl() -> Optional[dict]:
     return get_fx_usdbrl()
 
 
-def _render_share_buttons() -> None:
+def _render_share_buttons(T: dict) -> None:
     """Social share buttons with correct share URLs + email + copy."""
     import urllib.parse as _url
     _share_url = "https://portinhogit.github.io/equity-guard/"
     _raw_url = _share_url
     _app_url = _url.quote(_share_url)
-    _title = _url.quote("Equity Guard — Terminal Financeiro de ações da B3")
-    _body = _url.quote(f"Confira o Equity Guard, terminal financeiro gratuito para ações da B3:\n{_raw_url}")
+    _title = _url.quote(T["share_title"])
+    _body = _url.quote(T["share_body"].format(url=_raw_url))
 
     _btn_style = (
         "display:inline-flex;align-items:center;justify-content:center;"
@@ -490,8 +490,9 @@ def _render_share_buttons() -> None:
 
     btns = ""
     for name, color, url, icon in _icons:
+        _tip = T["share_tooltip"].format(name=name)
         btns += (
-            f"<a href='{url}' target='_blank' title='Compartilhar no {name}' style='"
+            f"<a href='{url}' target='_blank' title='{_tip}' style='"
             f"{_btn_style}background:{color};' "
             f"onmouseover=\"this.style.transform='scale(1.15)';this.style.boxShadow='0 0 10px {color}80'\" "
             f"onmouseout=\"this.style.transform='scale(1)';this.style.boxShadow='none'\">"
@@ -608,17 +609,17 @@ def _render_briefing(T: dict) -> None:
                 f"border-radius:10px;padding:14px 16px;'>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
-                f"🏦 Juros</div>"
+                f"{T['briefing_juros']}</div>"
                 f"{_card(_fed_label, f'{FED_FUNDS_RATE:.2f}% {_aa}', '')}"
                 f"{_card(_selic_label, f'{SELIC_RATE:.2f}% {_aa}', '')}"
                 f"<div style='height:8px;'></div>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
-                f"🛢️ Commodities</div>"
+                f"{T['briefing_commodities_label']}</div>"
                 f"{_card('Brent', f'US$ {brent_val}', _fmt_chg('Brent'))}"
                 f"{_card('WTI', f'US$ {wti_val}', _fmt_chg('WTI'))}"
                 f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:8px;'>"
-                f"Fonte: BCB · Fed · EIA · Yahoo Finance</div>"
+                f"{T['briefing_source_left']}</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -629,13 +630,13 @@ def _render_briefing(T: dict) -> None:
                 f"border-radius:10px;padding:14px 16px;'>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
-                f"📊 Bolsas</div>"
+                f"{T['briefing_bolsas']}</div>"
                 f"{_card('Ibovespa', _fmt_val('IBOV', 'br'), _fmt_chg('IBOV'))}"
                 f"{_card('S&P 500', _fmt_val('S&P 500'), _fmt_chg('S&P 500'))}"
                 f"{_card('NASDAQ', _fmt_val('NASDAQ'), _fmt_chg('NASDAQ'))}"
                 f"{_card('FTSE', _fmt_val('FTSE'), _fmt_chg('FTSE'))}"
                 f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:8px;'>"
-                f"Fonte: Yahoo Finance · B3</div>"
+                f"{T['briefing_source_right']}</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -670,8 +671,8 @@ def _render_briefing(T: dict) -> None:
                 unsafe_allow_html=True,
             )
         st.markdown(
-            "<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
-            "Fonte: Yahoo Finance · BCB · Fed</div>",
+            f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
+            f"{T['briefing_source_footer']}</div>",
             unsafe_allow_html=True,
         )
 
@@ -781,7 +782,7 @@ def _render_prevdow_panel(T: dict) -> None:
         "border-top:none;border-radius:0 0 10px 10px;padding:8px 14px 10px;'>"
         "<table style='width:100%;border-collapse:collapse;'>"
         f"<tr style='border-bottom:1px solid #30363d;'>"
-        f"<td style='{_hdr}padding-bottom:6px;'>Perfil</td>"
+        f"<td style='{_hdr}padding-bottom:6px;'>{T['prevdow_profile_col']}</td>"
         f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_month']}</td>"
         f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_year']}</td>"
         f"</tr>"
@@ -806,13 +807,13 @@ def _render_prevdow_panel(T: dict) -> None:
         f"padding:10px 8px;border-radius:8px;font-size:.78rem;"
         f"font-weight:800;text-decoration:none;margin-top:6px;"
         f"border:1px solid #e74c3c;letter-spacing:.3px;'>"
-        f"🔒 Acessar Área do Participante</a>",
+        f"{T['prevdow_access']}</a>",
         unsafe_allow_html=True,
     )
 
     st.markdown(
-        "<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
-        "Fonte: Portal Prevdow</div>",
+        f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
+        f"{T['prevdow_source']}</div>",
         unsafe_allow_html=True,
     )
 
@@ -856,7 +857,7 @@ def _render_nitro_panel(T: dict) -> None:
         f"border-top:none;border-radius:0 0 10px 10px;padding:8px 14px 10px;'>"
         "<table style='width:100%;border-collapse:collapse;'>"
         f"<tr style='border-bottom:1px solid #30363d;'>"
-        f"<td style='{_hdr}padding-bottom:6px;'>Perfil</td>"
+        f"<td style='{_hdr}padding-bottom:6px;'>{T['prevdow_profile_col']}</td>"
         f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_month']}</td>"
         f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_year']}</td>"
         f"</tr>"
@@ -886,8 +887,8 @@ def _render_nitro_panel(T: dict) -> None:
     )
 
     st.markdown(
-        "<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
-        "Fonte: IFM Previdência</div>",
+        f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
+        f"{T['nitro_source']}</div>",
         unsafe_allow_html=True,
     )
 
@@ -938,20 +939,20 @@ def _render_macro_panel(T: dict) -> None:
         f"<div style='font-size:.7rem;color:#6e7681;margin-bottom:4px;'>"
         f"{T['macro_usdbrl_label']}</div>"
         f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
-        f"<span style='font-size:.72rem;color:#6e7681;'>Fech. anterior (venda)</span>"
+        f"<span style='font-size:.72rem;color:#6e7681;'>{T['fx_prev_close']}</span>"
         f"<span style='font-size:.85rem;font-weight:600;color:#8b949e;'>{_fx_fmt(prev)}</span></div>"
         f"<div style='{_row_style}border-bottom:1px solid #21262d;"
         f"background:rgba(212,175,55,.05);border-radius:4px;padding:5px 4px;margin:2px 0;'>"
-        f"<span style='font-size:.75rem;color:#d4af37;font-weight:700;'>Cotação online</span>"
+        f"<span style='font-size:.75rem;color:#d4af37;font-weight:700;'>{T['fx_online']}</span>"
         f"<span style='font-size:1rem;font-weight:800;color:#d4af37;'>{_fx_fmt(ask)}</span></div>"
         f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
-        f"<span style='font-size:.75rem;color:#8b949e;'>Venda</span>"
+        f"<span style='font-size:.75rem;color:#8b949e;'>{T['fx_sell']}</span>"
         f"<span style='font-size:.95rem;font-weight:700;color:#e6edf3;'>{_fx_fmt(ask)}</span></div>"
         f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
-        f"<span style='font-size:.75rem;color:#8b949e;'>Compra</span>"
+        f"<span style='font-size:.75rem;color:#8b949e;'>{T['fx_buy']}</span>"
         f"<span style='font-size:.95rem;font-weight:700;color:#e6edf3;'>{_fx_fmt(bid)}</span></div>"
         f"<div style='{_row_style}'>"
-        f"<span style='font-size:.75rem;color:#8b949e;'>Médio</span>"
+        f"<span style='font-size:.75rem;color:#8b949e;'>{T['fx_avg']}</span>"
         f"<span style='font-size:.95rem;font-weight:700;color:#e6edf3;'>{_fx_fmt(avg)}</span></div>"
         f"<div style='text-align:right;margin-top:4px;'>"
         f"<span style='font-size:.78rem;font-weight:700;color:{color};'>"
@@ -989,14 +990,14 @@ def _render_macro_panel(T: dict) -> None:
                 yaxis=dict(visible=False, range=[y_min - pad, y_max + pad]),
                 hovermode="x unified",
             )
-            st.caption("Dólar venda · 7 dias")
+            st.caption(T["fx_chart_label"])
             st.plotly_chart(spark, use_container_width=True,
                             config={"displayModeBar": False})
         except Exception:
             pass
     st.markdown(
-        "<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
-        "Fonte: BCB PTAX · Yahoo Finance</div>",
+        f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
+        f"{T['fx_source']}</div>",
         unsafe_allow_html=True,
     )
 
@@ -1423,27 +1424,27 @@ def render_sidebar(user: dict, T: dict) -> tuple:
                 else:
                     st.caption(T["admin_no_users"])
 
-            with st.expander("📊 Acessos", expanded=False):
+            with st.expander(T["admin_access_title"], expanded=False):
                 _a_stats = get_stats()
                 st.markdown(
                     f"<div style='display:flex;gap:12px;margin-bottom:8px;'>"
                     f"<div style='flex:1;background:#161b22;border:1px solid #30363d;"
                     f"border-radius:8px;padding:8px;text-align:center;'>"
-                    f"<div style='font-size:.65rem;color:#6e7681;'>TOTAL</div>"
+                    f"<div style='font-size:.65rem;color:#6e7681;'>{T['admin_total']}</div>"
                     f"<div style='font-size:1.1rem;font-weight:800;color:#d4af37;'>"
                     f"{_a_stats['total']:,}</div></div>"
                     f"<div style='flex:1;background:#161b22;border:1px solid #30363d;"
                     f"border-radius:8px;padding:8px;text-align:center;'>"
-                    f"<div style='font-size:.65rem;color:#6e7681;'>HOJE</div>"
+                    f"<div style='font-size:.65rem;color:#6e7681;'>{T['admin_today']}</div>"
                     f"<div style='font-size:1.1rem;font-weight:800;color:#3fb950;'>"
                     f"{_a_stats['today']:,}</div></div></div>",
                     unsafe_allow_html=True,
                 )
                 _daily = get_daily_series(30)
                 if _daily:
-                    _df_visits = pd.DataFrame(_daily, columns=["Data", "Acessos"])
-                    _df_visits["Data"] = pd.to_datetime(_df_visits["Data"])
-                    st.bar_chart(_df_visits.set_index("Data"), height=150)
+                    _df_visits = pd.DataFrame(_daily, columns=[T["admin_chart_date"], T["admin_chart_visits"]])
+                    _df_visits[T["admin_chart_date"]] = pd.to_datetime(_df_visits[T["admin_chart_date"]])
+                    st.bar_chart(_df_visits.set_index(T["admin_chart_date"]), height=150)
 
         st.divider()
 
@@ -1982,7 +1983,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
 
     # ── Key metrics ───────────────────────────────────────────────────────────
     st.markdown('<div class="eg-nav-anchor" id="sec-metricas"></div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="eg-section-header">{T["current_price"][:2]} Métricas</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="eg-section-header">{T["current_price"][:2]} {T["nav_metricas"]}</div>', unsafe_allow_html=True)
     m1, m2, m3, m4, m5 = st.columns(5)
 
     with m1:
@@ -2400,36 +2401,27 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     )
     st.caption(T["data_source"].format(version=APP_VERSION))
     st.markdown(
-        "<div style='text-align:center;color:#6e7681;font-size:.72rem;margin-top:8px;'>"
-        "App desenvolvido pelo Consórcio YlvorxVHM."
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    _footer_stats = get_stats()
-    st.markdown(
-        f"<div style='text-align:center;color:#484f58;font-size:.6rem;margin-top:4px;'>"
-        f"👁 {_footer_stats['total']:,} acessos · {_footer_stats['today']:,} hoje"
+        f"<div style='text-align:center;color:#6e7681;font-size:.72rem;margin-top:8px;'>"
+        f"{T['footer_credit']}"
         f"</div>",
         unsafe_allow_html=True,
     )
-    _render_share_buttons()
+    _footer_stats = get_stats()
+    _visits_total = f"{_footer_stats['total']:,}"
+    _visits_today = f"{_footer_stats['today']:,}"
+    st.markdown(
+        f"<div style='text-align:center;color:#484f58;font-size:.6rem;margin-top:4px;'>"
+        f"{T['footer_visits'].format(total=_visits_total, today=_visits_today)}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    _render_share_buttons(T)
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 def main() -> None:
     _inject_css()
-
-    # ── FAB — botão flutuante para abrir sidebar no mobile ───────────────────
-    st.markdown(
-        '<div class="eg-mobile-balloon">'
-        '← Toque na seta<br>'
-        '💲 Dólar<br>'
-        '🏦 Previdência<br>'
-        '📊 Ações'
-        '</div>',
-        unsafe_allow_html=True,
-    )
 
     # ── Session defaults ─────────────────────────────────────────────────────
     if "lang" not in st.session_state:
@@ -2439,6 +2431,17 @@ def main() -> None:
         st.session_state.user = _make_anon_user()
 
     T    = get_translator()
+
+    # ── FAB — botão flutuante para abrir sidebar no mobile ───────────────────
+    st.markdown(
+        f'<div class="eg-mobile-balloon">'
+        f'{T["mobile_hint"]}<br>'
+        f'{T["mobile_dollar"]}<br>'
+        f'{T["mobile_pension"]}<br>'
+        f'{T["mobile_stocks"]}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
     user = st.session_state.user
 
     # ── Analytics — registrar visita (1x por sessão) ─────────────────────────
@@ -2464,19 +2467,19 @@ def main() -> None:
         "</h1>",
         unsafe_allow_html=True,
     )
-    _render_share_buttons()
+    _render_share_buttons(T)
 
     # ── Navigation menu (topo da página, logo após o header) ────────────────
     _nav_items = [
-        ("Cotação", "sec-cotacao"),
-        ("Projeção", "sec-projecao"),
-        ("Dividendos", "sec-dividendos"),
-        ("Métricas", "sec-metricas"),
-        ("Saúde", "sec-saude"),
-        ("Técnico", "sec-tecnico"),
-        ("Inteligência", "sec-inteligencia"),
-        ("Proventos", "sec-proventos"),
-        ("Indicadores", "sec-indicadores"),
+        (T["nav_cotacao"], "sec-cotacao"),
+        (T["nav_projecao"], "sec-projecao"),
+        (T["nav_dividendos"], "sec-dividendos"),
+        (T["nav_metricas"], "sec-metricas"),
+        (T["nav_saude"], "sec-saude"),
+        (T["nav_tecnico"], "sec-tecnico"),
+        (T["nav_inteligencia"], "sec-inteligencia"),
+        (T["nav_proventos"], "sec-proventos"),
+        (T["nav_indicadores"], "sec-indicadores"),
     ]
     _nav_btns = "".join(
         f'<button class="eg-nav-btn" onclick="document.getElementById(\'{aid}\').scrollIntoView({{behavior:\'smooth\',block:\'start\'}})">{label}</button>'
@@ -2485,7 +2488,7 @@ def main() -> None:
     st.markdown(
         f"""<div class="eg-nav-menu">
         {_nav_btns}
-        <button class="eg-nav-btn eg-nav-topo" onclick="window.scrollTo({{top:0,behavior:'smooth'}})">Topo ↑</button>
+        <button class="eg-nav-btn eg-nav-topo" onclick="window.scrollTo({{top:0,behavior:'smooth'}})">{T["nav_topo"]}</button>
         </div>""",
         unsafe_allow_html=True,
     )
