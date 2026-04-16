@@ -466,23 +466,27 @@ def _maybe_pension_alert(T: dict) -> None:
 
 def _render_briefing(T: dict) -> None:
     """
-    🗞️ Briefing de Fechamento — expander aberto por default no topo da página.
-    Ordem: EUA (locomotiva) → Brasil → Global (FTSE, IBOV, S&P, NASDAQ) →
-    Commodities (Brent, WTI). Inclui botão que copia o resumo para WhatsApp.
+    🗞️ Briefing de Fechamento — layout em duas colunas: Bolsas e Commodities.
     """
     import urllib.parse as _url
 
     inds = _fetch_global_indicators()
     by_name = {i["name"]: i for i in inds}
 
-    def _fmt(ind_name: str, locale_hint: str = "us") -> str:
+    def _fmt_val(ind_name: str, locale_hint: str = "us") -> str:
         ind = by_name.get(ind_name)
         if not ind or ind.get("last") is None:
             return "—"
-        val = _fmt_index_value(ind["last"], locale_hint)
+        return _fmt_index_value(ind["last"], locale_hint)
+
+    def _fmt_chg(ind_name: str) -> str:
+        ind = by_name.get(ind_name)
+        if not ind:
+            return ""
         chg = ind.get("change") or 0
         arrow = "▲" if chg > 0 else ("▼" if chg < 0 else "■")
-        return f"**{val}** {arrow}{chg:+.2f}%"
+        color = "#3fb950" if chg > 0 else ("#f85149" if chg < 0 else "#8b949e")
+        return f"<span style='color:{color};font-weight:700;'>{arrow}{chg:+.2f}%</span>"
 
     def _fmt_date_br(iso: str) -> str:
         try:
@@ -490,39 +494,72 @@ def _render_briefing(T: dict) -> None:
         except Exception:
             return iso
 
+    def _card(name: str, val: str, chg_html: str) -> str:
+        return (
+            f"<div style='display:flex;justify-content:space-between;align-items:center;"
+            f"padding:6px 0;border-bottom:1px solid #21262d;'>"
+            f"<span style='color:#8b949e;font-size:.82rem;'>{name}</span>"
+            f"<span style='font-size:.88rem;'>"
+            f"<b style='color:#e6edf3;'>{val}</b> {chg_html}</span></div>"
+        )
+
     today = pd.Timestamp.now().strftime("%d/%m/%Y")
     with st.expander(T["briefing_title"].format(date=today), expanded=True):
-        lines = [
-            T["briefing_usa"].format(
-                fed=FED_FUNDS_RATE, fed_next=_fmt_date_br(FED_NEXT_MEETING)),
-            T["briefing_br"].format(
-                selic=SELIC_RATE, selic_next=_fmt_date_br(SELIC_NEXT_MEETING)),
-            T["briefing_markets"].format(
-                ftse=_fmt("FTSE"),
-                ibov=_fmt("IBOV", "br"),
-                sp=_fmt("S&P 500"),
-                nasdaq=_fmt("NASDAQ"),
-            ),
-            T["briefing_commodities"].format(
-                brent=_fmt_index_value(
-                    (by_name.get("Brent") or {}).get("last") or 0, "us"
-                ),
-                wti=_fmt_index_value(
-                    (by_name.get("WTI") or {}).get("last") or 0, "us"
-                ),
-            ),
+
+        _bc1, _bc2 = st.columns(2)
+
+        with _bc1:
+            st.markdown(
+                f"<div style='background:#161b22;border:1px solid #30363d;"
+                f"border-radius:10px;padding:14px 16px;'>"
+                f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
+                f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
+                f"📊 Bolsas</div>"
+                f"{_card('Ibovespa', _fmt_val('IBOV', 'br'), _fmt_chg('IBOV'))}"
+                f"{_card('S&P 500', _fmt_val('S&P 500'), _fmt_chg('S&P 500'))}"
+                f"{_card('NASDAQ', _fmt_val('NASDAQ'), _fmt_chg('NASDAQ'))}"
+                f"{_card('FTSE', _fmt_val('FTSE'), _fmt_chg('FTSE'))}"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        with _bc2:
+            brent_val = _fmt_val("Brent")
+            wti_val = _fmt_val("WTI")
+            _copom_html = f"<span style='color:#8b949e;font-size:.75rem;'>COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}</span>"
+            _fomc_html = f"<span style='color:#8b949e;font-size:.75rem;'>FOMC {_fmt_date_br(FED_NEXT_MEETING)}</span>"
+            st.markdown(
+                f"<div style='background:#161b22;border:1px solid #30363d;"
+                f"border-radius:10px;padding:14px 16px;'>"
+                f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
+                f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
+                f"🛢️ Commodities</div>"
+                f"{_card('Brent', f'US$ {brent_val}', _fmt_chg('Brent'))}"
+                f"{_card('WTI', f'US$ {wti_val}', _fmt_chg('WTI'))}"
+                f"<div style='height:8px;'></div>"
+                f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
+                f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
+                f"🏦 Juros</div>"
+                f"{_card('🇧🇷 Selic', f'{SELIC_RATE:.2f}%', _copom_html)}"
+                f"{_card('🇺🇸 Fed Funds', f'{FED_FUNDS_RATE:.2f}%', _fomc_html)}"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        # ── WhatsApp share ───────────────────────────────────────────────────
+        wa_lines = [
+            f"🗞️ *Briefing Equity Guard · {today}*", "",
+            f"📊 *Bolsas*",
+            f"Ibovespa {_fmt_val('IBOV', 'br')} · S&P 500 {_fmt_val('S&P 500')} · NASDAQ {_fmt_val('NASDAQ')} · FTSE {_fmt_val('FTSE')}",
+            "",
+            f"🛢️ *Commodities*",
+            f"Brent US$ {_fmt_val('Brent')} · WTI US$ {_fmt_val('WTI')}",
+            "",
+            f"🏦 *Juros*",
+            f"Selic {SELIC_RATE:.2f}% (COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}) · Fed {FED_FUNDS_RATE:.2f}% (FOMC {_fmt_date_br(FED_NEXT_MEETING)})",
+            "",
+            "_Enviado via Equity Guard_",
         ]
-        for line in lines:
-            st.markdown(line)
-
-        # ── WhatsApp copy button — pre-fills the same briefing in plain text ──
-        def _strip_md(s: str) -> str:
-            return s.replace("**", "*")  # WhatsApp bold is single *
-
-        wa_lines = [f"🗞️ *Briefing Equity Guard · {today}*", ""]
-        wa_lines += [_strip_md(l) for l in lines]
-        wa_lines.append("")
-        wa_lines.append("_Enviado via Equity Guard_")
         wa_url = f"https://wa.me/?text={_url.quote(chr(10).join(wa_lines))}"
         try:
             st.link_button(
