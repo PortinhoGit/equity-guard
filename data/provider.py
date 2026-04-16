@@ -296,37 +296,74 @@ def get_global_indicators() -> list:
 
 def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
     """
-    Cotação USD/BRL (último fechamento) + histórico de 7 dias para sparkline.
-    Usa o par 'USDBRL=X' do yfinance. Retorna dict ou None se falhar.
-
-        {
-          "last":   5.23,
-          "prev":   5.21,
-          "change": 0.38,     # variação percentual vs dia anterior
-          "series": pd.Series(índice=datas, valores=close)   # últimos 7 dias úteis
-        }
+    Cotação USD/BRL compra/venda + histórico de 7 dias (venda) para sparkline.
+    Tenta BCB PTAX primeiro; fallback via yfinance USDBRL=X.
     """
+    import requests as _req
+
+    bid = ask = None
+    # ── BCB PTAX (compra/venda oficial) ──────────────────────────────────────
+    try:
+        _today = pd.Timestamp.now().strftime("%m-%d-%Y")
+        _url = (
+            "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+            f"CotacaoDolarDia(dataCotacao=@d)?@d='{_today}'"
+            "&$top=1&$orderby=dataHoraCotacao%20desc&$format=json"
+        )
+        r = _req.get(_url, timeout=5)
+        if r.ok:
+            data = r.json().get("value", [])
+            if data:
+                bid = float(data[0]["cotacaoCompra"])
+                ask = float(data[0]["cotacaoVenda"])
+    except Exception as e:
+        logger.warning(f"BCB PTAX falhou: {e}")
+
+    # ── yfinance fallback + sparkline ────────────────────────────────────────
     try:
         tk = yf.Ticker("USDBRL=X")
         hist = tk.history(period="1mo", interval="1d", auto_adjust=True)
         if hist is None or hist.empty:
-            return None
-        closes = hist["Close"].dropna()
-        if len(closes) < 2:
-            return None
-        if closes.index.tz is not None:
-            closes.index = closes.index.tz_localize(None)
-        series = closes.tail(7)
-        last = float(series.iloc[-1])
-        prev = float(series.iloc[-2]) if len(series) >= 2 else last
-        chg  = ((last - prev) / prev * 100) if prev else 0.0
-        return {
-            "last": last, "prev": prev, "change": chg, "series": series,
-            "fetched_at": pd.Timestamp.now(),
-        }
+            if bid is None:
+                return None
+            hist_ok = False
+        else:
+            hist_ok = True
     except Exception as e:
         logger.error(f"Erro ao buscar USDBRL=X: {e}")
+        if bid is None:
+            return None
+        hist_ok = False
+
+    series = None
+    if hist_ok:
+        closes = hist["Close"].dropna()
+        if closes.index.tz is not None:
+            closes.index = closes.index.tz_localize(None)
+        if len(closes) >= 2:
+            series = closes.tail(7)
+            if ask is None:
+                ask = float(series.iloc[-1])
+            if bid is None:
+                bid = round(ask * 0.995, 4)
+
+    if ask is None:
         return None
+
+    if bid is None:
+        bid = round(ask * 0.995, 4)
+
+    avg = round((bid + ask) / 2, 4)
+
+    prev = float(series.iloc[-2]) if series is not None and len(series) >= 2 else ask
+    chg = ((ask - prev) / prev * 100) if prev else 0.0
+
+    return {
+        "bid": bid, "ask": ask, "avg": avg,
+        "last": ask, "prev": prev, "change": chg,
+        "series": series,
+        "fetched_at": pd.Timestamp.now(),
+    }
 
 
 def get_stock_history(ticker: str, period: str) -> Optional[pd.DataFrame]:

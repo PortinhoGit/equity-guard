@@ -827,16 +827,19 @@ def _render_macro_panel(T: dict) -> None:
         st.caption(T["macro_unavailable"])
         return
 
-    last   = fx["last"]
+    bid    = fx.get("bid", 0)
+    ask    = fx.get("ask", 0)
+    avg    = fx.get("avg", 0)
     change = fx["change"]
-    series = fx["series"]
+    series = fx.get("series")
     fetched = fx.get("fetched_at")
+
+    def _fx_fmt(v):
+        return f"R${v:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     arrow = "▲" if change > 0 else ("▼" if change < 0 else "■")
     color = "#3fb950" if change > 0 else ("#f85149" if change < 0 else "#8b949e")
 
-    # Current rate + delta — using BR locale (R$ hardcoded here, USD/BRL pair)
-    last_str = f"R${last:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".")
     ts_html = ""
     if fetched is not None:
         _ts = T["macro_updated_at"].format(
@@ -844,54 +847,66 @@ def _render_macro_panel(T: dict) -> None:
             time=fetched.strftime("%H:%M"),
         )
         ts_html = (
-            f"<div style='font-size:.66rem;color:#6e7681;margin-top:4px;'>"
+            f"<div style='font-size:.66rem;color:#6e7681;margin-top:6px;'>"
             f"🕒 {_ts}</div>"
         )
+
+    _row_style = "display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;"
     st.markdown(
         f"<div style='background:#161b22;border:1px solid #21262d;"
         f"border-radius:10px;padding:10px 12px;margin-top:2px;'>"
-        f"<div style='font-size:.7rem;color:#6e7681;margin-bottom:2px;'>"
+        f"<div style='font-size:.7rem;color:#6e7681;margin-bottom:4px;'>"
         f"{T['macro_usdbrl_label']}</div>"
-        f"<div style='display:flex;justify-content:space-between;align-items:baseline;'>"
-        f"<span style='font-size:1.05rem;font-weight:800;color:#e6edf3;'>{last_str}</span>"
+        f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
+        f"<span style='font-size:.75rem;color:#8b949e;'>Compra</span>"
+        f"<span style='font-size:.95rem;font-weight:700;color:#e6edf3;'>{_fx_fmt(bid)}</span></div>"
+        f"<div style='{_row_style}border-bottom:1px solid #21262d;'>"
+        f"<span style='font-size:.75rem;color:#8b949e;'>Venda</span>"
+        f"<span style='font-size:.95rem;font-weight:700;color:#e6edf3;'>{_fx_fmt(ask)}</span></div>"
+        f"<div style='{_row_style}'>"
+        f"<span style='font-size:.75rem;color:#d4af37;font-weight:600;'>Médio</span>"
+        f"<span style='font-size:.95rem;font-weight:700;color:#d4af37;'>{_fx_fmt(avg)}</span></div>"
+        f"<div style='text-align:right;margin-top:4px;'>"
         f"<span style='font-size:.78rem;font-weight:700;color:{color};'>"
-        f"{arrow} {change:+.2f}%</span>"
-        f"</div>{ts_html}</div>",
+        f"{arrow} {change:+.2f}%</span></div>"
+        f"{ts_html}</div>",
         unsafe_allow_html=True,
     )
 
-    # 7-day sparkline
-    try:
-        spark = go.Figure()
-        spark.add_trace(go.Scatter(
-            x=list(series.index), y=list(series.values),
-            mode="lines",
-            line=dict(color=color, width=1.8, shape="spline", smoothing=.5),
-            fill="tozeroy",
-            fillcolor=("rgba(63,185,80,.12)" if change >= 0 else "rgba(248,81,73,.12)"),
-            hovertemplate="%{x|%d %b}<br>R$ %{y:.4f}<extra></extra>",
-        ))
-        y_min = float(series.min())
-        y_max = float(series.max())
-        pad = (y_max - y_min) * 0.15 if y_max > y_min else 0.05
-        spark.update_layout(
-            height=90,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=2, b=14),
-            showlegend=False,
-            xaxis=dict(
-                visible=True, showgrid=False, zeroline=False, showline=False,
-                tickfont=dict(color="#6e7681", size=8),
-                tickformat="%d/%m", nticks=3,
-            ),
-            yaxis=dict(visible=False, range=[y_min - pad, y_max + pad]),
-            hovermode="x unified",
-        )
-        st.plotly_chart(spark, use_container_width=True,
-                        config={"displayModeBar": False})
-    except Exception:
-        pass
+    # Gráfico dólar venda (7 dias)
+    if series is not None and len(series) >= 2:
+        try:
+            spark = go.Figure()
+            spark.add_trace(go.Scatter(
+                x=list(series.index), y=list(series.values),
+                mode="lines",
+                line=dict(color=color, width=1.8, shape="spline", smoothing=.5),
+                fill="tozeroy",
+                fillcolor=("rgba(63,185,80,.12)" if change >= 0 else "rgba(248,81,73,.12)"),
+                hovertemplate="%{x|%d %b}<br>R$ %{y:.4f}<extra></extra>",
+            ))
+            y_min = float(series.min())
+            y_max = float(series.max())
+            pad = (y_max - y_min) * 0.15 if y_max > y_min else 0.05
+            spark.update_layout(
+                height=90,
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=0, r=0, t=2, b=14),
+                showlegend=False,
+                xaxis=dict(
+                    visible=True, showgrid=False, zeroline=False, showline=False,
+                    tickfont=dict(color="#6e7681", size=8),
+                    tickformat="%d/%m", nticks=3,
+                ),
+                yaxis=dict(visible=False, range=[y_min - pad, y_max + pad]),
+                hovermode="x unified",
+            )
+            st.caption("Dólar venda · 7 dias")
+            st.plotly_chart(spark, use_container_width=True,
+                            config={"displayModeBar": False})
+        except Exception:
+            pass
 
 
 @st.fragment
