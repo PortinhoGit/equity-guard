@@ -231,16 +231,18 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 [data-testid="stDataFrame"] > div { overflow-x: auto !important; }
 /* FAB — floating action button to open sidebar on mobile */
 .eg-fab {
-    position: fixed; bottom: 24px; right: 24px; z-index: 99999;
-    width: 52px; height: 52px; border-radius: 50%;
+    position: fixed; top: 60px; left: 12px; z-index: 99999;
+    height: auto; border-radius: 12px;
     background: linear-gradient(135deg,#b8941f,#d4af37);
     color: #0d1117; border: none; cursor: pointer;
-    font-size: 1.3rem; font-weight: 900;
+    font-size: .7rem; font-weight: 800; letter-spacing: .3px;
     box-shadow: 0 4px 16px rgba(212,175,55,.4);
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 2px; padding: 8px 10px;
     transition: transform .2s, box-shadow .2s;
 }
-.eg-fab:hover { transform: scale(1.1); box-shadow: 0 6px 24px rgba(212,175,55,.6); }
+.eg-fab:hover { transform: scale(1.05); box-shadow: 0 6px 24px rgba(212,175,55,.6); }
+.eg-fab span { font-size: 1.1rem; line-height: 1; }
 @media (min-width: 769px) { .eg-fab { display: none; } }
 /* ── Z-index defensivo: radios/headers acima do container Plotly ─────────── */
 [data-testid="stRadio"], .eg-section-header {
@@ -2418,7 +2420,11 @@ def main() -> None:
         """<button class="eg-fab" onclick="
             var btn = window.parent.document.querySelector('[data-testid=\\'collapsedControl\\']');
             if(btn) btn.click();
-        " title="Abrir menu">☰</button>""",
+        " title="Abrir menu">
+            <span>💲</span>Dólar
+            <span>🏦</span>Previd.
+            <span>📊</span>Ações
+        </button>""",
         unsafe_allow_html=True,
     )
 
