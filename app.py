@@ -141,6 +141,27 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 .eg-credit-badge { background:#0d1117; border:1px solid #d4af37; border-radius:20px; padding:6px 14px; font-size:.82rem; color:#d4af37; text-align:center; margin:8px 0; }
 /* Signal */
 .eg-signal { border-radius:12px; padding:13px 18px; text-align:center; font-size:1.05rem; font-weight:800; letter-spacing:.5px; border:1px solid rgba(255,255,255,.08); }
+/* Nav menu */
+.eg-nav-menu {
+    position: sticky; top: 0; z-index: 999;
+    background: #161b22; border-bottom: 1px solid #30363d;
+    padding: 8px 4px; display: flex; gap: 4px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.eg-nav-menu::-webkit-scrollbar { display: none; }
+.eg-nav-btn {
+    background: transparent; color: #8b949e;
+    border: 1px solid transparent; border-radius: 20px;
+    padding: 6px 16px; font-size: 0.82rem; font-weight: 600;
+    white-space: nowrap; cursor: pointer;
+    transition: all 0.2s; font-family: 'Inter', system-ui, sans-serif;
+}
+.eg-nav-btn:hover {
+    color: #d4af37; border-color: #d4af37;
+    background: rgba(212,175,55,0.08);
+}
+.eg-nav-topo { color: #d4af37; margin-left: auto; }
 /* Health row */
 .eg-health-row { display:flex; justify-content:space-between; align-items:center; padding:9px 14px; border-radius:8px; margin:5px 0; font-size:.88rem; border:1px solid #30363d; }
 /* Best badge */
@@ -1640,8 +1661,35 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ══════════════════════════════════════════════════════════════════════════
+    # 🧭 NAVIGATION MENU — sticky horizontal bar
+    # ══════════════════════════════════════════════════════════════════════════
+    _nav_items = [
+        ("Cotação", "sec-cotacao"),
+        ("Projeção", "sec-projecao"),
+        ("Dividendos", "sec-dividendos"),
+        ("Métricas", "sec-metricas"),
+        ("Saúde", "sec-saude"),
+        ("Técnico", "sec-tecnico"),
+        ("Inteligência", "sec-inteligencia"),
+        ("Proventos", "sec-proventos"),
+        ("Indicadores", "sec-indicadores"),
+    ]
+    _nav_btns = "".join(
+        f'<button class="eg-nav-btn" onclick="document.getElementById(\'{aid}\').scrollIntoView({{behavior:\'smooth\',block:\'start\'}})">{label}</button>'
+        for label, aid in _nav_items
+    )
+    st.markdown(
+        f"""<div class="eg-nav-menu">
+        {_nav_btns}
+        <button class="eg-nav-btn eg-nav-topo" onclick="window.scrollTo({{top:0,behavior:'smooth'}})">Topo ↑</button>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    # ══════════════════════════════════════════════════════════════════════════
     # 📈 INTERACTIVE QUOTE — right below the signal (primary scroll experience)
     # ══════════════════════════════════════════════════════════════════════════
+    st.markdown('<span id="sec-cotacao"></span>', unsafe_allow_html=True)
     _render_interactive_quote(ticker, df, T, cs)
 
     st.divider()
@@ -1649,6 +1697,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # 🔮 FUTURE-FOCUS BLOCK — projection + monthly map at the top of the page
     # ══════════════════════════════════════════════════════════════════════════
+    st.markdown('<span id="sec-projecao"></span>', unsafe_allow_html=True)
     _fut_left, _fut_right = st.columns([3, 2])
 
     with _fut_left:
@@ -1738,6 +1787,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # 🎯 INCOME GOAL CALCULATOR
     # ══════════════════════════════════════════════════════════════════════════
+    st.markdown('<span id="sec-dividendos"></span>', unsafe_allow_html=True)
     st.markdown(
         f'<div class="eg-section-header">{T["goal_title"]}</div>',
         unsafe_allow_html=True,
@@ -1779,6 +1829,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Key metrics ───────────────────────────────────────────────────────────
+    st.markdown('<span id="sec-metricas"></span>', unsafe_allow_html=True)
     st.markdown(f'<div class="eg-section-header">{T["current_price"][:2]} Métricas</div>', unsafe_allow_html=True)
     m1, m2, m3, m4, m5 = st.columns(5)
 
@@ -1901,6 +1952,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Financial health + Trend ──────────────────────────────────────────────
+    st.markdown('<span id="sec-saude"></span>', unsafe_allow_html=True)
     col_h, col_t = st.columns(2)
 
     with col_h:
@@ -1997,6 +2049,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Main chart ────────────────────────────────────────────────────────────
+    st.markdown('<span id="sec-tecnico"></span>', unsafe_allow_html=True)
     st.markdown(f'<div class="eg-section-header">{T["chart_title"]}</div>', unsafe_allow_html=True)
     try:
         st.plotly_chart(
@@ -2010,6 +2063,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # 🧠 ANÁLISE ESTRUTURADA — unified narrative (trend + technicals + valuation)
     # ══════════════════════════════════════════════════════════════════════════
+    st.markdown('<span id="sec-inteligencia"></span>', unsafe_allow_html=True)
     st.markdown(
         f'<div class="eg-section-header" style="margin-top:12px;">{T["narrative_title"]}</div>',
         unsafe_allow_html=True,
@@ -2107,6 +2161,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Dividends (historical bar chart) ──────────────────────────────────────
+    st.markdown('<span id="sec-proventos"></span>', unsafe_allow_html=True)
     st.markdown(f'<div class="eg-section-header">{T["dividends_title"]}</div>', unsafe_allow_html=True)
     if dividends is not None and not dividends.empty:
         st.plotly_chart(
@@ -2160,6 +2215,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         st.info(T["cal_no_data"])
 
     # ── Glossary expander ─────────────────────────────────────────────────────
+    st.markdown('<span id="sec-indicadores"></span>', unsafe_allow_html=True)
     with st.expander(T["glossary_title"]):
         _g1, _g2 = st.columns(2)
         _gitems = T["glossary_items"]
