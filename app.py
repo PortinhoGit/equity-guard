@@ -141,29 +141,27 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 .eg-credit-badge { background:#0d1117; border:1px solid #d4af37; border-radius:20px; padding:6px 14px; font-size:.82rem; color:#d4af37; text-align:center; margin:8px 0; }
 /* Signal */
 .eg-signal { border-radius:12px; padding:13px 18px; text-align:center; font-size:1.05rem; font-weight:800; letter-spacing:.5px; border:1px solid rgba(255,255,255,.08); }
-/* Nav menu — fixed at top of viewport */
+/* Nav menu */
 .eg-nav-menu {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
-    background: #161b22; border-bottom: 1px solid #30363d;
-    padding: 8px 16px; display: flex; gap: 4px;
+    background: #1c2333; border: 1px solid #d4af37;
+    border-radius: 12px; padding: 8px 12px; display: flex; gap: 4px;
     overflow-x: auto; -webkit-overflow-scrolling: touch;
     scrollbar-width: none; justify-content: center;
+    margin-bottom: 12px; flex-wrap: wrap;
 }
 .eg-nav-menu::-webkit-scrollbar { display: none; }
 .eg-nav-btn {
-    background: transparent; color: #8b949e;
-    border: 1px solid transparent; border-radius: 20px;
-    padding: 6px 16px; font-size: 0.82rem; font-weight: 600;
+    background: rgba(212,175,55,0.06); color: #e6edf3;
+    border: 1px solid #30363d; border-radius: 20px;
+    padding: 6px 14px; font-size: 0.78rem; font-weight: 600;
     white-space: nowrap; cursor: pointer;
     transition: all 0.2s; font-family: 'Inter', system-ui, sans-serif;
 }
 .eg-nav-btn:hover {
-    color: #d4af37; border-color: #d4af37;
-    background: rgba(212,175,55,0.08);
+    color: #0d1117; border-color: #d4af37;
+    background: #d4af37;
 }
-.eg-nav-topo { color: #d4af37; margin-left: auto; }
-.eg-nav-anchor { display: block; height: 48px; margin-top: -48px; visibility: hidden; pointer-events: none; }
-.eg-nav-spacer { height: 48px; }
+.eg-nav-topo { color: #d4af37; border-color: #d4af37; margin-left: auto; }
 /* Health row */
 .eg-health-row { display:flex; justify-content:space-between; align-items:center; padding:9px 14px; border-radius:8px; margin:5px 0; font-size:.88rem; border:1px solid #30363d; }
 /* Best badge */
@@ -1712,7 +1710,6 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         ("Técnico", "sec-tecnico"),
         ("Inteligência", "sec-inteligencia"),
         ("Proventos", "sec-proventos"),
-        ("Previdência", "sec-previdencia"),
         ("Indicadores", "sec-indicadores"),
     ]
     _nav_btns = "".join(
@@ -1723,8 +1720,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         f"""<div class="eg-nav-menu">
         {_nav_btns}
         <button class="eg-nav-btn eg-nav-topo" onclick="window.scrollTo({{top:0,behavior:'smooth'}})">Topo ↑</button>
-        </div>
-        <div class="eg-nav-spacer"></div>""",
+        </div>""",
         unsafe_allow_html=True,
     )
 
@@ -2226,6 +2222,19 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ── Dividend Calendar ─────────────────────────────────────────────────────
     st.markdown(f'<div class="eg-section-header">{T["cal_title"]}</div>', unsafe_allow_html=True)
     _cal = get_dividend_calendar(ticker)
+    if _cal.empty and dividends is not None and not dividends.empty:
+        _today = pd.Timestamp.now().normalize()
+        _rows = []
+        for _ex_date, _val in dividends.tail(15).items():
+            _ex_ts = pd.Timestamp(_ex_date).normalize()
+            _com_ts = _ex_ts - pd.offsets.BDay(1)
+            _status = "paid" if _ex_ts < _today else "provisioned"
+            _d_until = int((_com_ts - _today).days) if _com_ts >= _today else None
+            _rows.append({"type": "Div/JCP", "com_date": _com_ts, "ex_date": _ex_ts,
+                          "payment_date": None, "value": float(_val),
+                          "status": _status, "days_until_com": _d_until})
+        if _rows:
+            _cal = pd.DataFrame(_rows).sort_values("ex_date", ascending=False).reset_index(drop=True)
     if not _cal.empty:
         # Countdown banner for upcoming dividends
         _upcoming = _cal[_cal["status"] == "provisioned"]
@@ -2255,16 +2264,6 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         st.caption(T["cal_com_hint"])
     else:
         st.info(T["cal_no_data"])
-
-    # ── Previdência — Prevdow + Nitro ────────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-previdencia"></div>', unsafe_allow_html=True)
-    _prev_col1, _prev_col2 = st.columns(2)
-    with _prev_col1:
-        _render_prevdow_panel(T)
-    with _prev_col2:
-        _render_nitro_panel(T)
-
-    st.divider()
 
     # ── Glossary expander ─────────────────────────────────────────────────────
     st.markdown('<div class="eg-nav-anchor" id="sec-indicadores"></div>', unsafe_allow_html=True)
