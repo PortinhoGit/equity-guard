@@ -1696,32 +1696,6 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ══════════════════════════════════════════════════════════════════════════
-    # 🧭 NAVIGATION MENU — sticky horizontal bar
-    # ══════════════════════════════════════════════════════════════════════════
-    _nav_items = [
-        ("Cotação", "sec-cotacao"),
-        ("Projeção", "sec-projecao"),
-        ("Dividendos", "sec-dividendos"),
-        ("Métricas", "sec-metricas"),
-        ("Saúde", "sec-saude"),
-        ("Técnico", "sec-tecnico"),
-        ("Inteligência", "sec-inteligencia"),
-        ("Proventos", "sec-proventos"),
-        ("Indicadores", "sec-indicadores"),
-    ]
-    _nav_btns = "".join(
-        f'<button class="eg-nav-btn" onclick="document.getElementById(\'{aid}\').scrollIntoView({{behavior:\'smooth\',block:\'start\'}})">{label}</button>'
-        for label, aid in _nav_items
-    )
-    st.markdown(
-        f"""<div class="eg-nav-menu">
-        {_nav_btns}
-        <button class="eg-nav-btn eg-nav-topo" onclick="window.scrollTo({{top:0,behavior:'smooth'}})">Topo ↑</button>
-        </div>""",
-        unsafe_allow_html=True,
-    )
-
-    # ══════════════════════════════════════════════════════════════════════════
     # 📈 INTERACTIVE QUOTE — right below the signal (primary scroll experience)
     # ══════════════════════════════════════════════════════════════════════════
     st.markdown('<div class="eg-nav-anchor" id="sec-cotacao"></div>', unsafe_allow_html=True)
@@ -2326,6 +2300,30 @@ def main() -> None:
 
     # ── Global indicators ribbon (Bloomberg-style top bar) ───────────────────
     _render_global_bar(T)
+
+    # ── Navigation menu ──────────────────────────────────────────────────────
+    _nav_items = [
+        ("Cotação", "sec-cotacao"),
+        ("Projeção", "sec-projecao"),
+        ("Dividendos", "sec-dividendos"),
+        ("Métricas", "sec-metricas"),
+        ("Saúde", "sec-saude"),
+        ("Técnico", "sec-tecnico"),
+        ("Inteligência", "sec-inteligencia"),
+        ("Proventos", "sec-proventos"),
+        ("Indicadores", "sec-indicadores"),
+    ]
+    _nav_btns = "".join(
+        f'<button class="eg-nav-btn" onclick="document.getElementById(\'{aid}\').scrollIntoView({{behavior:\'smooth\',block:\'start\'}})">{label}</button>'
+        for label, aid in _nav_items
+    )
+    st.markdown(
+        f"""<div class="eg-nav-menu">
+        {_nav_btns}
+        <button class="eg-nav-btn eg-nav-topo" onclick="window.scrollTo({{top:0,behavior:'smooth'}})">Topo ↑</button>
+        </div>""",
+        unsafe_allow_html=True,
+    )
 
     # ── Sidebar + analysis ───────────────────────────────────────────────────
     ticker, period, target_yield, clicked = render_sidebar(user, T)
