@@ -604,6 +604,38 @@ def _render_briefing(T: dict) -> None:
         color = "#3fb950" if chg > 0 else ("#f85149" if chg < 0 else "#8b949e")
         return f"<span style='color:{color};font-weight:700;'>{arrow}{chg:+.2f}%</span>"
 
+    def _chg_trio(ind_name: str) -> str:
+        """Retorna 'dia | YTD | 1A' formatado para o card."""
+        ind = by_name.get(ind_name)
+        if not ind:
+            return ""
+        def _c(v):
+            if v is None:
+                return "<span style='color:#484f58;'>—</span>"
+            c = "#3fb950" if v > 0 else ("#f85149" if v < 0 else "#8b949e")
+            return f"<span style='color:{c};font-weight:700;'>{v:+.1f}%</span>"
+        chg = ind.get("change") or 0
+        ytd = ind.get("chg_ytd")
+        y1 = ind.get("chg_1y")
+        return (
+            f"<div style='display:flex;gap:6px;justify-content:flex-end;font-size:.68rem;margin-top:2px;'>"
+            f"<span style='color:#484f58;'>dia</span>{_c(chg)} "
+            f"<span style='color:#484f58;'>YTD</span>{_c(ytd)} "
+            f"<span style='color:#484f58;'>1A</span>{_c(y1)}</div>"
+        )
+
+    def _wa_chg_trio(ind_name: str) -> str:
+        """Retorna 'dia/YTD/1A' para WhatsApp texto."""
+        ind = by_name.get(ind_name)
+        if not ind:
+            return ""
+        chg = ind.get("change") or 0
+        ytd = ind.get("chg_ytd")
+        y1 = ind.get("chg_1y")
+        ytd_s = f"{ytd:+.1f}%" if ytd is not None else "—"
+        y1_s = f"{y1:+.1f}%" if y1 is not None else "—"
+        return f"dia {chg:+.1f}% · YTD {ytd_s} · 1A {y1_s}"
+
     def _fmt_date_br(iso: str) -> str:
         try:
             return pd.Timestamp(iso).strftime("%d/%m/%Y")
@@ -642,8 +674,8 @@ def _render_briefing(T: dict) -> None:
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
                 f"{T['briefing_commodities_label']}</div>"
-                f"{_card('Brent', f'US$ {brent_val}', _fmt_chg('Brent'))}"
-                f"{_card('WTI', f'US$ {wti_val}', _fmt_chg('WTI'))}"
+                f"{_card('Brent', f'US$ {brent_val}', _chg_trio('Brent'))}"
+                f"{_card('WTI', f'US$ {wti_val}', _chg_trio('WTI'))}"
                 f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:8px;'>"
                 f"{T['briefing_source_left']}</div>"
                 f"</div>",
@@ -657,10 +689,10 @@ def _render_briefing(T: dict) -> None:
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
                 f"{T['briefing_bolsas']}</div>"
-                f"{_card('Ibovespa', _fmt_val('IBOV', 'br'), _fmt_chg('IBOV'))}"
-                f"{_card('S&P 500', _fmt_val('S&P 500'), _fmt_chg('S&P 500'))}"
-                f"{_card('NASDAQ', _fmt_val('NASDAQ'), _fmt_chg('NASDAQ'))}"
-                f"{_card('FTSE', _fmt_val('FTSE'), _fmt_chg('FTSE'))}"
+                f"{_card('Ibovespa', _fmt_val('IBOV', 'br'), _chg_trio('IBOV'))}"
+                f"{_card('S&P 500', _fmt_val('S&P 500'), _chg_trio('S&P 500'))}"
+                f"{_card('NASDAQ', _fmt_val('NASDAQ'), _chg_trio('NASDAQ'))}"
+                f"{_card('FTSE', _fmt_val('FTSE'), _chg_trio('FTSE'))}"
                 f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:8px;'>"
                 f"{T['briefing_source_right']}</div>"
                 f"</div>",
@@ -692,17 +724,26 @@ def _render_briefing(T: dict) -> None:
             f"COPOM: {_fmt_date_br(SELIC_NEXT_MEETING)}",
             "",
             f"🛢️ *Commodities*",
-            f"Brent: US$ {_fmt_val('Brent')}",
-            f"WTI: US$ {_fmt_val('WTI')}",
+            f"Brent: US$ {_fmt_val('Brent')} ({_wa_chg_trio('Brent')})",
+            f"WTI: US$ {_fmt_val('WTI')} ({_wa_chg_trio('WTI')})",
             "",
             f"💵 *Dólar Comercial*",
             f"Venda: {_fx_com}",
+        ]
+        _fx_wa_data = _fx_wa or {}
+        _fx_ytd = _fx_wa_data.get("chg_ytd")
+        _fx_1y = _fx_wa_data.get("chg_1y")
+        _fx_chg = _fx_wa_data.get("change", 0)
+        _fx_ytd_s = f"{_fx_ytd:+.1f}%" if _fx_ytd is not None else "—"
+        _fx_1y_s = f"{_fx_1y:+.1f}%" if _fx_1y is not None else "—"
+        wa_lines += [
+            f"dia {_fx_chg:+.1f}% · YTD {_fx_ytd_s} · 1A {_fx_1y_s}",
             "",
             f"📊 *Bolsas*",
-            f"Ibovespa: {_fmt_val('IBOV', 'br')}",
-            f"S&P 500: {_fmt_val('S&P 500')}",
-            f"NASDAQ: {_fmt_val('NASDAQ')}",
-            f"FTSE: {_fmt_val('FTSE')}",
+            f"Ibovespa: {_fmt_val('IBOV', 'br')} ({_wa_chg_trio('IBOV')})",
+            f"S&P 500: {_fmt_val('S&P 500')} ({_wa_chg_trio('S&P 500')})",
+            f"NASDAQ: {_fmt_val('NASDAQ')} ({_wa_chg_trio('NASDAQ')})",
+            f"FTSE: {_fmt_val('FTSE')} ({_wa_chg_trio('FTSE')})",
             "",
             f"🏦 *Previdência ({_pd['data_base']})*",
             f"Prevdow CDI: {_pd['cdi_month']:+.2f}% mês / {_pd['cdi_year']:+.2f}% ano",
@@ -1056,6 +1097,12 @@ def _render_macro_panel(T: dict) -> None:
     _t_com = T.get("fx_commercial", "Comercial")
     _t_tur = T.get("fx_tourism", "Turismo")
     _t_prev = T.get("fx_prev_close", "Fech. ontem")
+    _fx_ytd = fx.get("chg_ytd")
+    _fx_1y = fx.get("chg_1y")
+    _ytd_str = f"{_fx_ytd:+.1f}%" if _fx_ytd is not None else "—"
+    _y1_str = f"{_fx_1y:+.1f}%" if _fx_1y is not None else "—"
+    _ytd_color = "#3fb950" if _fx_ytd and _fx_ytd > 0 else ("#f85149" if _fx_ytd and _fx_ytd < 0 else "#8b949e")
+    _y1_color = "#3fb950" if _fx_1y and _fx_1y > 0 else ("#f85149" if _fx_1y and _fx_1y < 0 else "#8b949e")
     _t_online = T.get("fx_online", "Cotação online")
     _t_sell = T.get("fx_sell", "Venda")
     _t_buy = T.get("fx_buy", "Compra")
@@ -1089,9 +1136,11 @@ def _render_macro_panel(T: dict) -> None:
         f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(com_bid)}</td>"
         f"<td style='{_cell}color:#e6edf3;font-weight:700;'>{_fx(tur_bid)}</td></tr>"
         f"</table>"
-        f"<div style='text-align:right;margin-top:4px;'>"
-        f"<span style='font-size:.78rem;font-weight:700;color:{color};'>"
-        f"{arrow} {change:+.2f}%</span></div>"
+        f"<div style='display:flex;gap:8px;justify-content:flex-end;font-size:.68rem;margin-top:6px;flex-wrap:wrap;'>"
+        f"<span><span style='color:#484f58;'>dia</span> <span style='color:{color};font-weight:700;'>{change:+.1f}%</span></span>"
+        f"<span><span style='color:#484f58;'>YTD</span> <span style='font-weight:700;color:{_ytd_color};'>{_ytd_str}</span></span>"
+        f"<span><span style='color:#484f58;'>1A</span> <span style='font-weight:700;color:{_y1_color};'>{_y1_str}</span></span>"
+        f"</div>"
         f"{ts_html}</div>",
         unsafe_allow_html=True,
     )

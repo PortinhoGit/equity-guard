@@ -265,29 +265,39 @@ _GLOBAL_TICKERS = [
 
 def get_global_indicators() -> list:
     """
-    Busca o último fechamento + variação diária % dos principais índices
-    globais e commodities de energia.
-    Retorna lista de dicts: {name, symbol, locale, last, change}.
-    Valores None quando o fetch falha (não quebra o painel).
+    Busca fechamento + variação dia/YTD/1ano dos principais índices e commodities.
+    Retorna lista de dicts com: name, symbol, locale, last, change, chg_ytd, chg_1y.
     """
     results = []
     for name, sym, locale in _GLOBAL_TICKERS:
         entry = {"name": name, "symbol": sym, "locale": locale,
-                 "last": None, "change": None}
+                 "last": None, "change": None, "chg_ytd": None, "chg_1y": None}
         try:
             tk = yf.Ticker(sym)
-            hist = tk.history(period="5d", interval="1d", auto_adjust=True)
+            hist = tk.history(period="13mo", interval="1d", auto_adjust=True)
             if hist is None or hist.empty:
                 results.append(entry)
                 continue
             closes = hist["Close"].dropna()
+            if closes.index.tz is not None:
+                closes.index = closes.index.tz_localize(None)
             if len(closes) < 2:
                 results.append(entry)
                 continue
             last = float(closes.iloc[-1])
             prev = float(closes.iloc[-2])
-            entry["last"]   = last
+            entry["last"] = last
             entry["change"] = ((last - prev) / prev * 100) if prev else 0.0
+            jan1 = pd.Timestamp(pd.Timestamp.now().year, 1, 1)
+            ytd_data = closes[closes.index <= jan1 + pd.Timedelta(days=5)]
+            if not ytd_data.empty:
+                ytd_price = float(ytd_data.iloc[-1])
+                entry["chg_ytd"] = ((last - ytd_price) / ytd_price * 100) if ytd_price else None
+            y1_cutoff = pd.Timestamp.now() - pd.Timedelta(days=365)
+            y1_data = closes[closes.index <= y1_cutoff + pd.Timedelta(days=5)]
+            if not y1_data.empty:
+                y1_price = float(y1_data.iloc[-1])
+                entry["chg_1y"] = ((last - y1_price) / y1_price * 100) if y1_price else None
         except Exception as e:
             logger.error(f"global indicator {sym} failed: {e}")
         results.append(entry)
@@ -322,7 +332,7 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
     # ── yfinance (comercial) + sparkline ─────────────────────────────────────
     try:
         tk = yf.Ticker("USDBRL=X")
-        hist = tk.history(period="1mo", interval="1d", auto_adjust=True)
+        hist = tk.history(period="13mo", interval="1d", auto_adjust=True)
         if hist is None or hist.empty:
             if bid is None:
                 return None
@@ -352,8 +362,26 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
     if bid is None:
         bid = round(ask * 0.995, 4)
 
+    all_closes = hist["Close"].dropna() if hist_ok else None
+    if all_closes is not None and all_closes.index.tz is not None:
+        all_closes.index = all_closes.index.tz_localize(None)
+
     prev = float(series.iloc[-2]) if series is not None and len(series) >= 2 else ask
     chg = ((ask - prev) / prev * 100) if prev else 0.0
+
+    chg_ytd = None
+    chg_1y = None
+    if all_closes is not None and len(all_closes) > 5:
+        jan1 = pd.Timestamp(pd.Timestamp.now().year, 1, 1)
+        ytd_data = all_closes[all_closes.index <= jan1 + pd.Timedelta(days=5)]
+        if not ytd_data.empty:
+            ytd_price = float(ytd_data.iloc[-1])
+            chg_ytd = ((ask - ytd_price) / ytd_price * 100) if ytd_price else None
+        y1_cutoff = pd.Timestamp.now() - pd.Timedelta(days=365)
+        y1_data = all_closes[all_closes.index <= y1_cutoff + pd.Timedelta(days=5)]
+        if not y1_data.empty:
+            y1_price = float(y1_data.iloc[-1])
+            chg_1y = ((ask - y1_price) / y1_price * 100) if y1_price else None
 
     TURISMO_SPREAD = 0.04
     tur_bid = round(bid * (1 + TURISMO_SPREAD), 4)
@@ -363,7 +391,8 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
     return {
         "com_bid": bid, "com_ask": ask, "com_prev": prev,
         "tur_bid": tur_bid, "tur_ask": tur_ask, "tur_prev": prev_tur,
-        "change": chg, "series": series,
+        "change": chg, "chg_ytd": chg_ytd, "chg_1y": chg_1y,
+        "series": series,
         "last": ask, "prev": prev,
         "fetched_at": pd.Timestamp.now(tz="America/Sao_Paulo").tz_localize(None),
     }
