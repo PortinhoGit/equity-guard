@@ -718,6 +718,7 @@ def _render_briefing(T: dict) -> None:
 
         _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
         _hora_online = _now_brt.strftime("%H:%M")
+        _yesterday_brt = (_now_brt - pd.offsets.BDay(1)).strftime("%d/%m/%Y")
 
         _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
         _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
@@ -751,18 +752,18 @@ def _render_briefing(T: dict) -> None:
         # ── Botão VERMELHO: Fechamento dia anterior ──────────────────────────
         _close_msg = (
             "*Briefing Equity Guard*\\n"
-            + "*Fechamento " + today + "*\\n\\n"
+            + "*Fechamento " + _yesterday_brt + "*\\n\\n"
             + _juros_block + "\\n\\n"
             + "--- *Commodities* ---\\n"
-            + "Brent  US$ " + _wa_val('Brent') + "  " + _wa_chg('Brent') + "\\n"
-            + "WTI  US$ " + _wa_val('WTI') + "  " + _wa_chg('WTI') + "\\n\\n"
+            + "Brent .... US$ " + _wa_val('Brent') + "\\n"
+            + "WTI ...... US$ " + _wa_val('WTI') + "\\n\\n"
             + "--- *Dolar* ---\\n"
-            + "Venda  " + _fx_prev + "\\n\\n"
+            + "Venda .... " + _fx_prev + "\\n\\n"
             + "--- *Bolsas* ---\\n"
-            + "Ibovespa  " + _wa_val('IBOV', 'br') + "  " + _wa_chg('IBOV') + "\\n"
-            + "S&P 500  " + _wa_val('S&P 500') + "  " + _wa_chg('S&P 500') + "\\n"
-            + "NASDAQ  " + _wa_val('NASDAQ') + "  " + _wa_chg('NASDAQ') + "\\n"
-            + "FTSE  " + _wa_val('FTSE') + "  " + _wa_chg('FTSE') + "\\n\\n"
+            + "Ibovespa . " + _wa_val('IBOV', 'br') + "\\n"
+            + "S&P 500 .. " + _wa_val('S&P 500') + "\\n"
+            + "NASDAQ ... " + _wa_val('NASDAQ') + "\\n"
+            + "FTSE ..... " + _wa_val('FTSE') + "\\n\\n"
             + _prev_block + "\\n\\n"
             + _footer
         )
@@ -773,15 +774,15 @@ def _render_briefing(T: dict) -> None:
             + "*Online " + today + " " + _hora_online + " (Brasilia)*\\n\\n"
             + _juros_block + "\\n\\n"
             + "--- *Commodities* ---\\n"
-            + "Brent  US$ " + _wa_val('Brent') + "  " + _wa_chg('Brent') + "\\n"
-            + "WTI  US$ " + _wa_val('WTI') + "  " + _wa_chg('WTI') + "\\n\\n"
+            + "Brent .... US$ " + _wa_val('Brent') + " " + _wa_chg('Brent') + "\\n"
+            + "WTI ...... US$ " + _wa_val('WTI') + " " + _wa_chg('WTI') + "\\n\\n"
             + "--- *Dolar* ---\\n"
-            + "Venda  " + _fx_com + "  " + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
+            + "Venda .... " + _fx_com + " " + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
             + "--- *Bolsas* ---\\n"
-            + "Ibovespa  " + _wa_val('IBOV', 'br') + "  " + _wa_chg('IBOV') + "\\n"
-            + "S&P 500  " + _wa_val('S&P 500') + "  " + _wa_chg('S&P 500') + "\\n"
-            + "NASDAQ  " + _wa_val('NASDAQ') + "  " + _wa_chg('NASDAQ') + "\\n"
-            + "FTSE  " + _wa_val('FTSE') + "  " + _wa_chg('FTSE') + "\\n\\n"
+            + "Ibovespa . " + _wa_val('IBOV', 'br') + " " + _wa_chg('IBOV') + "\\n"
+            + "S&P 500 .. " + _wa_val('S&P 500') + " " + _wa_chg('S&P 500') + "\\n"
+            + "NASDAQ ... " + _wa_val('NASDAQ') + " " + _wa_chg('NASDAQ') + "\\n"
+            + "FTSE ..... " + _wa_val('FTSE') + " " + _wa_chg('FTSE') + "\\n\\n"
             + _prev_block + "\\n\\n"
             + _footer
         )
