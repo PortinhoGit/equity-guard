@@ -22,7 +22,7 @@ _PT: dict = {
     "custom_ticker_label": "Outro ticker",
     "rate_annual": "a.a.",
     "period_label": "Período",
-    "yield_slider": "Yield Mínimo Desejado (%)",
+    "yield_slider": "Retorno Mínimo Desejado (%)",
     "analyze_btn":  "🔍 Analisar",
     "logout_btn":   "Sair",
     "lang_select":  "Idioma",

@@ -696,76 +696,120 @@ def _render_briefing(T: dict) -> None:
                 unsafe_allow_html=True,
             )
 
-        # ── WhatsApp share — layout vertical organizado ────────────────────
+        # ── WhatsApp share — dois botões: fechamento + online ────────────────
         _fx_wa = _fetch_fx_usdbrl()
-        _fx_com = f"R${_fx_wa['com_ask']:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".") if _fx_wa else "—"
-
         _pd = PREVDOW_DATA
         _nd = NITRO_DATA
+        import streamlit.components.v1 as _wa_comp
+
+        def _fx_fmt_wa(v):
+            return f"R${v:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".") if v else "---"
 
         def _wa_chg(name):
             ind = by_name.get(name)
             if not ind or ind.get("change") is None:
                 return ""
             c = ind["change"]
-            arrow = "▲" if c > 0 else ("▼" if c < 0 else "■")
-            return f"{arrow}{c:+.1f}%"
+            arrow = "+" if c > 0 else ""
+            return f"{arrow}{c:.1f}%"
 
-        _fx_chg = (_fx_wa or {}).get("change", 0)
-        _fx_arrow = "▲" if _fx_chg > 0 else ("▼" if _fx_chg < 0 else "■")
+        def _wa_val(name, loc="us"):
+            return _fmt_val(name, loc)
 
-        wa_lines = [
-            "*Briefing Equity Guard*",
-            "*" + today + "*",
-            "",
-            "--- *Juros* ---",
-            "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (FOMC " + _fmt_date_br(FED_NEXT_MEETING) + ")",
-            "BR Selic: " + f"{SELIC_RATE:.2f}%" + " (COPOM " + _fmt_date_br(SELIC_NEXT_MEETING) + ")",
-            "",
-            "--- *Commodities* ---",
-            "Brent US$ " + _fmt_val('Brent') + " " + _wa_chg('Brent'),
-            "WTI US$ " + _fmt_val('WTI') + " " + _wa_chg('WTI'),
-            "",
-            "--- *Dolar Comercial* ---",
-            "Venda " + _fx_com + " " + _fx_arrow + f"{_fx_chg:+.1f}%",
-            "",
-            "--- *Bolsas* ---",
-            "Ibovespa " + _fmt_val('IBOV', 'br') + " " + _wa_chg('IBOV'),
-            "S&P 500 " + _fmt_val('S&P 500') + " " + _wa_chg('S&P 500'),
-            "NASDAQ " + _fmt_val('NASDAQ') + " " + _wa_chg('NASDAQ'),
-            "FTSE " + _fmt_val('FTSE') + " " + _wa_chg('FTSE'),
-            "",
-            "--- *Previdencia (" + _pd['data_base'] + ")* ---",
-            "Prevdow CDI " + f"{_pd['cdi_month']:+.2f}%" + " | Bal. " + f"{_pd['balanced_month']:+.2f}%",
-            "Nitro CDI " + f"{_nd['cdi_month']:+.2f}%" + " | Bal. " + f"{_nd['balanced_month']:+.2f}%",
-            "",
-            "_Cortesia YlvorxVHM_",
-            "equityguard.streamlit.app",
-        ]
-        _wa_text_raw = chr(10).join(wa_lines)
-        _wa_text_escaped = _wa_text_raw.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
-        import streamlit.components.v1 as _wa_comp
-        _btn_label = T.get("briefing_copy_btn", "Compartilhar no WhatsApp")
-        _wa_comp.html("""
-        <button onclick="
-            var msg = `""" + _wa_text_escaped + """`;
+        _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
+        _hora_online = _now_brt.strftime("%H:%M")
+
+        _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
+        _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
+        _fx_chg_val = (_fx_wa or {}).get("change", 0)
+
+        _emoji_js = """
             msg = msg.replace('--- *Juros* ---', String.fromCodePoint(0x1F3E6)+' *Juros*');
             msg = msg.replace('US Fed:', String.fromCodePoint(0x1F1FA,0x1F1F8)+' Fed:');
             msg = msg.replace('BR Selic:', String.fromCodePoint(0x1F1E7,0x1F1F7)+' Selic:');
             msg = msg.replace('--- *Commodities* ---', String.fromCodePoint(0x1F6E2)+' *Commodities*');
-            msg = msg.replace('--- *Dolar Comercial* ---', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
+            msg = msg.replace('--- *Dolar* ---', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
             msg = msg.replace('--- *Bolsas* ---', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
             msg = msg.replace('--- *Previdencia', String.fromCodePoint(0x1F3E6)+' *Previdencia');
-            msg = msg.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA)+' *Briefing Equity Guard*');
-            msg = msg.replace('equityguard.streamlit.app', String.fromCodePoint(0x1F449)+' equityguard.streamlit.app');
+            msg = msg.replace('*Briefing', String.fromCodePoint(0x1F4CA)+' *Briefing');
+            msg = msg.replace('equityguard', String.fromCodePoint(0x1F449)+' equityguard');
+        """
+
+        # Dados comuns (juros e previdência não mudam entre fechamento e online)
+        _juros_block = (
+            "--- *Juros* ---\\n"
+            + "US Fed:  " + f"{FED_FUNDS_RATE:.2f}%" + "  FOMC " + _fmt_date_br(FED_NEXT_MEETING) + "\\n"
+            + "BR Selic:  " + f"{SELIC_RATE:.2f}%" + "  COPOM " + _fmt_date_br(SELIC_NEXT_MEETING)
+        )
+        _prev_block = (
+            "--- *Previdencia (" + _pd['data_base'] + ")* ---\\n"
+            + "Prevdow CDI  " + f"{_pd['cdi_month']:+.2f}%" + "  Bal. " + f"{_pd['balanced_month']:+.2f}%" + "\\n"
+            + "Nitro CDI  " + f"{_nd['cdi_month']:+.2f}%" + "  Bal. " + f"{_nd['balanced_month']:+.2f}%"
+        )
+        _footer = "_Cortesia YlvorxVHM_\\nequityguard.streamlit.app"
+
+        # ── Botão VERMELHO: Fechamento dia anterior ──────────────────────────
+        _close_msg = (
+            "*Briefing Equity Guard*\\n"
+            + "*Fechamento " + today + "*\\n\\n"
+            + _juros_block + "\\n\\n"
+            + "--- *Commodities* ---\\n"
+            + "Brent  US$ " + _wa_val('Brent') + "  " + _wa_chg('Brent') + "\\n"
+            + "WTI  US$ " + _wa_val('WTI') + "  " + _wa_chg('WTI') + "\\n\\n"
+            + "--- *Dolar* ---\\n"
+            + "Venda  " + _fx_prev + "\\n\\n"
+            + "--- *Bolsas* ---\\n"
+            + "Ibovespa  " + _wa_val('IBOV', 'br') + "  " + _wa_chg('IBOV') + "\\n"
+            + "S&P 500  " + _wa_val('S&P 500') + "  " + _wa_chg('S&P 500') + "\\n"
+            + "NASDAQ  " + _wa_val('NASDAQ') + "  " + _wa_chg('NASDAQ') + "\\n"
+            + "FTSE  " + _wa_val('FTSE') + "  " + _wa_chg('FTSE') + "\\n\\n"
+            + _prev_block + "\\n\\n"
+            + _footer
+        )
+
+        # ── Botão VERDE: Cotação online ──────────────────────────────────────
+        _online_msg = (
+            "*Briefing Equity Guard*\\n"
+            + "*Online " + today + " " + _hora_online + " (Brasilia)*\\n\\n"
+            + _juros_block + "\\n\\n"
+            + "--- *Commodities* ---\\n"
+            + "Brent  US$ " + _wa_val('Brent') + "  " + _wa_chg('Brent') + "\\n"
+            + "WTI  US$ " + _wa_val('WTI') + "  " + _wa_chg('WTI') + "\\n\\n"
+            + "--- *Dolar* ---\\n"
+            + "Venda  " + _fx_com + "  " + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
+            + "--- *Bolsas* ---\\n"
+            + "Ibovespa  " + _wa_val('IBOV', 'br') + "  " + _wa_chg('IBOV') + "\\n"
+            + "S&P 500  " + _wa_val('S&P 500') + "  " + _wa_chg('S&P 500') + "\\n"
+            + "NASDAQ  " + _wa_val('NASDAQ') + "  " + _wa_chg('NASDAQ') + "\\n"
+            + "FTSE  " + _wa_val('FTSE') + "  " + _wa_chg('FTSE') + "\\n\\n"
+            + _prev_block + "\\n\\n"
+            + _footer
+        )
+
+        _wa_comp.html("""
+        <div style="display:flex;flex-direction:column;gap:6px;">
+        <button onclick="
+            var msg = '""" + _close_msg + """';
+            """ + _emoji_js + """
+            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+        " style="
+            display:block;width:100%;background:#c0392b;color:#fff;
+            padding:10px 8px;border-radius:8px;font-size:.78rem;
+            font-weight:700;border:none;cursor:pointer;
+            font-family:Inter,system-ui,sans-serif;
+        ">Fechamento dia anterior</button>
+        <button onclick="
+            var msg = '""" + _online_msg + """';
+            """ + _emoji_js + """
             window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
         " style="
             display:block;width:100%;background:#25d366;color:#fff;
-            padding:10px 8px;border-radius:8px;font-size:.82rem;
+            padding:10px 8px;border-radius:8px;font-size:.78rem;
             font-weight:700;border:none;cursor:pointer;
             font-family:Inter,system-ui,sans-serif;
-        ">""" + _btn_label + """</button>
-        """, height=45)
+        ">Cotacao online (""" + _hora_online + """)</button>
+        </div>
+        """, height=90)
         st.markdown(
             f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
             f"{T['briefing_source_footer']}</div>",
@@ -780,7 +824,6 @@ def _render_briefing(T: dict) -> None:
             "📲 Enviar briefing para meu WhatsApp</div></div>",
             unsafe_allow_html=True,
         )
-        _wa_msg = chr(10).join(wa_lines)
         _phone_col, _send_col = st.columns([3, 2])
         with _phone_col:
             _phone = st.text_input(
@@ -788,7 +831,7 @@ def _render_briefing(T: dict) -> None:
                 placeholder="5511999381625",
                 key="eg_wa_phone",
                 label_visibility="collapsed",
-                help="DDD + número, sem espaços. Ex: 5511999381625",
+                help="DDD + numero, sem espacos. Ex: 5511999381625",
             )
         with _send_col:
             if st.button("Enviar para mim", use_container_width=True, key="eg_wa_send"):
@@ -798,12 +841,7 @@ def _render_briefing(T: dict) -> None:
                         _clean = "55" + _clean
                     _wa_comp.html("""
                     <script>
-                    var msg = `""" + _wa_text_escaped + """`;
-                    msg = msg.replace('--- *Juros* ---', String.fromCodePoint(0x1F3E6)+' *Juros*');
-                    msg = msg.replace('US Fed:', String.fromCodePoint(0x1F1FA,0x1F1F8)+' Fed:');
-                    msg = msg.replace('BR Selic:', String.fromCodePoint(0x1F1E7,0x1F1F7)+' Selic:');
-                    msg = msg.replace('--- *Commodities* ---', String.fromCodePoint(0x1F6E2)+' *Commodities*');
-                    msg = msg.replace('--- *Dolar Comercial* ---', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
+                    var msg = '""" + _online_msg + """';
                     msg = msg.replace('--- *Bolsas* ---', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
                     msg = msg.replace('--- *Previdencia', String.fromCodePoint(0x1F3E6)+' *Previdencia');
                     msg = msg.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA)+' *Briefing Equity Guard*');
@@ -2661,10 +2699,6 @@ def main() -> None:
         st.session_state.ga_injected = True
 
     # ── FAB — botão flutuante que abre/fecha sidebar no mobile ─────────────
-    _fab_hint = T["mobile_hint"]
-    _fab_dollar = T["mobile_dollar"]
-    _fab_pension = T["mobile_pension"]
-    _fab_stocks = T["mobile_stocks"]
     import streamlit.components.v1 as _components
     _components.html(f"""
     <script>
