@@ -612,7 +612,7 @@ def _render_briefing(T: dict) -> None:
             f"<b style='color:#e6edf3;'>{val}</b> {chg_html}</span></div>"
         )
 
-    today = pd.Timestamp.now().strftime("%d/%m/%Y")
+    today = pd.Timestamp.now(tz="America/Sao_Paulo").strftime("%d/%m/%Y")
     with st.expander(T["briefing_title"].format(date=today), expanded=True):
 
         _bc1, _bc2 = st.columns(2)
@@ -660,19 +660,45 @@ def _render_briefing(T: dict) -> None:
                 unsafe_allow_html=True,
             )
 
-        # ── WhatsApp share ───────────────────────────────────────────────────
+        # ── WhatsApp share — layout vertical organizado ────────────────────
+        _fx_wa = _fetch_fx_usdbrl()
+        _fx_com = f"R${_fx_wa['com_ask']:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".") if _fx_wa else "—"
+
+        _pd = PREVDOW_DATA
+        _nd = NITRO_DATA
+
         wa_lines = [
-            f"🗞️ *Briefing Equity Guard · {today}*", "",
-            f"📊 *Bolsas*",
-            f"Ibovespa {_fmt_val('IBOV', 'br')} · S&P 500 {_fmt_val('S&P 500')} · NASDAQ {_fmt_val('NASDAQ')} · FTSE {_fmt_val('FTSE')}",
+            f"📊 *Briefing Equity Guard · {today}*",
+            "",
+            f"🇺🇸 *Juros EUA*",
+            f"Fed Funds: {FED_FUNDS_RATE:.2f}% a.a.",
+            f"Próxima reunião FOMC: {_fmt_date_br(FED_NEXT_MEETING)}",
+            "",
+            f"🇧🇷 *Juros Brasil*",
+            f"Selic: {SELIC_RATE:.2f}% a.a.",
+            f"Próxima reunião COPOM: {_fmt_date_br(SELIC_NEXT_MEETING)}",
             "",
             f"🛢️ *Commodities*",
-            f"Brent US$ {_fmt_val('Brent')} · WTI US$ {_fmt_val('WTI')}",
+            f"Brent: US$ {_fmt_val('Brent')}",
+            f"WTI: US$ {_fmt_val('WTI')}",
             "",
-            f"🏦 *Juros*",
-            f"Selic {SELIC_RATE:.2f}% (COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}) · Fed {FED_FUNDS_RATE:.2f}% (FOMC {_fmt_date_br(FED_NEXT_MEETING)})",
+            f"💲 *Dólar Comercial*",
+            f"Venda: {_fx_com}",
             "",
-            "_Enviado via Equity Guard_",
+            f"📊 *Bolsas*",
+            f"Ibovespa: {_fmt_val('IBOV', 'br')}",
+            f"S&P 500: {_fmt_val('S&P 500')}",
+            f"NASDAQ: {_fmt_val('NASDAQ')}",
+            f"FTSE: {_fmt_val('FTSE')}",
+            "",
+            f"🏦 *Previdência (base {_pd['data_base']})*",
+            f"Prevdow CDI: {_pd['cdi_month']:+.2f}% mês / {_pd['cdi_year']:+.2f}% ano",
+            f"Prevdow Bal.: {_pd['balanced_month']:+.2f}% mês / {_pd['balanced_year']:+.2f}% ano",
+            f"Nitro CDI: {_nd['cdi_month']:+.2f}% mês / {_nd['cdi_year']:+.2f}% ano",
+            f"Nitro Bal.: {_nd['balanced_month']:+.2f}% mês / {_nd['balanced_year']:+.2f}% ano",
+            "",
+            f"_Cortesia YlvorxVHM_",
+            f"_Mais informações: https://portinhogit.github.io/equity-guard/_",
         ]
         wa_url = f"https://wa.me/?text={_url.quote(chr(10).join(wa_lines))}"
         try:
