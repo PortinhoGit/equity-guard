@@ -707,58 +707,45 @@ def _render_briefing(T: dict) -> None:
         _nd = NITRO_DATA
         _news = _fetch_market_news()
 
-        _wa_news = ""
-        if _news:
-            _wa_news_lines = [f"{n['flag']} {n['title'][:60]} ({n['source']})" for n in _news[:3]]
-            _wa_news = "\n".join(_wa_news_lines)
+        def _wa_chg(name):
+            ind = by_name.get(name)
+            if not ind or ind.get("change") is None:
+                return ""
+            c = ind["change"]
+            arrow = "▲" if c > 0 else ("▼" if c < 0 else "■")
+            return f"{arrow}{c:+.1f}%"
+
+        _fx_chg = (_fx_wa or {}).get("change", 0)
+        _fx_arrow = "▲" if _fx_chg > 0 else ("▼" if _fx_chg < 0 else "■")
 
         wa_lines = [
             f"📊 *Briefing Equity Guard · {today}*",
             "",
-            f"🇺🇸 *Juros EUA*",
-            f"Fed Funds: {FED_FUNDS_RATE:.2f}% a.a.",
-            f"FOMC: {_fmt_date_br(FED_NEXT_MEETING)}",
-            "",
-            f"🇧🇷 *Juros Brasil*",
-            f"Selic: {SELIC_RATE:.2f}% a.a.",
-            f"COPOM: {_fmt_date_br(SELIC_NEXT_MEETING)}",
+            f"🏦 *Juros*",
+            f"🇺🇸 Fed: {FED_FUNDS_RATE:.2f}% · FOMC {_fmt_date_br(FED_NEXT_MEETING)}",
+            f"🇧🇷 Selic: {SELIC_RATE:.2f}% · COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}",
             "",
             f"🛢️ *Commodities*",
-            f"Brent: US$ {_fmt_val('Brent')} ({_wa_chg_trio('Brent')})",
-            f"WTI: US$ {_fmt_val('WTI')} ({_wa_chg_trio('WTI')})",
+            f"Brent US$ {_fmt_val('Brent')} {_wa_chg('Brent')}",
+            f"WTI US$ {_fmt_val('WTI')} {_wa_chg('WTI')}",
             "",
             f"💵 *Dólar Comercial*",
-            f"Venda: {_fx_com}",
-        ]
-        _fx_wa_data = _fx_wa or {}
-        _fx_ytd = _fx_wa_data.get("chg_ytd")
-        _fx_1y = _fx_wa_data.get("chg_1y")
-        _fx_chg = _fx_wa_data.get("change", 0)
-        _fx_ytd_s = f"{_fx_ytd:+.1f}%" if _fx_ytd is not None else "—"
-        _fx_1y_s = f"{_fx_1y:+.1f}%" if _fx_1y is not None else "—"
-        wa_lines += [
-            f"dia {_fx_chg:+.1f}% · YTD {_fx_ytd_s} · 1A {_fx_1y_s}",
+            f"Venda {_fx_com} {_fx_arrow}{_fx_chg:+.1f}%",
             "",
             f"📊 *Bolsas*",
-            f"Ibovespa: {_fmt_val('IBOV', 'br')} ({_wa_chg_trio('IBOV')})",
-            f"S&P 500: {_fmt_val('S&P 500')} ({_wa_chg_trio('S&P 500')})",
-            f"NASDAQ: {_fmt_val('NASDAQ')} ({_wa_chg_trio('NASDAQ')})",
-            f"FTSE: {_fmt_val('FTSE')} ({_wa_chg_trio('FTSE')})",
+            f"Ibovespa {_fmt_val('IBOV', 'br')} {_wa_chg('IBOV')}",
+            f"S&P 500 {_fmt_val('S&P 500')} {_wa_chg('S&P 500')}",
+            f"NASDAQ {_fmt_val('NASDAQ')} {_wa_chg('NASDAQ')}",
+            f"FTSE {_fmt_val('FTSE')} {_wa_chg('FTSE')}",
             "",
             f"🏦 *Previdência ({_pd['data_base']})*",
-            f"Prevdow CDI: {_pd['cdi_month']:+.2f}% mês / {_pd['cdi_year']:+.2f}% ano",
-            f"Prevdow Bal.: {_pd['balanced_month']:+.2f}% mês / {_pd['balanced_year']:+.2f}% ano",
-            f"Nitro CDI: {_nd['cdi_month']:+.2f}% mês / {_nd['cdi_year']:+.2f}% ano",
-            f"Nitro Bal.: {_nd['balanced_month']:+.2f}% mês / {_nd['balanced_year']:+.2f}% ano",
-        ]
-
-        if _wa_news:
-            wa_lines += ["", f"📰 *Manchetes*", _wa_news]
-
-        wa_lines += [
+            f"Prevdow CDI {_pd['cdi_month']:+.2f}% mês · {_pd['cdi_year']:+.2f}% ano",
+            f"Prevdow Bal. {_pd['balanced_month']:+.2f}% mês · {_pd['balanced_year']:+.2f}% ano",
+            f"Nitro CDI {_nd['cdi_month']:+.2f}% mês · {_nd['cdi_year']:+.2f}% ano",
+            f"Nitro Bal. {_nd['balanced_month']:+.2f}% mês · {_nd['balanced_year']:+.2f}% ano",
             "",
             f"_Cortesia YlvorxVHM_",
-            f"👉 *Equity Guard* — Acesse: https://portinhogit.github.io/equity-guard/",
+            f"👉 *Equity Guard*: https://portinhogit.github.io/equity-guard/",
         ]
         wa_url = f"https://wa.me/?text={_url.quote(chr(10).join(wa_lines))}"
         try:
