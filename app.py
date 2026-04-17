@@ -41,6 +41,7 @@ from data.provider import (
     get_stock_history,
     get_fx_usdbrl,
     get_global_indicators,
+    get_market_news,
 )
 from core.valuation import (
     calculate_avg_dividends,
@@ -509,6 +510,12 @@ def _fetch_global_indicators() -> list:
     return get_global_indicators()
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def _fetch_market_news() -> list:
+    """Cached market news (10-min TTL)."""
+    return get_market_news()
+
+
 def _fmt_index_value(val: float, locale: str) -> str:
     """Format index / commodity values with locale-aware thousands separator."""
     if val is None:
@@ -667,22 +674,28 @@ def _render_briefing(T: dict) -> None:
         _pd = PREVDOW_DATA
         _nd = NITRO_DATA
 
+        # Manchetes para o WhatsApp
+        _wa_news = ""
+        if _news:
+            _wa_news_lines = [f"{n['flag']} {n['title']} ({n['source']})" for n in _news[:4]]
+            _wa_news = "\n".join(_wa_news_lines)
+
         wa_lines = [
             f"📊 *Briefing Equity Guard · {today}*",
             "",
             f"🇺🇸 *Juros EUA*",
             f"Fed Funds: {FED_FUNDS_RATE:.2f}% a.a.",
-            f"Próxima reunião FOMC: {_fmt_date_br(FED_NEXT_MEETING)}",
+            f"FOMC: {_fmt_date_br(FED_NEXT_MEETING)}",
             "",
             f"🇧🇷 *Juros Brasil*",
             f"Selic: {SELIC_RATE:.2f}% a.a.",
-            f"Próxima reunião COPOM: {_fmt_date_br(SELIC_NEXT_MEETING)}",
+            f"COPOM: {_fmt_date_br(SELIC_NEXT_MEETING)}",
             "",
             f"🛢️ *Commodities*",
             f"Brent: US$ {_fmt_val('Brent')}",
             f"WTI: US$ {_fmt_val('WTI')}",
             "",
-            f"💲 *Dólar Comercial*",
+            f"💵 *Dólar Comercial*",
             f"Venda: {_fx_com}",
             "",
             f"📊 *Bolsas*",
@@ -691,14 +704,20 @@ def _render_briefing(T: dict) -> None:
             f"NASDAQ: {_fmt_val('NASDAQ')}",
             f"FTSE: {_fmt_val('FTSE')}",
             "",
-            f"🏦 *Previdência (base {_pd['data_base']})*",
+            f"🏦 *Previdência ({_pd['data_base']})*",
             f"Prevdow CDI: {_pd['cdi_month']:+.2f}% mês / {_pd['cdi_year']:+.2f}% ano",
             f"Prevdow Bal.: {_pd['balanced_month']:+.2f}% mês / {_pd['balanced_year']:+.2f}% ano",
             f"Nitro CDI: {_nd['cdi_month']:+.2f}% mês / {_nd['cdi_year']:+.2f}% ano",
             f"Nitro Bal.: {_nd['balanced_month']:+.2f}% mês / {_nd['balanced_year']:+.2f}% ano",
+        ]
+
+        if _wa_news:
+            wa_lines += ["", f"📰 *Manchetes*", _wa_news]
+
+        wa_lines += [
             "",
             f"_Cortesia YlvorxVHM_",
-            f"_Mais informações: https://portinhogit.github.io/equity-guard/_",
+            f"👉 *Equity Guard* — Acesse: https://portinhogit.github.io/equity-guard/",
         ]
         wa_url = f"https://wa.me/?text={_url.quote(chr(10).join(wa_lines))}"
         try:
@@ -720,6 +739,28 @@ def _render_briefing(T: dict) -> None:
             f"{T['briefing_source_footer']}</div>",
             unsafe_allow_html=True,
         )
+
+        # ── Manchetes do mercado ──────────────────────────────────────────────
+        _news = _fetch_market_news()
+        if _news:
+            _news_html = ""
+            for n in _news[:6]:
+                _news_html += (
+                    f"<div style='padding:5px 0;border-bottom:1px solid #21262d;font-size:.78rem;'>"
+                    f"<span>{n['flag']}</span> "
+                    f"<span style='color:#e6edf3;'>{n['title']}</span>"
+                    f"<span style='color:#484f58;font-size:.65rem;'> — {n['source']}</span>"
+                    f"</div>"
+                )
+            st.markdown(
+                f"<div style='background:#161b22;border:1px solid #30363d;"
+                f"border-radius:10px;padding:12px 14px;margin-top:10px;'>"
+                f"<div style='font-size:.72rem;color:#d4af37;font-weight:700;"
+                f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;'>"
+                f"📰 Manchetes do Mercado</div>"
+                f"{_news_html}</div>",
+                unsafe_allow_html=True,
+            )
 
         # ── Enviar para meu WhatsApp ─────────────────────────────────────────
         st.markdown(

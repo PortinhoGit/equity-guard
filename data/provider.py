@@ -369,6 +369,24 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
     }
 
 
+def get_market_news(max_per_source: int = 3) -> list:
+    """Busca manchetes de mercado do yfinance para Ibovespa e S&P 500."""
+    results = []
+    for label, sym in [("🇧🇷", "^BVSP"), ("🇺🇸", "^GSPC")]:
+        try:
+            news = yf.Ticker(sym).news or []
+            for n in news[:max_per_source]:
+                c = n.get("content", n)
+                title = c.get("title", "")
+                provider = c.get("provider", {})
+                source = provider.get("displayName", "") if isinstance(provider, dict) else ""
+                if title:
+                    results.append({"flag": label, "title": title, "source": source})
+        except Exception as e:
+            logger.warning(f"News falhou para {sym}: {e}")
+    return results
+
+
 def get_stock_history(ticker: str, period: str) -> Optional[pd.DataFrame]:
     """
     Histórico de preços para um período específico (gráfico interativo).
