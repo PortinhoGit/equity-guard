@@ -717,7 +717,7 @@ def _render_briefing(T: dict) -> None:
             return _fmt_val(name, loc)
 
         _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
-        _hora_online = _now_brt.strftime("%H:%M")
+        _hora_online = _now_brt.strftime("%H:%M:%S")
         _yesterday_brt = (_now_brt - pd.offsets.BDay(1)).strftime("%d/%m/%Y")
 
         _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
