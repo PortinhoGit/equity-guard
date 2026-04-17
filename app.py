@@ -723,6 +723,7 @@ def _render_briefing(T: dict) -> None:
         _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
         _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
         _fx_chg_val = (_fx_wa or {}).get("change", 0)
+        _fx_arrow = "+" if _fx_chg_val > 0 else ""
 
         _emoji_js = """
             msg = msg.replace('--- *Juros* ---', String.fromCodePoint(0x1F3E6)+' *Juros*');
