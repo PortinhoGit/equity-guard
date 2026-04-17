@@ -454,7 +454,7 @@ def _fetch_fx_usdbrl() -> Optional[dict]:
 def _render_share_buttons(T: dict) -> None:
     """Social share buttons with correct share URLs + email + copy."""
     import urllib.parse as _url
-    _share_url = "https://portinhogit.github.io/equity-guard/"
+    _share_url = "https://equityguard.streamlit.app/"
     _raw_url = _share_url
     _app_url = _url.quote(_share_url)
     _title = _url.quote(T["share_title"])
