@@ -712,34 +712,34 @@ def _render_briefing(T: dict) -> None:
         _fx_chg = (_fx_wa or {}).get("change", 0)
         _fx_arrow = "▲" if _fx_chg > 0 else ("▼" if _fx_chg < 0 else "■")
 
-        _wa = []
-        _wa.append("*Briefing Equity Guard*")
-        _wa.append("*" + today + "*")
-        _wa.append("")
-        _wa.append("\U0001f3e6 *Juros*")
-        _wa.append("\U0001f1fa\U0001f1f8 Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (FOMC " + _fmt_date_br(FED_NEXT_MEETING) + ")")
-        _wa.append("\U0001f1e7\U0001f1f7 Selic: " + f"{SELIC_RATE:.2f}%" + " (COPOM " + _fmt_date_br(SELIC_NEXT_MEETING) + ")")
-        _wa.append("")
-        _wa.append("\U0001f6e2\ufe0f *Commodities*")
-        _wa.append("Brent US$ " + _fmt_val('Brent') + " " + _wa_chg('Brent'))
-        _wa.append("WTI US$ " + _fmt_val('WTI') + " " + _wa_chg('WTI'))
-        _wa.append("")
-        _wa.append("\U0001f4b5 *Dolar Comercial*")
-        _wa.append("Venda " + _fx_com + " " + _fx_arrow + f"{_fx_chg:+.1f}%")
-        _wa.append("")
-        _wa.append("\U0001f4c8 *Bolsas*")
-        _wa.append("Ibovespa " + _fmt_val('IBOV', 'br') + " " + _wa_chg('IBOV'))
-        _wa.append("S&P 500 " + _fmt_val('S&P 500') + " " + _wa_chg('S&P 500'))
-        _wa.append("NASDAQ " + _fmt_val('NASDAQ') + " " + _wa_chg('NASDAQ'))
-        _wa.append("FTSE " + _fmt_val('FTSE') + " " + _wa_chg('FTSE'))
-        _wa.append("")
-        _wa.append("\U0001f3e6 *Previdencia (" + _pd['data_base'] + ")*")
-        _wa.append("Prevdow CDI " + f"{_pd['cdi_month']:+.2f}%" + " | Bal. " + f"{_pd['balanced_month']:+.2f}%")
-        _wa.append("Nitro CDI " + f"{_nd['cdi_month']:+.2f}%" + " | Bal. " + f"{_nd['balanced_month']:+.2f}%")
-        _wa.append("")
-        _wa.append("_Cortesia YlvorxVHM_")
-        _wa.append("equityguard.streamlit.app")
-        wa_lines = _wa
+        wa_lines = [
+            "*Briefing Equity Guard*",
+            "*" + today + "*",
+            "",
+            "--- *Juros* ---",
+            "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (FOMC " + _fmt_date_br(FED_NEXT_MEETING) + ")",
+            "BR Selic: " + f"{SELIC_RATE:.2f}%" + " (COPOM " + _fmt_date_br(SELIC_NEXT_MEETING) + ")",
+            "",
+            "--- *Commodities* ---",
+            "Brent US$ " + _fmt_val('Brent') + " " + _wa_chg('Brent'),
+            "WTI US$ " + _fmt_val('WTI') + " " + _wa_chg('WTI'),
+            "",
+            "--- *Dolar Comercial* ---",
+            "Venda " + _fx_com + " " + _fx_arrow + f"{_fx_chg:+.1f}%",
+            "",
+            "--- *Bolsas* ---",
+            "Ibovespa " + _fmt_val('IBOV', 'br') + " " + _wa_chg('IBOV'),
+            "S&P 500 " + _fmt_val('S&P 500') + " " + _wa_chg('S&P 500'),
+            "NASDAQ " + _fmt_val('NASDAQ') + " " + _wa_chg('NASDAQ'),
+            "FTSE " + _fmt_val('FTSE') + " " + _wa_chg('FTSE'),
+            "",
+            "--- *Previdencia (" + _pd['data_base'] + ")* ---",
+            "Prevdow CDI " + f"{_pd['cdi_month']:+.2f}%" + " | Bal. " + f"{_pd['balanced_month']:+.2f}%",
+            "Nitro CDI " + f"{_nd['cdi_month']:+.2f}%" + " | Bal. " + f"{_nd['balanced_month']:+.2f}%",
+            "",
+            "_Cortesia YlvorxVHM_",
+            "equityguard.streamlit.app",
+        ]
         _wa_text_raw = chr(10).join(wa_lines)
         _wa_text_escaped = _wa_text_raw.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
         import streamlit.components.v1 as _wa_comp
