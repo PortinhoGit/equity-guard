@@ -721,6 +721,38 @@ def _render_briefing(T: dict) -> None:
             unsafe_allow_html=True,
         )
 
+        # ── Enviar para meu WhatsApp ─────────────────────────────────────────
+        st.markdown(
+            "<div style='margin-top:12px;border-top:1px solid #21262d;padding-top:10px;'>"
+            "<div style='font-size:.72rem;color:#d4af37;font-weight:700;"
+            "text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;'>"
+            "📲 Enviar briefing para meu WhatsApp</div></div>",
+            unsafe_allow_html=True,
+        )
+        _wa_msg = chr(10).join(wa_lines)
+        _phone_col, _send_col = st.columns([3, 2])
+        with _phone_col:
+            _phone = st.text_input(
+                "Seu WhatsApp",
+                placeholder="5511999381625",
+                key="eg_wa_phone",
+                label_visibility="collapsed",
+                help="DDD + número, sem espaços. Ex: 5511999381625",
+            )
+        with _send_col:
+            if st.button("📲 Enviar para mim", use_container_width=True, key="eg_wa_send"):
+                _clean = "".join(c for c in _phone if c.isdigit())
+                if len(_clean) >= 10:
+                    if not _clean.startswith("55"):
+                        _clean = "55" + _clean
+                    _wa_self = f"https://wa.me/{_clean}?text={_url.quote(_wa_msg)}"
+                    st.markdown(
+                        f"<meta http-equiv='refresh' content='0;url={_wa_self}'>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.error("Número inválido. Use formato: 5511999381625")
+
 
 def _render_global_bar(T: dict) -> None:
     """
