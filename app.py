@@ -743,16 +743,26 @@ def _render_briefing(T: dict) -> None:
         _wa_text_raw = chr(10).join(wa_lines)
         _wa_text_escaped = _wa_text_raw.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
         import streamlit.components.v1 as _wa_comp
-        _wa_comp.html(f"""
+        _btn_label = T.get("briefing_copy_btn", "Compartilhar no WhatsApp")
+        _wa_comp.html("""
         <button onclick="
-            var msg = `{_wa_text_escaped}`;
+            var msg = `""" + _wa_text_escaped + """`;
+            msg = msg.replace('--- *Juros* ---', String.fromCodePoint(0x1F3E6)+' *Juros*');
+            msg = msg.replace('US Fed:', String.fromCodePoint(0x1F1FA,0x1F1F8)+' Fed:');
+            msg = msg.replace('BR Selic:', String.fromCodePoint(0x1F1E7,0x1F1F7)+' Selic:');
+            msg = msg.replace('--- *Commodities* ---', String.fromCodePoint(0x1F6E2)+' *Commodities*');
+            msg = msg.replace('--- *Dolar Comercial* ---', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
+            msg = msg.replace('--- *Bolsas* ---', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
+            msg = msg.replace('--- *Previdencia', String.fromCodePoint(0x1F3E6)+' *Previdencia');
+            msg = msg.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA)+' *Briefing Equity Guard*');
+            msg = msg.replace('equityguard.streamlit.app', String.fromCodePoint(0x1F449)+' equityguard.streamlit.app');
             window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
         " style="
             display:block;width:100%;background:#25d366;color:#fff;
             padding:10px 8px;border-radius:8px;font-size:.82rem;
             font-weight:700;border:none;cursor:pointer;
             font-family:Inter,system-ui,sans-serif;
-        ">{T.get("briefing_copy_btn", "Compartilhar no WhatsApp")}</button>
+        ">""" + _btn_label + """</button>
         """, height=45)
         st.markdown(
             f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
@@ -784,10 +794,19 @@ def _render_briefing(T: dict) -> None:
                 if len(_clean) >= 10:
                     if not _clean.startswith("55"):
                         _clean = "55" + _clean
-                    _wa_comp.html(f"""
+                    _wa_comp.html("""
                     <script>
-                    var msg = `{_wa_text_escaped}`;
-                    window.parent.open('https://wa.me/{_clean}?text=' + encodeURIComponent(msg), '_blank');
+                    var msg = `""" + _wa_text_escaped + """`;
+                    msg = msg.replace('--- *Juros* ---', String.fromCodePoint(0x1F3E6)+' *Juros*');
+                    msg = msg.replace('US Fed:', String.fromCodePoint(0x1F1FA,0x1F1F8)+' Fed:');
+                    msg = msg.replace('BR Selic:', String.fromCodePoint(0x1F1E7,0x1F1F7)+' Selic:');
+                    msg = msg.replace('--- *Commodities* ---', String.fromCodePoint(0x1F6E2)+' *Commodities*');
+                    msg = msg.replace('--- *Dolar Comercial* ---', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
+                    msg = msg.replace('--- *Bolsas* ---', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
+                    msg = msg.replace('--- *Previdencia', String.fromCodePoint(0x1F3E6)+' *Previdencia');
+                    msg = msg.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA)+' *Briefing Equity Guard*');
+                    msg = msg.replace('equityguard.streamlit.app', String.fromCodePoint(0x1F449)+' equityguard.streamlit.app');
+                    window.parent.open('https://wa.me/""" + _clean + """?text=' + encodeURIComponent(msg), '_blank');
                     </script>
                     """, height=0)
                 else:
