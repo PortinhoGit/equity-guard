@@ -229,6 +229,8 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch;
     }
+    /* Plotly charts: limit height on mobile */
+    [data-testid="stPlotlyChart"] > div { max-height: 380px !important; }
     /* Let plotly charts breathe */
     [data-testid="stPlotlyChart"] { overflow: hidden; }
     /* Top auth bar: stack buttons full-width on mobile */
@@ -367,12 +369,12 @@ def _main_chart(df: pd.DataFrame, teto: float, ticker: str, T: dict, cs: str = "
         decreasing=dict(line=dict(color="#f85149"), fillcolor="#f85149"),
     ), row=1, col=1)
     fig.add_trace(go.Scatter(
-        x=df_ma.index, y=df_ma["MA20"], name="MA20",
+        x=df_ma.index, y=df_ma["MA20"], name="MA20 (Curta)",
         line=dict(color="#e3b341", width=1.6),
         hovertemplate=f"MA20: {cs} %{{y:.2f}}<extra></extra>",
     ), row=1, col=1)
     fig.add_trace(go.Scatter(
-        x=df_ma.index, y=df_ma["MA200"], name="MA200",
+        x=df_ma.index, y=df_ma["MA200"], name="MA200 (Longa)",
         line=dict(color="#bc8cff", width=2.0),
         hovertemplate=f"MA200: {cs} %{{y:.2f}}<extra></extra>",
     ), row=1, col=1)
@@ -423,7 +425,7 @@ def _main_chart(df: pd.DataFrame, teto: float, ticker: str, T: dict, cs: str = "
         for lvl, col in [(70, "rgba(248,81,73,.5)"), (30, "rgba(63,185,80,.5)"), (50, "rgba(139,148,158,.3)")]:
             fig.add_hline(y=lvl, line_dash="dot", line_color=col, line_width=1, row=2, col=1)
 
-    fig.update_layout(height=680, hovermode="x unified", xaxis_rangeslider_visible=False, **_CHART_LAYOUT)
+    fig.update_layout(height=500, hovermode="x unified", xaxis_rangeslider_visible=False, **_CHART_LAYOUT)
     for ax in ["xaxis", "xaxis2", "yaxis", "yaxis2"]:
         fig.update_layout(**{ax: _AXIS})
     fig.update_yaxes(range=[0, 100], row=2, col=1)
@@ -1219,18 +1221,22 @@ def _render_interactive_quote(ticker: str, df: pd.DataFrame, T: dict, cs: str) -
         (T["range_low"],   _w52_lo,      "#f85149"),
         (T["range_high"],  _w52_hi,      "#3fb950"),
     ]
-    _oc = st.columns(6)
-    for _col, (_lbl, _val, _vc) in zip(_oc, _ohlc_items):
-        _vstr = _fmt_money(_val, cs) if _val is not None else "—"
-        with _col:
-            st.markdown(
-                f"<div style='background:#161b22;border:1px solid #21262d;"
-                f"border-radius:9px;padding:10px 8px;text-align:center;'>"
-                f"<div style='font-size:.7rem;color:#6e7681;margin-bottom:4px;'>{_lbl}</div>"
-                f"<div style='font-size:.95rem;font-weight:700;color:{_vc};'>{_vstr}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+    _ohlc_html = (
+        "<style>.eq-ohlc{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}"
+        "@media(max-width:768px){.eq-ohlc{grid-template-columns:repeat(3,1fr)}}</style>"
+        "<div class='eq-ohlc'>"
+    )
+    for _lbl, _val, _vc in _ohlc_items:
+        _vstr = _fmt_money(_val, cs) if _val is not None else "\u2014"
+        _ohlc_html += (
+            f"<div style='background:#161b22;border:1px solid #21262d;"
+            f"border-radius:9px;padding:8px 6px;text-align:center;'>"
+            f"<div style='font-size:.65rem;color:#6e7681;margin-bottom:3px;'>{_lbl}</div>"
+            f"<div style='font-size:.85rem;font-weight:700;color:{_vc};'>{_vstr}</div>"
+            f"</div>"
+        )
+    _ohlc_html += "</div>"
+    st.markdown(_ohlc_html, unsafe_allow_html=True)
 
 
 def _quick_chart(df: pd.DataFrame, T: dict, cs: str = "R$") -> go.Figure:
@@ -1986,6 +1992,30 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             unsafe_allow_html=True,
         )
 
+    # ── Sticky ticker bar (mobile) ───────────────────────────────────────────
+    _ticker_display = normalize_ticker(ticker)
+    _price_display = f"{cs} {price:.2f}"
+    import streamlit.components.v1 as _sticky_comp
+    _sticky_comp.html("""
+    <script>
+    (function() {
+        var doc = window.parent.document;
+        if (doc.getElementById('eg-sticky-ticker')) return;
+        var bar = doc.createElement('div');
+        bar.id = 'eg-sticky-ticker';
+        bar.innerHTML = '""" + _ticker_display + " | " + _price_display + """';
+        bar.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;z-index:99998;'
+            + 'background:#161b22;border-bottom:1px solid #d4af37;'
+            + 'padding:6px 16px;font-size:13px;font-weight:800;color:#d4af37;'
+            + 'text-align:center;font-family:Inter,system-ui,sans-serif;';
+        doc.body.appendChild(bar);
+        function check() { bar.style.display = window.parent.innerWidth <= 768 ? 'block' : 'none'; }
+        check();
+        window.parent.addEventListener('resize', check);
+    })();
+    </script>
+    """, height=0)
+
     st.divider()
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -2146,29 +2176,39 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ── Key metrics ───────────────────────────────────────────────────────────
     st.markdown('<div class="eg-nav-anchor" id="sec-metricas"></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="eg-section-header">{T["current_price"][:2]} {T["nav_metricas"]}</div>', unsafe_allow_html=True)
-    m1, m2, m3, m4, m5 = st.columns(5)
+    dy = fundamentals.get("dividend_yield")
+    _dy_s = f"{dy*100:.2f}%" if dy else T["na"]
+    _teto_s = f"{cs} {teto:.2f}" if teto > 0 else T["na"]
+    _margin_s = f"{margin:.1f}%" if teto > 0 else T["na"]
+    _margin_c = "#3fb950" if margin > 0 else "#f85149"
+    _margin_d = T["below_delta"] if margin > 0 else T["above_delta"]
+    _rsi_c = "#f85149" if rsi_now > 70 else ("#3fb950" if rsi_now < 30 else "#8b949e")
+    _rsi_lbl = T["overbought"] if rsi_now > 70 else (T["oversold"] if rsi_now < 30 else T["neutral_rsi"])
+    ceiling_label = T["ceiling_price"].format(pct=yield_pct)
 
-    with m1:
-        st.metric(T["current_price"], f"{cs} {price:.2f}", help=T["tooltip_price"])
-    with m2:
-        ceiling_label = T["ceiling_price"].format(pct=yield_pct)
-        st.metric(ceiling_label, f"{cs} {teto:.2f}" if teto > 0 else T["na"], help=T["tooltip_ceiling"])
-    with m3:
-        if teto > 0:
-            delta_txt = T["below_delta"] if margin > 0 else T["above_delta"]
-            st.metric(T["safety_margin"], f"{margin:.1f}%",
-                      delta=delta_txt, delta_color="normal" if margin > 0 else "inverse",
-                      help=T["tooltip_margin"])
-        else:
-            st.metric(T["safety_margin"], T["na"], help=T["tooltip_margin"])
-    with m4:
-        dy = fundamentals.get("dividend_yield")
-        st.metric(T["dividend_yield"], f"{dy*100:.2f}%" if dy else T["na"], help=T["tooltip_dy"])
-    with m5:
-        rsi_lbl = T["overbought"] if rsi_now > 70 else (T["oversold"] if rsi_now < 30 else T["neutral_rsi"])
-        st.metric(T["rsi_label"], f"{rsi_now:.1f}", delta=rsi_lbl,
-                  delta_color="inverse" if rsi_now > 70 else ("normal" if rsi_now < 30 else "off"),
-                  help=T["tooltip_rsi"])
+    _met_items = [
+        (T["current_price"], f"{cs} {price:.2f}", "", "#d4af37"),
+        (ceiling_label, _teto_s, "", "#e6edf3"),
+        (T["safety_margin"], _margin_s, _margin_d, _margin_c),
+        (T["dividend_yield"], _dy_s, "", "#58a6ff"),
+        (T["rsi_label"], f"{rsi_now:.1f}", _rsi_lbl, _rsi_c),
+    ]
+    _met_html = (
+        "<style>.eq-met{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}"
+        "@media(max-width:768px){.eq-met{grid-template-columns:repeat(3,1fr)}}</style>"
+        "<div class='eq-met'>"
+    )
+    for _ml, _mv, _md, _mc in _met_items:
+        _delta_html = f"<div style='font-size:.65rem;color:{_mc};margin-top:2px;'>{_md}</div>" if _md else ""
+        _met_html += (
+            f"<div style='background:#161b22;border:1px solid #30363d;"
+            f"border-radius:10px;padding:10px 8px;text-align:center;'>"
+            f"<div style='font-size:.62rem;color:#6e7681;margin-bottom:3px;'>{_ml}</div>"
+            f"<div style='font-size:1rem;font-weight:800;color:{_mc};'>{_mv}</div>"
+            f"{_delta_html}</div>"
+        )
+    _met_html += "</div>"
+    st.markdown(_met_html, unsafe_allow_html=True)
 
     if teto > 0:
         if margin > 0:
@@ -2190,28 +2230,33 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.markdown(f'<div class="eg-section-header">{T["perf_title"]}</div>', unsafe_allow_html=True)
     _perf = get_price_performance(df)
     if _perf:
-        _pp1, _pp2, _pp3, _pp4, _pp5 = st.columns(5)
-        for _col, _lbl, _ref, _chg in [
-            (_pp1, T["perf_1d"],      _perf.get("yesterday"),  _perf.get("chg_1d")),
-            (_pp2, T["perf_7d"],      _perf.get("price_7d"),   _perf.get("chg_7d")),
-            (_pp3, T["perf_30d"],     _perf.get("price_30d"),  _perf.get("chg_30d")),
-            (_pp4, T["perf_52w_min"], _perf.get("w52_min"),    None),
-            (_pp5, T["perf_52w_max"], _perf.get("w52_max"),    None),
-        ]:
-            _clr   = "#3fb950" if (_chg is not None and _chg > 0) else (
-                     "#f85149" if (_chg is not None and _chg < 0) else "#8b949e")
-            _chg_s = f"{_chg:+.1f}%" if _chg is not None else "—"
-            _ref_s = f"{cs} {_ref:.2f}" if _ref is not None else "—"
-            with _col:
-                st.markdown(
-                    f"<div style='background:#161b22;border:1px solid #21262d;"
-                    f"border-radius:10px;padding:10px 12px;text-align:center;'>"
-                    f"<div style='font-size:.74rem;color:#6e7681;margin-bottom:3px;'>{_lbl}</div>"
-                    f"<div style='font-size:1rem;font-weight:700;color:#e6edf3;'>{_ref_s}</div>"
-                    f"<div style='font-size:.84rem;font-weight:700;color:{_clr};'>{_chg_s}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+        _perf_data = [
+            (T["perf_1d"],      _perf.get("yesterday"),  _perf.get("chg_1d")),
+            (T["perf_7d"],      _perf.get("price_7d"),   _perf.get("chg_7d")),
+            (T["perf_30d"],     _perf.get("price_30d"),  _perf.get("chg_30d")),
+            (T["perf_52w_min"], _perf.get("w52_min"),    None),
+            (T["perf_52w_max"], _perf.get("w52_max"),    None),
+        ]
+        _perf_html = (
+            "<style>.eq-perf{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}"
+            "@media(max-width:768px){.eq-perf{grid-template-columns:repeat(3,1fr)}}</style>"
+            "<div class='eq-perf'>"
+        )
+        for _lbl, _ref, _chg in _perf_data:
+            _clr = "#3fb950" if (_chg is not None and _chg > 0) else (
+                   "#f85149" if (_chg is not None and _chg < 0) else "#8b949e")
+            _chg_s = f"{_chg:+.1f}%" if _chg is not None else "\u2014"
+            _ref_s = f"{cs} {_ref:.2f}" if _ref is not None else "\u2014"
+            _perf_html += (
+                f"<div style='background:#161b22;border:1px solid #21262d;"
+                f"border-radius:10px;padding:8px 6px;text-align:center;'>"
+                f"<div style='font-size:.65rem;color:#6e7681;margin-bottom:3px;'>{_lbl}</div>"
+                f"<div style='font-size:.88rem;font-weight:700;color:#e6edf3;'>{_ref_s}</div>"
+                f"<div style='font-size:.75rem;font-weight:700;color:{_clr};'>{_chg_s}</div>"
+                f"</div>"
+            )
+        _perf_html += "</div>"
+        st.markdown(_perf_html, unsafe_allow_html=True)
         _chg30 = _perf.get("chg_30d")
         _chg7  = _perf.get("chg_7d")
         _wmin  = _perf.get("w52_min")
@@ -2629,12 +2674,13 @@ def main() -> None:
         if (doc.getElementById('eg-fab-injected')) return;
         var fab = doc.createElement('div');
         fab.id = 'eg-fab-injected';
-        fab.innerHTML = '{_fab_hint}<br>{_fab_dollar}<br>{_fab_pension}<br>{_fab_stocks}';
-        fab.style.cssText = 'display:none;position:fixed;top:10px;right:10px;z-index:999999;'
+        fab.innerHTML = '\u2630';
+        fab.style.cssText = 'display:none;position:fixed;bottom:16px;left:16px;z-index:999999;'
             + 'background:linear-gradient(135deg,#b8941f,#d4af37);color:#0d1117;'
-            + 'border-radius:14px;padding:8px 12px;font-size:11px;font-weight:800;'
-            + 'box-shadow:0 4px 20px rgba(212,175,55,.5);line-height:1.5;text-align:center;'
-            + 'cursor:pointer;font-family:Inter,system-ui,sans-serif;';
+            + 'border-radius:50%;width:48px;height:48px;font-size:20px;font-weight:900;'
+            + 'box-shadow:0 4px 16px rgba(212,175,55,.5);'
+            + 'cursor:pointer;font-family:Inter,system-ui,sans-serif;'
+            + 'display:flex;align-items:center;justify-content:center;';
         fab.onclick = function() {{
             var openBtn = doc.querySelector('[data-testid="collapsedControl"]');
             var closeBtn = doc.querySelector('[data-testid="stSidebarCollapseButton"] button');
