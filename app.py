@@ -41,7 +41,6 @@ from data.provider import (
     get_stock_history,
     get_fx_usdbrl,
     get_global_indicators,
-    get_market_news,
 )
 from core.valuation import (
     calculate_avg_dividends,
@@ -510,10 +509,6 @@ def _fetch_global_indicators() -> list:
     return get_global_indicators()
 
 
-@st.cache_data(ttl=600, show_spinner=False)
-def _fetch_market_news() -> list:
-    """Cached market news (10-min TTL)."""
-    return get_market_news()
 
 
 def _fmt_index_value(val: float, locale: str) -> str:
@@ -705,7 +700,6 @@ def _render_briefing(T: dict) -> None:
 
         _pd = PREVDOW_DATA
         _nd = NITRO_DATA
-        _news = _fetch_market_news()
 
         def _wa_chg(name):
             ind = by_name.get(name)
@@ -766,27 +760,6 @@ def _render_briefing(T: dict) -> None:
             f"{T['briefing_source_footer']}</div>",
             unsafe_allow_html=True,
         )
-
-        # ── Manchetes do mercado ──────────────────────────────────────────────
-        if _news:
-            _news_html = ""
-            for n in _news[:6]:
-                _news_html += (
-                    f"<div style='padding:5px 0;border-bottom:1px solid #21262d;font-size:.78rem;'>"
-                    f"<span>{n['flag']}</span> "
-                    f"<span style='color:#e6edf3;'>{n['title']}</span>"
-                    f"<span style='color:#484f58;font-size:.65rem;'> — {n['source']}</span>"
-                    f"</div>"
-                )
-            st.markdown(
-                f"<div style='background:#161b22;border:1px solid #30363d;"
-                f"border-radius:10px;padding:12px 14px;margin-top:10px;'>"
-                f"<div style='font-size:.72rem;color:#d4af37;font-weight:700;"
-                f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;'>"
-                f"📰 Manchetes do Mercado</div>"
-                f"{_news_html}</div>",
-                unsafe_allow_html=True,
-            )
 
         # ── Enviar para meu WhatsApp ─────────────────────────────────────────
         st.markdown(
