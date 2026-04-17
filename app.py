@@ -705,8 +705,8 @@ def _render_briefing(T: dict) -> None:
 
         _pd = PREVDOW_DATA
         _nd = NITRO_DATA
+        _news = _fetch_market_news()
 
-        # Manchetes para o WhatsApp
         _wa_news = ""
         if _news:
             _wa_news_lines = [f"{n['flag']} {n['title']} ({n['source']})" for n in _news[:4]]
@@ -782,7 +782,6 @@ def _render_briefing(T: dict) -> None:
         )
 
         # ── Manchetes do mercado ──────────────────────────────────────────────
-        _news = _fetch_market_news()
         if _news:
             _news_html = ""
             for n in _news[:6]:
