@@ -709,7 +709,7 @@ def _render_briefing(T: dict) -> None:
 
         _wa_news = ""
         if _news:
-            _wa_news_lines = [f"{n['flag']} {n['title']} ({n['source']})" for n in _news[:4]]
+            _wa_news_lines = [f"{n['flag']} {n['title'][:60]} ({n['source']})" for n in _news[:3]]
             _wa_news = "\n".join(_wa_news_lines)
 
         wa_lines = [
@@ -827,9 +827,10 @@ def _render_briefing(T: dict) -> None:
                     if not _clean.startswith("55"):
                         _clean = "55" + _clean
                     _wa_self = f"https://wa.me/{_clean}?text={_url.quote(_wa_msg)}"
-                    st.markdown(
-                        f"<meta http-equiv='refresh' content='0;url={_wa_self}'>",
-                        unsafe_allow_html=True,
+                    import streamlit.components.v1 as _wa_redir
+                    _wa_redir.html(
+                        f"<script>window.parent.open('{_wa_self}', '_blank');</script>",
+                        height=0,
                     )
                 else:
                     st.error("Número inválido. Use formato: 5511999381625")
