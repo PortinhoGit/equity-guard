@@ -740,21 +740,20 @@ def _render_briefing(T: dict) -> None:
         _wa.append("_Cortesia YlvorxVHM_")
         _wa.append("equityguard.streamlit.app")
         wa_lines = _wa
-        wa_url = f"https://wa.me/?text={_url.quote(chr(10).join(wa_lines))}"
-        try:
-            st.link_button(
-                T["briefing_copy_btn"], wa_url,
-                use_container_width=True, type="primary",
-            )
-        except Exception:
-            st.markdown(
-                f"<a href='{wa_url}' target='_blank' style='display:block;"
-                f"text-align:center;background:#25d366;color:#fff;"
-                f"padding:8px;border-radius:8px;font-size:.82rem;"
-                f"font-weight:700;text-decoration:none;margin-top:6px;'>"
-                f"{T['briefing_copy_btn']}</a>",
-                unsafe_allow_html=True,
-            )
+        _wa_text_raw = chr(10).join(wa_lines)
+        _wa_text_escaped = _wa_text_raw.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+        import streamlit.components.v1 as _wa_comp
+        _wa_comp.html(f"""
+        <button onclick="
+            var msg = `{_wa_text_escaped}`;
+            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+        " style="
+            display:block;width:100%;background:#25d366;color:#fff;
+            padding:10px 8px;border-radius:8px;font-size:.82rem;
+            font-weight:700;border:none;cursor:pointer;
+            font-family:Inter,system-ui,sans-serif;
+        ">{T.get("briefing_copy_btn", "Compartilhar no WhatsApp")}</button>
+        """, height=45)
         st.markdown(
             f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
             f"{T['briefing_source_footer']}</div>",
@@ -780,17 +779,17 @@ def _render_briefing(T: dict) -> None:
                 help="DDD + número, sem espaços. Ex: 5511999381625",
             )
         with _send_col:
-            if st.button("📲 Enviar para mim", use_container_width=True, key="eg_wa_send"):
+            if st.button("Enviar para mim", use_container_width=True, key="eg_wa_send"):
                 _clean = "".join(c for c in _phone if c.isdigit())
                 if len(_clean) >= 10:
                     if not _clean.startswith("55"):
                         _clean = "55" + _clean
-                    _wa_self = f"https://wa.me/{_clean}?text={_url.quote(_wa_msg)}"
-                    import streamlit.components.v1 as _wa_redir
-                    _wa_redir.html(
-                        f"<script>window.parent.open('{_wa_self}', '_blank');</script>",
-                        height=0,
-                    )
+                    _wa_comp.html(f"""
+                    <script>
+                    var msg = `{_wa_text_escaped}`;
+                    window.parent.open('https://wa.me/{_clean}?text=' + encodeURIComponent(msg), '_blank');
+                    </script>
+                    """, height=0)
                 else:
                     st.error("Número inválido. Use formato: 5511999381625")
 
