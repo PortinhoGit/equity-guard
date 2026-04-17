@@ -739,13 +739,11 @@ def _render_briefing(T: dict) -> None:
             f"FTSE {_fmt_val('FTSE')} {_wa_chg('FTSE')}",
             "",
             f"🏦 *Previdência ({_pd['data_base']})*",
-            f"Prevdow CDI {_pd['cdi_month']:+.2f}% mês · {_pd['cdi_year']:+.2f}% ano",
-            f"Prevdow Bal. {_pd['balanced_month']:+.2f}% mês · {_pd['balanced_year']:+.2f}% ano",
-            f"Nitro CDI {_nd['cdi_month']:+.2f}% mês · {_nd['cdi_year']:+.2f}% ano",
-            f"Nitro Bal. {_nd['balanced_month']:+.2f}% mês · {_nd['balanced_year']:+.2f}% ano",
+            f"Prevdow: CDI {_pd['cdi_month']:+.2f}% · Bal. {_pd['balanced_month']:+.2f}%",
+            f"Nitro: CDI {_nd['cdi_month']:+.2f}% · Bal. {_nd['balanced_month']:+.2f}%",
             "",
             f"_Cortesia YlvorxVHM_",
-            f"👉 *Equity Guard*: https://portinhogit.github.io/equity-guard/",
+            f"👉 equityguard.streamlit.app",
         ]
         wa_url = f"https://wa.me/?text={_url.quote(chr(10).join(wa_lines))}"
         try:
