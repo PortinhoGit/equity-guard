@@ -730,6 +730,12 @@ def _render_briefing(T: dict) -> None:
         _fx_arrow = "+" if _fx_chg_val > 0 else ""
         _hora_corte = _mkt["hora_corte"].strftime("%Hh%M")
 
+        def _pad(name, width=10):
+            return name + " " * max(1, width - len(name))
+
+        def _rpad(val, width=12):
+            return " " * max(1, width - len(val)) + val
+
         _emoji_js = """
             msg = msg.replace('--- *Juros* ---', String.fromCodePoint(0x1F3E6)+' *Juros*');
             msg = msg.replace('US Fed:', String.fromCodePoint(0x1F1FA,0x1F1F8)+' Fed:');
@@ -760,12 +766,6 @@ def _render_briefing(T: dict) -> None:
         _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nequityguard.streamlit.app"
 
         # ── Mensagem base com dados atuais (alinhado em colunas) ────────────
-        def _pad(name, width=10):
-            return name + " " * max(1, width - len(name))
-
-        def _rpad(val, width=12):
-            return " " * max(1, width - len(val)) + val
-
         _brent_v = "US$ " + _wa_val('Brent')
         _wti_v = "US$ " + _wa_val('WTI')
         _ibov_v = _wa_val('IBOV', 'br')
