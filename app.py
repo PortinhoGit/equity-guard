@@ -763,7 +763,7 @@ def _render_briefing(T: dict) -> None:
             + "Prevdow: CDI " + _prev_cdi + " | Bal. " + _prev_bal + "\\n"
             + "Nitro: CDI " + _nit_cdi + " | Bal. " + _nit_bal
         )
-        _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nequityguard.streamlit.app"
+        _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
         _body_block = (
             _juros_block + "\\n\\n"
