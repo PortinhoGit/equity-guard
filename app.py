@@ -737,54 +737,46 @@ def _render_briefing(T: dict) -> None:
             return " " * max(1, width - len(val)) + val
 
         _emoji_js = """
-            msg = msg.replace('--- *Juros* ---', String.fromCodePoint(0x1F3E6)+' *Juros*');
+            msg = msg.replace('*Juros*', String.fromCodePoint(0x1F3E6)+' *Juros*');
             msg = msg.replace('US Fed:', String.fromCodePoint(0x1F1FA,0x1F1F8)+' Fed:');
             msg = msg.replace('BR Selic:', String.fromCodePoint(0x1F1E7,0x1F1F7)+' Selic:');
-            msg = msg.replace('--- *Commodities* ---', String.fromCodePoint(0x1F6E2)+' *Commodities*');
-            msg = msg.replace('--- *Dolar* ---', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
-            msg = msg.replace('--- *Bolsas* ---', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
-            msg = msg.replace('--- *Previd\\u00eancia', String.fromCodePoint(0x1F3E6)+' *Previd\\u00eancia');
+            msg = msg.replace('*Commodities*', String.fromCodePoint(0x1F6E2)+' *Commodities*');
+            msg = msg.replace('*Dolar Comercial*', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
+            msg = msg.replace('*Bolsas*', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
+            msg = msg.replace('*Previd\\u00eancia', String.fromCodePoint(0x1F3E6)+' *Previd\\u00eancia');
             msg = msg.replace('*Briefing', String.fromCodePoint(0x1F4CA)+' *Briefing');
             msg = msg.replace('equityguard', String.fromCodePoint(0x1F449)+' equityguard');
         """
 
-        # Dados comuns (juros e previdência não mudam entre fechamento e online)
+        # Formato: nome: valor variacao (sem tentativa de alinhar colunas — WhatsApp usa fonte proporcional)
         _juros_block = (
-            "--- *Juros* ---\\n"
-            + _pad("US Fed") + _rpad(f"{FED_FUNDS_RATE:.2f}%") + "  FOMC " + _fmt_date_br(FED_NEXT_MEETING) + "\\n"
-            + _pad("BR Selic") + _rpad(f"{SELIC_RATE:.2f}%") + "  COPOM " + _fmt_date_br(SELIC_NEXT_MEETING)
+            "*Juros*\\n"
+            + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (FOMC " + _fmt_date_br(FED_NEXT_MEETING) + ")\\n"
+            + "BR Selic: " + f"{SELIC_RATE:.2f}%" + " (COPOM " + _fmt_date_br(SELIC_NEXT_MEETING) + ")"
         )
         _prev_cdi = f"{_pd['cdi_month']:+.2f}%"
         _prev_bal = f"{_pd['balanced_month']:+.2f}%"
         _nit_cdi = f"{_nd['cdi_month']:+.2f}%"
         _nit_bal = f"{_nd['balanced_month']:+.2f}%"
         _prev_block = (
-            "--- *Previd\u00eancia (" + _pd['data_base'] + ")* ---\\n"
-            + _pad("Prevdow") + _rpad("CDI " + _prev_cdi) + "  Bal. " + _prev_bal + "\\n"
-            + _pad("Nitro") + _rpad("CDI " + _nit_cdi) + "  Bal. " + _nit_bal
+            "*Previd\u00eancia " + _pd['data_base'] + "*\\n"
+            + "Prevdow: CDI " + _prev_cdi + " | Bal. " + _prev_bal + "\\n"
+            + "Nitro: CDI " + _nit_cdi + " | Bal. " + _nit_bal
         )
         _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nequityguard.streamlit.app"
 
-        # ── Mensagem base com dados atuais (alinhado em colunas) ────────────
-        _brent_v = "US$ " + _wa_val('Brent')
-        _wti_v = "US$ " + _wa_val('WTI')
-        _ibov_v = _wa_val('IBOV', 'br')
-        _sp_v = _wa_val('S&P 500')
-        _nq_v = _wa_val('NASDAQ')
-        _ftse_v = _wa_val('FTSE')
-
         _body_block = (
             _juros_block + "\\n\\n"
-            + "--- *Commodities* ---\\n"
-            + _pad("Brent") + _rpad(_brent_v) + "  " + _wa_chg('Brent') + "\\n"
-            + _pad("WTI") + _rpad(_wti_v) + "  " + _wa_chg('WTI') + "\\n\\n"
-            + "--- *Dolar* ---\\n"
-            + _pad("Venda") + _rpad(_fx_com) + "  " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
-            + "--- *Bolsas* ---\\n"
-            + _pad("Ibovespa") + _rpad(_ibov_v) + "  " + _wa_chg('IBOV') + "\\n"
-            + _pad("S&P 500") + _rpad(_sp_v) + "  " + _wa_chg('S&P 500') + "\\n"
-            + _pad("NASDAQ") + _rpad(_nq_v) + "  " + _wa_chg('NASDAQ') + "\\n"
-            + _pad("FTSE") + _rpad(_ftse_v) + "  " + _wa_chg('FTSE') + "\\n\\n"
+            + "*Commodities*\\n"
+            + "Brent: US$ " + _wa_val('Brent') + "  " + _wa_chg('Brent') + "\\n"
+            + "WTI: US$ " + _wa_val('WTI') + "  " + _wa_chg('WTI') + "\\n\\n"
+            + "*Dolar Comercial*\\n"
+            + "Venda: " + _fx_com + "  " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
+            + "*Bolsas*\\n"
+            + "Ibovespa: " + _wa_val('IBOV', 'br') + "  " + _wa_chg('IBOV') + "\\n"
+            + "S&P 500: " + _wa_val('S&P 500') + "  " + _wa_chg('S&P 500') + "\\n"
+            + "NASDAQ: " + _wa_val('NASDAQ') + "  " + _wa_chg('NASDAQ') + "\\n"
+            + "FTSE: " + _wa_val('FTSE') + "  " + _wa_chg('FTSE') + "\\n\\n"
             + _prev_block + "\\n\\n"
             + _footer
         )
@@ -792,7 +784,7 @@ def _render_briefing(T: dict) -> None:
         # ── Fechamento do último pregão (data_ref) ───────────────────────────
         _close_msg = (
             "*Briefing Equity Guard*\\n"
-            + "*Fechamento " + _data_ref + " (mercado fechou " + _hora_corte + ")*\\n\\n"
+            + "*Fechamento " + _data_ref + "*\\n\\n"
             + _body_block
         )
 
