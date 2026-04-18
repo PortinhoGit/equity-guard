@@ -65,21 +65,22 @@ def dia_util_anterior(d: date) -> date:
     return ultimo_dia_util(d)
 
 
-def get_hora_corte_nyc(d: date) -> time:
-    """Hora de fechamento da NYSE em horário de Brasília."""
-    return time(17, 0) if is_dst_eua(d) else time(18, 0)
+HORA_CORTE = time(20, 0)
+HORA_ABERTURA = time(10, 0)
 
 
 def get_status_mercado() -> Dict:
     """
     Retorna o estado atual do mercado.
+    Corte fixo: 20h Brasília (último mercado a fechar = Brent/WTI ~20h).
+    Abertura: 10h Brasília (B3).
 
     Returns:
         {
             "estado": "ONLINE" | "FECHAMENTO",
             "data_ref": date do último pregão,
             "data_anterior": date do pregão anterior ao data_ref,
-            "hora_corte": time de fechamento NYC,
+            "hora_corte": time(20, 0),
             "label": str para exibição,
         }
     """
@@ -89,23 +90,18 @@ def get_status_mercado() -> Dict:
     hoje = now.date()
     hora_atual = now.time()
 
-    hora_corte = get_hora_corte_nyc(hoje)
-    abertura = time(10, 0)
-
-    if is_dia_util(hoje) and abertura <= hora_atual < hora_corte:
-        # Mercado aberto
+    if is_dia_util(hoje) and HORA_ABERTURA <= hora_atual < HORA_CORTE:
         data_ref = hoje
         data_ant = dia_util_anterior(hoje)
         return {
             "estado": "ONLINE",
             "data_ref": data_ref,
             "data_anterior": data_ant,
-            "hora_corte": hora_corte,
+            "hora_corte": HORA_CORTE,
             "label": f"Online {now.strftime('%d/%m/%Y %H:%M:%S')} (Brasilia)",
         }
     else:
-        # Mercado fechado
-        if is_dia_util(hoje) and hora_atual >= hora_corte:
+        if is_dia_util(hoje) and hora_atual >= HORA_CORTE:
             data_ref = hoje
         else:
             data_ref = ultimo_dia_util(hoje)
@@ -114,6 +110,6 @@ def get_status_mercado() -> Dict:
             "estado": "FECHAMENTO",
             "data_ref": data_ref,
             "data_anterior": data_ant,
-            "hora_corte": hora_corte,
+            "hora_corte": HORA_CORTE,
             "label": f"Fechamento {data_ref.strftime('%d/%m/%Y')}",
         }
