@@ -365,8 +365,8 @@ def _main_chart(df: pd.DataFrame, teto: float, ticker: str, T: dict, cs: str = "
     fig.add_trace(go.Candlestick(
         x=df_ma.index, open=df_ma["Open"], high=df_ma["High"],
         low=df_ma["Low"], close=df_ma["Close"], name="Price",
-        increasing=dict(line=dict(color="#3fb950"), fillcolor="#3fb950"),
-        decreasing=dict(line=dict(color="#f85149"), fillcolor="#f85149"),
+        increasing=dict(line=dict(color="#58a6ff"), fillcolor="#58a6ff"),
+        decreasing=dict(line=dict(color="#dc2626"), fillcolor="#dc2626"),
     ), row=1, col=1)
     fig.add_trace(go.Scatter(
         x=df_ma.index, y=df_ma["MA20"], name="MA20 (Curta)",
@@ -402,13 +402,13 @@ def _main_chart(df: pd.DataFrame, teto: float, ticker: str, T: dict, cs: str = "
         if not tops.empty:
             fig.add_trace(go.Scatter(
                 x=tops.index, y=tops.values, mode="markers", name=T["top_marker"],
-                marker=dict(color="#f85149", size=7, symbol="triangle-down"),
+                marker=dict(color="#dc2626", size=7, symbol="triangle-down"),
                 hovertemplate=f"{T['top_marker']}: {cs} %{{y:.2f}}<extra></extra>",
             ), row=1, col=1)
         if not bottoms.empty:
             fig.add_trace(go.Scatter(
                 x=bottoms.index, y=bottoms.values, mode="markers", name=T["bottom_marker"],
-                marker=dict(color="#3fb950", size=7, symbol="triangle-up"),
+                marker=dict(color="#58a6ff", size=7, symbol="triangle-up"),
                 hovertemplate=f"{T['bottom_marker']}: {cs} %{{y:.2f}}<extra></extra>",
             ), row=1, col=1)
     except Exception:
@@ -598,7 +598,7 @@ def _render_briefing(T: dict) -> None:
             return ""
         chg = ind.get("change") or 0
         arrow = "▲" if chg > 0 else ("▼" if chg < 0 else "■")
-        color = "#3fb950" if chg > 0 else ("#f85149" if chg < 0 else "#8b949e")
+        color = "#58a6ff" if chg > 0 else ("#dc2626" if chg < 0 else "#8b949e")
         return f"<span style='color:{color};font-weight:700;'>{arrow}{chg:+.2f}%</span>"
 
     def _chg_trio(ind_name: str) -> str:
@@ -609,7 +609,7 @@ def _render_briefing(T: dict) -> None:
         def _c(v):
             if v is None:
                 return "<span style='color:#484f58;'>—</span>"
-            c = "#3fb950" if v > 0 else ("#f85149" if v < 0 else "#8b949e")
+            c = "#58a6ff" if v > 0 else ("#dc2626" if v < 0 else "#8b949e")
             return f"<span style='color:{c};font-weight:700;'>{v:+.1f}%</span>"
         chg = ind.get("change") or 0
         ytd = ind.get("chg_ytd")
@@ -748,7 +748,7 @@ def _render_briefing(T: dict) -> None:
             + "Prevdow CDI  " + f"{_pd['cdi_month']:+.2f}%" + "  Bal. " + f"{_pd['balanced_month']:+.2f}%" + "\\n"
             + "Nitro CDI  " + f"{_nd['cdi_month']:+.2f}%" + "  Bal. " + f"{_nd['balanced_month']:+.2f}%"
         )
-        _footer = "_Cortesia YlvorxVHM_\\nequityguard.streamlit.app"
+        _footer = "_Cortesia YlvorixVHM_\\nequityguard.streamlit.app"
 
         # ── Botão VERMELHO: Fechamento dia anterior ──────────────────────────
         _close_msg = (
@@ -888,7 +888,7 @@ def _render_global_bar(T: dict) -> None:
                 continue
             val_str = _fmt_index_value(last, ind.get("locale", "us"))
             arrow   = "▲" if chg > 0 else ("▼" if chg < 0 else "■")
-            color   = "#3fb950" if chg > 0 else ("#f85149" if chg < 0 else "#8b949e")
+            color   = "#58a6ff" if chg > 0 else ("#dc2626" if chg < 0 else "#8b949e")
             with col:
                 st.markdown(
                     f"<div style='background:#161b22;border:1px solid #21262d;"
@@ -950,7 +950,7 @@ def _render_prevdow_panel(T: dict) -> None:
 
     # ── Returns table (Perfil | No mês | No ano) ──────────────────────────────
     def _val_html(v: float) -> str:
-        c = "#3fb950" if v > 0 else ("#f85149" if v < 0 else "#8b949e")
+        c = "#58a6ff" if v > 0 else ("#dc2626" if v < 0 else "#8b949e")
         return f"<span style='font-weight:800;color:{c};'>{v:+.2f}%</span>"
 
     _hdr = "color:#6e7681;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;"
@@ -1025,7 +1025,7 @@ def _render_nitro_panel(T: dict) -> None:
 
     # ── Returns table (Perfil | No mês | No ano) ──────────────────────────────
     def _val_html(v: float) -> str:
-        c = "#3fb950" if v > 0 else ("#f85149" if v < 0 else "#8b949e")
+        c = "#58a6ff" if v > 0 else ("#dc2626" if v < 0 else "#8b949e")
         return f"<span style='font-weight:800;color:{c};'>{v:+.2f}%</span>"
 
     _hdr = "color:#6e7681;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;"
@@ -1099,7 +1099,7 @@ def _render_macro_panel(T: dict) -> None:
         return f"R${v:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     arrow = "▲" if change > 0 else ("▼" if change < 0 else "■")
-    color = "#3fb950" if change > 0 else ("#f85149" if change < 0 else "#8b949e")
+    color = "#58a6ff" if change > 0 else ("#dc2626" if change < 0 else "#8b949e")
 
     ts_html = ""
     if fetched is not None:
@@ -1120,8 +1120,8 @@ def _render_macro_panel(T: dict) -> None:
     _fx_1y = fx.get("chg_1y")
     _ytd_str = f"{_fx_ytd:+.1f}%" if _fx_ytd is not None else "—"
     _y1_str = f"{_fx_1y:+.1f}%" if _fx_1y is not None else "—"
-    _ytd_color = "#3fb950" if _fx_ytd and _fx_ytd > 0 else ("#f85149" if _fx_ytd and _fx_ytd < 0 else "#8b949e")
-    _y1_color = "#3fb950" if _fx_1y and _fx_1y > 0 else ("#f85149" if _fx_1y and _fx_1y < 0 else "#8b949e")
+    _ytd_color = "#58a6ff" if _fx_ytd and _fx_ytd > 0 else ("#dc2626" if _fx_ytd and _fx_ytd < 0 else "#8b949e")
+    _y1_color = "#58a6ff" if _fx_1y and _fx_1y > 0 else ("#dc2626" if _fx_1y and _fx_1y < 0 else "#8b949e")
     _t_online = T.get("fx_online", "Cotação online")
     _t_sell = T.get("fx_sell", "Venda")
     _t_buy = T.get("fx_buy", "Compra")
@@ -1256,10 +1256,10 @@ def _render_interactive_quote(ticker: str, df: pd.DataFrame, T: dict, cs: str) -
     _ohlc_items = [
         (T["close_label"], _today_close, "#e6edf3"),
         (T["open_label"],  _today_open,  "#e6edf3"),
-        (T["day_high"],    _today_high,  "#3fb950"),
-        (T["day_low"],     _today_low,   "#f85149"),
-        (T["range_low"],   _w52_lo,      "#f85149"),
-        (T["range_high"],  _w52_hi,      "#3fb950"),
+        (T["day_high"],    _today_high,  "#58a6ff"),
+        (T["day_low"],     _today_low,   "#dc2626"),
+        (T["range_low"],   _w52_lo,      "#dc2626"),
+        (T["range_high"],  _w52_hi,      "#58a6ff"),
     ]
     _ohlc_html = (
         "<style>.eq-ohlc{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}"
@@ -1293,7 +1293,7 @@ def _quick_chart(df: pd.DataFrame, T: dict, cs: str = "R$") -> go.Figure:
     last  = float(close.iloc[-1])
     is_up = last >= first
 
-    line_c = "#3fb950" if is_up else "#f85149"
+    line_c = "#58a6ff" if is_up else "#dc2626"
     fill_c = "rgba(63,185,80,.18)" if is_up else "rgba(248,81,73,.18)"
 
     fig.add_trace(go.Scatter(
@@ -1335,7 +1335,7 @@ def _quick_chart(df: pd.DataFrame, T: dict, cs: str = "R$") -> go.Figure:
 def _dividend_chart(dividends: pd.Series, ticker: str, T: dict, cs: str = "R$") -> go.Figure:
     annual = dividends.resample("YE").sum()
     avg = float(annual.mean())
-    colors = ["#3fb950" if v >= avg else "#e3b341" for v in annual.values]
+    colors = ["#58a6ff" if v >= avg else "#e3b341" for v in annual.values]
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=annual.index.year.tolist(), y=annual.values.tolist(),
@@ -1589,7 +1589,7 @@ def render_sidebar(user: dict, T: dict) -> tuple:
         if not is_admin and not is_anon:
             _credits_left = user.get("credits", 0)
             pct   = max(0, min(int(_credits_left / USER_QUERY_LIMIT * 100), 100))
-            bar_c = "#3fb950" if pct > 50 else ("#e3b341" if pct > 20 else "#f85149")
+            bar_c = "#58a6ff" if pct > 50 else ("#e3b341" if pct > 20 else "#dc2626")
             st.markdown(
                 f'<div style="background:#21262d;border-radius:20px;height:5px;margin:4px 0 10px;">'
                 f'<div style="background:{bar_c};width:{pct}%;height:100%;border-radius:20px;"></div>'
@@ -1643,7 +1643,7 @@ def render_sidebar(user: dict, T: dict) -> tuple:
                     f"<div style='flex:1;background:#161b22;border:1px solid #30363d;"
                     f"border-radius:8px;padding:8px;text-align:center;'>"
                     f"<div style='font-size:.65rem;color:#6e7681;'>{T['admin_today']}</div>"
-                    f"<div style='font-size:1.1rem;font-weight:800;color:#3fb950;'>"
+                    f"<div style='font-size:1.1rem;font-weight:800;color:#58a6ff;'>"
                     f"{_a_stats['today']:,}</div></div></div>",
                     unsafe_allow_html=True,
                 )
@@ -1794,11 +1794,11 @@ def render_sidebar(user: dict, T: dict) -> tuple:
         # ══════════════════════════════════════════════════════════════════════
         # ── Signal rows HTML ───────────────────────────────────────────────────
         _sig_colors = {
-            "strong_buy": "#3fb950",
+            "strong_buy": "#58a6ff",
             "buy":        "#56d364",
             "wait":       "#d29922",
             "neutral":    "#58a6ff",
-            "avoid":      "#f85149",
+            "avoid":      "#dc2626",
         }
         _signal_rows_html = "".join(
             f"<div style='display:flex;align-items:center;gap:6px;padding:3px 0;'>"
@@ -1868,9 +1868,9 @@ def render_sidebar(user: dict, T: dict) -> tuple:
 
 def _health_row(icon: str, label: str, hint: str, value_str: str, ok, tooltip: str = "") -> None:
     if ok is True:
-        bg, vc, border = "rgba(63,185,80,.08)", "#3fb950", "rgba(63,185,80,.25)"
+        bg, vc, border = "rgba(63,185,80,.08)", "#58a6ff", "rgba(63,185,80,.25)"
     elif ok is False:
-        bg, vc, border = "rgba(248,81,73,.08)", "#f85149", "rgba(248,81,73,.25)"
+        bg, vc, border = "rgba(248,81,73,.08)", "#dc2626", "rgba(248,81,73,.25)"
     else:
         bg, vc, border = "#161b22", "#8b949e", "#30363d"
     title_attr = f' title="{tooltip}"' if tooltip else ""
@@ -2131,7 +2131,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
                     _bg     = "#161b22"
                     _border = "#30363d"
                     _fg     = "#6e7681"
-                _ring = "box-shadow:0 0 0 2px #3fb950;" if _is_now else ""
+                _ring = "box-shadow:0 0 0 2px #58a6ff;" if _is_now else ""
                 _grid_html += (
                     f"<div style='background:{_bg};border:1px solid {_border};"
                     f"border-radius:8px;padding:8px 4px;text-align:center;{_ring}'>"
@@ -2220,9 +2220,9 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     _dy_s = f"{dy*100:.2f}%" if dy else T["na"]
     _teto_s = f"{cs} {teto:.2f}" if teto > 0 else T["na"]
     _margin_s = f"{margin:.1f}%" if teto > 0 else T["na"]
-    _margin_c = "#3fb950" if margin > 0 else "#f85149"
+    _margin_c = "#58a6ff" if margin > 0 else "#dc2626"
     _margin_d = T["below_delta"] if margin > 0 else T["above_delta"]
-    _rsi_c = "#f85149" if rsi_now > 70 else ("#3fb950" if rsi_now < 30 else "#8b949e")
+    _rsi_c = "#dc2626" if rsi_now > 70 else ("#58a6ff" if rsi_now < 30 else "#8b949e")
     _rsi_lbl = T["overbought"] if rsi_now > 70 else (T["oversold"] if rsi_now < 30 else T["neutral_rsi"])
     ceiling_label = T["ceiling_price"].format(pct=yield_pct)
 
@@ -2283,8 +2283,8 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             "<div class='eq-perf'>"
         )
         for _lbl, _ref, _chg in _perf_data:
-            _clr = "#3fb950" if (_chg is not None and _chg > 0) else (
-                   "#f85149" if (_chg is not None and _chg < 0) else "#8b949e")
+            _clr = "#58a6ff" if (_chg is not None and _chg > 0) else (
+                   "#dc2626" if (_chg is not None and _chg < 0) else "#8b949e")
             _chg_s = f"{_chg:+.1f}%" if _chg is not None else "\u2014"
             _ref_s = f"{cs} {_ref:.2f}" if _ref is not None else "\u2014"
             _perf_html += (
@@ -2329,14 +2329,14 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
                 f"<div style='display:flex;justify-content:space-between;align-items:flex-end;"
                 f"font-size:.74rem;color:#6e7681;margin-bottom:6px;'>"
                 f"<span>📉 {T['range_low']}<br>"
-                f"<b style='color:#f85149;font-size:.95rem;'>{cs} {_w52_min:.2f}</b></span>"
+                f"<b style='color:#dc2626;font-size:.95rem;'>{cs} {_w52_min:.2f}</b></span>"
                 f"<span style='text-align:center;'>💎 {T['current_price'][2:].strip()}<br>"
                 f"<b style='color:#d4af37;font-size:1.05rem;'>{cs} {_curr:.2f}</b></span>"
                 f"<span style='text-align:right;'>📈 {T['range_high']}<br>"
-                f"<b style='color:#3fb950;font-size:.95rem;'>{cs} {_w52_max:.2f}</b></span>"
+                f"<b style='color:#58a6ff;font-size:.95rem;'>{cs} {_w52_max:.2f}</b></span>"
                 f"</div>"
                 f"<div style='position:relative;height:12px;background:linear-gradient(90deg,"
-                f"#3fb950 0%,#e3b341 50%,#f85149 100%);border-radius:6px;margin-top:10px;'>"
+                f"#58a6ff 0%,#e3b341 50%,#dc2626 100%);border-radius:6px;margin-top:10px;'>"
                 f"<div style='position:absolute;left:{_pos_pct:.1f}%;top:-5px;"
                 f"transform:translateX(-50%);width:5px;height:22px;background:#e6edf3;"
                 f"border-radius:2px;box-shadow:0 0 8px rgba(255,255,255,.8);'></div>"
@@ -2401,9 +2401,9 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         st.markdown(f'<div class="eg-section-header">{T["trend_title"]}</div>', unsafe_allow_html=True)
         ov = trend["overall"]
         trend_map = {
-            "TENDÊNCIA DE ALTA FORTE":  (T["trend_bull_strong"], "rgba(63,185,80,.12)",   "#3fb950"),
+            "TENDÊNCIA DE ALTA FORTE":  (T["trend_bull_strong"], "rgba(63,185,80,.12)",   "#58a6ff"),
             "TENDÊNCIA DE ALTA":        (T["trend_bull"],        "rgba(63,185,80,.07)",   "#56d364"),
-            "TENDÊNCIA DE BAIXA FORTE": (T["trend_bear_strong"], "rgba(248,81,73,.12)",   "#f85149"),
+            "TENDÊNCIA DE BAIXA FORTE": (T["trend_bear_strong"], "rgba(248,81,73,.12)",   "#dc2626"),
             "TENDÊNCIA DE BAIXA":       (T["trend_bear"],        "rgba(248,81,73,.07)",   "#ff6b6b"),
         }
         t_label, t_bg, t_color = trend_map.get(ov, (T["trend_neutral"], "#161b22", "#8b949e"))
@@ -2432,7 +2432,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         elif trend.get("death_cross"):
             st.error(T["death_cross"])
 
-        rsi_bar_c = "#f85149" if rsi_now > 70 else ("#3fb950" if rsi_now < 30 else "#e3b341")
+        rsi_bar_c = "#dc2626" if rsi_now > 70 else ("#58a6ff" if rsi_now < 30 else "#e3b341")
         st.markdown(
             f"<div style='margin-top:12px;'>"
             f"<span style='color:#8b949e;font-size:.82rem;'>RSI (14): </span>"
