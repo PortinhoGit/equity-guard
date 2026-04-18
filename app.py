@@ -745,7 +745,7 @@ def _render_briefing(T: dict) -> None:
             msg = msg.replace('*Bolsas*', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
             msg = msg.replace('*Previd\\u00eancia', String.fromCodePoint(0x1F3E6)+' *Previd\\u00eancia');
             msg = msg.replace('*Briefing', String.fromCodePoint(0x1F4CA)+' *Briefing');
-            msg = msg.replace('equityguard', String.fromCodePoint(0x1F449)+' equityguard');
+            msg = msg.replace('*Equity Guard*', String.fromCodePoint(0x1F449)+' *Equity Guard*');
         """
 
         # Formato: nome: valor variacao (sem tentativa de alinhar colunas — WhatsApp usa fonte proporcional)
@@ -889,7 +889,7 @@ def _render_briefing(T: dict) -> None:
                     msg = msg.replace('--- *Bolsas* ---', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
                     msg = msg.replace('--- *Previd\\u00eancia', String.fromCodePoint(0x1F3E6)+' *Previd\\u00eancia');
                     msg = msg.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA)+' *Briefing Equity Guard*');
-                    msg = msg.replace('equityguard.streamlit.app', String.fromCodePoint(0x1F449)+' equityguard.streamlit.app');
+                    msg = msg.replace('*Equity Guard*', String.fromCodePoint(0x1F449)+' *Equity Guard*');
                     window.parent.open('https://wa.me/""" + _clean + """?text=' + encodeURIComponent(msg), '_blank');
                     </script>
                     """, height=0)
