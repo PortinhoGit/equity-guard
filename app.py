@@ -755,19 +755,32 @@ def _render_briefing(T: dict) -> None:
         )
         _footer = "_Cortesia YlvorixVHM_\\nequityguard.streamlit.app"
 
-        # ── Mensagem base com dados atuais ────────────────────────────────────
+        # ── Mensagem base com dados atuais (alinhado em colunas) ────────────
+        def _pad(name, width=10):
+            return name + " " * max(1, width - len(name))
+
+        def _rpad(val, width=12):
+            return " " * max(1, width - len(val)) + val
+
+        _brent_v = "US$ " + _wa_val('Brent')
+        _wti_v = "US$ " + _wa_val('WTI')
+        _ibov_v = _wa_val('IBOV', 'br')
+        _sp_v = _wa_val('S&P 500')
+        _nq_v = _wa_val('NASDAQ')
+        _ftse_v = _wa_val('FTSE')
+
         _body_block = (
             _juros_block + "\\n\\n"
             + "--- *Commodities* ---\\n"
-            + "Brent .... US$ " + _wa_val('Brent') + " " + _wa_chg('Brent') + "\\n"
-            + "WTI ...... US$ " + _wa_val('WTI') + " " + _wa_chg('WTI') + "\\n\\n"
+            + _pad("Brent") + _rpad(_brent_v) + "  " + _wa_chg('Brent') + "\\n"
+            + _pad("WTI") + _rpad(_wti_v) + "  " + _wa_chg('WTI') + "\\n\\n"
             + "--- *Dolar* ---\\n"
-            + "Venda .... " + _fx_com + " " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
+            + _pad("Venda") + _rpad(_fx_com) + "  " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
             + "--- *Bolsas* ---\\n"
-            + "Ibovespa . " + _wa_val('IBOV', 'br') + " " + _wa_chg('IBOV') + "\\n"
-            + "S&P 500 .. " + _wa_val('S&P 500') + " " + _wa_chg('S&P 500') + "\\n"
-            + "NASDAQ ... " + _wa_val('NASDAQ') + " " + _wa_chg('NASDAQ') + "\\n"
-            + "FTSE ..... " + _wa_val('FTSE') + " " + _wa_chg('FTSE') + "\\n\\n"
+            + _pad("Ibovespa") + _rpad(_ibov_v) + "  " + _wa_chg('IBOV') + "\\n"
+            + _pad("S&P 500") + _rpad(_sp_v) + "  " + _wa_chg('S&P 500') + "\\n"
+            + _pad("NASDAQ") + _rpad(_nq_v) + "  " + _wa_chg('NASDAQ') + "\\n"
+            + _pad("FTSE") + _rpad(_ftse_v) + "  " + _wa_chg('FTSE') + "\\n\\n"
             + _prev_block + "\\n\\n"
             + _footer
         )
