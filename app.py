@@ -737,7 +737,7 @@ def _render_briefing(T: dict) -> None:
             msg = msg.replace('--- *Commodities* ---', String.fromCodePoint(0x1F6E2)+' *Commodities*');
             msg = msg.replace('--- *Dolar* ---', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
             msg = msg.replace('--- *Bolsas* ---', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
-            msg = msg.replace('--- *Previdencia', String.fromCodePoint(0x1F3E6)+' *Previdencia');
+            msg = msg.replace('--- *Previd\\u00eancia', String.fromCodePoint(0x1F3E6)+' *Previd\\u00eancia');
             msg = msg.replace('*Briefing', String.fromCodePoint(0x1F4CA)+' *Briefing');
             msg = msg.replace('equityguard', String.fromCodePoint(0x1F449)+' equityguard');
         """
@@ -745,13 +745,17 @@ def _render_briefing(T: dict) -> None:
         # Dados comuns (juros e previdência não mudam entre fechamento e online)
         _juros_block = (
             "--- *Juros* ---\\n"
-            + "US Fed:  " + f"{FED_FUNDS_RATE:.2f}%" + "  FOMC " + _fmt_date_br(FED_NEXT_MEETING) + "\\n"
-            + "BR Selic:  " + f"{SELIC_RATE:.2f}%" + "  COPOM " + _fmt_date_br(SELIC_NEXT_MEETING)
+            + _pad("US Fed") + _rpad(f"{FED_FUNDS_RATE:.2f}%") + "  FOMC " + _fmt_date_br(FED_NEXT_MEETING) + "\\n"
+            + _pad("BR Selic") + _rpad(f"{SELIC_RATE:.2f}%") + "  COPOM " + _fmt_date_br(SELIC_NEXT_MEETING)
         )
+        _prev_cdi = f"{_pd['cdi_month']:+.2f}%"
+        _prev_bal = f"{_pd['balanced_month']:+.2f}%"
+        _nit_cdi = f"{_nd['cdi_month']:+.2f}%"
+        _nit_bal = f"{_nd['balanced_month']:+.2f}%"
         _prev_block = (
-            "--- *Previdencia (" + _pd['data_base'] + ")* ---\\n"
-            + "Prevdow CDI  " + f"{_pd['cdi_month']:+.2f}%" + "  Bal. " + f"{_pd['balanced_month']:+.2f}%" + "\\n"
-            + "Nitro CDI  " + f"{_nd['cdi_month']:+.2f}%" + "  Bal. " + f"{_nd['balanced_month']:+.2f}%"
+            "--- *Previd\u00eancia (" + _pd['data_base'] + ")* ---\\n"
+            + _pad("Prevdow") + _rpad("CDI " + _prev_cdi) + "  Bal. " + _prev_bal + "\\n"
+            + _pad("Nitro") + _rpad("CDI " + _nit_cdi) + "  Bal. " + _nit_bal
         )
         _footer = "_Cortesia YlvorixVHM_\\nequityguard.streamlit.app"
 
@@ -891,7 +895,7 @@ def _render_briefing(T: dict) -> None:
                     <script>
                     var msg = '""" + _online_msg + """';
                     msg = msg.replace('--- *Bolsas* ---', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
-                    msg = msg.replace('--- *Previdencia', String.fromCodePoint(0x1F3E6)+' *Previdencia');
+                    msg = msg.replace('--- *Previd\\u00eancia', String.fromCodePoint(0x1F3E6)+' *Previd\\u00eancia');
                     msg = msg.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA)+' *Briefing Equity Guard*');
                     msg = msg.replace('equityguard.streamlit.app', String.fromCodePoint(0x1F449)+' equityguard.streamlit.app');
                     window.parent.open('https://wa.me/""" + _clean + """?text=' + encodeURIComponent(msg), '_blank');
