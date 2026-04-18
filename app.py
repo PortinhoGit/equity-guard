@@ -728,6 +728,7 @@ def _render_briefing(T: dict) -> None:
         _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
         _fx_chg_val = (_fx_wa or {}).get("change", 0)
         _fx_arrow = "+" if _fx_chg_val > 0 else ""
+        _hora_corte = _mkt["hora_corte"].strftime("%Hh%M")
 
         _emoji_js = """
             msg = msg.replace('--- *Juros* ---', String.fromCodePoint(0x1F3E6)+' *Juros*');
@@ -774,7 +775,7 @@ def _render_briefing(T: dict) -> None:
         # ── Fechamento do último pregão (data_ref) ───────────────────────────
         _close_msg = (
             "*Briefing Equity Guard*\\n"
-            + "*Fechamento " + _data_ref + "*\\n\\n"
+            + "*Fechamento " + _data_ref + " (mercado fechou " + _hora_corte + ")*\\n\\n"
             + _body_block
         )
 
@@ -831,7 +832,7 @@ def _render_briefing(T: dict) -> None:
                 padding:10px 8px;border-radius:8px;font-size:.78rem;
                 font-weight:700;border:none;cursor:pointer;
                 font-family:Inter,system-ui,sans-serif;
-            ">Fechamento """ + _data_ref + """</button>
+            ">Fechamento """ + _data_ref + """ (""" + _hora_corte + """)</button>
             <button onclick="
                 var msg = '""" + _ant_msg + """';
                 """ + _emoji_js + """
