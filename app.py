@@ -784,14 +784,14 @@ def _render_briefing(T: dict) -> None:
         # ── Fechamento do último pregão (data_ref) ───────────────────────────
         _close_msg = (
             "*Briefing Equity Guard*\\n"
-            + "*Fechamento " + _data_ref + "*\\n\\n"
+            + "*Fechamento " + _data_ref + ", " + _hora_corte + ".*\\n\\n"
             + _body_block
         )
 
         # ── Fechamento anterior (data_anterior) ──────────────────────────────
         _ant_msg = (
             "*Briefing Equity Guard*\\n"
-            + "*Fechamento " + _data_ant + "*\\n\\n"
+            + "*Fechamento " + _data_ant + ", " + _hora_corte + ".*\\n\\n"
             + _body_block
         )
 
