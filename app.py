@@ -9,6 +9,7 @@ import sys
 import os
 from typing import Optional
 from analytics import register_visit, get_stats, get_daily_series
+from market_status import get_status_mercado
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -696,7 +697,8 @@ def _render_briefing(T: dict) -> None:
                 unsafe_allow_html=True,
             )
 
-        # ── WhatsApp share — dois botões: fechamento + online ────────────────
+        # ── WhatsApp share — botões conforme status do mercado ────────────────
+        _mkt = get_status_mercado()
         _fx_wa = _fetch_fx_usdbrl()
         _pd = PREVDOW_DATA
         _nd = NITRO_DATA
@@ -718,7 +720,9 @@ def _render_briefing(T: dict) -> None:
 
         _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
         _hora_online = _now_brt.strftime("%H:%M:%S")
-        _yesterday_brt = (_now_brt - pd.offsets.BDay(1)).strftime("%d/%m/%Y")
+        _data_ref = _mkt["data_ref"].strftime("%d/%m/%Y")
+        _data_ant = _mkt["data_anterior"].strftime("%d/%m/%Y")
+        _is_online = _mkt["estado"] == "ONLINE"
 
         _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
         _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
@@ -750,16 +754,14 @@ def _render_briefing(T: dict) -> None:
         )
         _footer = "_Cortesia YlvorixVHM_\\nequityguard.streamlit.app"
 
-        # ── Botão VERMELHO: Fechamento dia anterior ──────────────────────────
-        _close_msg = (
-            "*Briefing Equity Guard*\\n"
-            + "*Fechamento " + _yesterday_brt + "*\\n\\n"
-            + _juros_block + "\\n\\n"
+        # ── Mensagem base com dados atuais ────────────────────────────────────
+        _body_block = (
+            _juros_block + "\\n\\n"
             + "--- *Commodities* ---\\n"
             + "Brent .... US$ " + _wa_val('Brent') + " " + _wa_chg('Brent') + "\\n"
             + "WTI ...... US$ " + _wa_val('WTI') + " " + _wa_chg('WTI') + "\\n\\n"
             + "--- *Dolar* ---\\n"
-            + "Venda .... " + _fx_prev + " " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
+            + "Venda .... " + _fx_com + " " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
             + "--- *Bolsas* ---\\n"
             + "Ibovespa . " + _wa_val('IBOV', 'br') + " " + _wa_chg('IBOV') + "\\n"
             + "S&P 500 .. " + _wa_val('S&P 500') + " " + _wa_chg('S&P 500') + "\\n"
@@ -769,49 +771,79 @@ def _render_briefing(T: dict) -> None:
             + _footer
         )
 
-        # ── Botão VERDE: Cotação online ──────────────────────────────────────
+        # ── Fechamento do último pregão (data_ref) ───────────────────────────
+        _close_msg = (
+            "*Briefing Equity Guard*\\n"
+            + "*Fechamento " + _data_ref + "*\\n\\n"
+            + _body_block
+        )
+
+        # ── Fechamento anterior (data_anterior) ──────────────────────────────
+        _ant_msg = (
+            "*Briefing Equity Guard*\\n"
+            + "*Fechamento " + _data_ant + "*\\n\\n"
+            + _body_block
+        )
+
+        # ── Online (só quando mercado aberto) ────────────────────────────────
         _online_msg = (
             "*Briefing Equity Guard*\\n"
             + "*Online " + today + " " + _hora_online + " (Brasilia)*\\n\\n"
-            + _juros_block + "\\n\\n"
-            + "--- *Commodities* ---\\n"
-            + "Brent .... US$ " + _wa_val('Brent') + " " + _wa_chg('Brent') + "\\n"
-            + "WTI ...... US$ " + _wa_val('WTI') + " " + _wa_chg('WTI') + "\\n\\n"
-            + "--- *Dolar* ---\\n"
-            + "Venda .... " + _fx_com + " " + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
-            + "--- *Bolsas* ---\\n"
-            + "Ibovespa . " + _wa_val('IBOV', 'br') + " " + _wa_chg('IBOV') + "\\n"
-            + "S&P 500 .. " + _wa_val('S&P 500') + " " + _wa_chg('S&P 500') + "\\n"
-            + "NASDAQ ... " + _wa_val('NASDAQ') + " " + _wa_chg('NASDAQ') + "\\n"
-            + "FTSE ..... " + _wa_val('FTSE') + " " + _wa_chg('FTSE') + "\\n\\n"
-            + _prev_block + "\\n\\n"
-            + _footer
+            + _body_block
         )
 
-        _wa_comp.html("""
-        <div style="display:flex;flex-direction:column;gap:6px;">
-        <button onclick="
-            var msg = '""" + _close_msg + """';
-            """ + _emoji_js + """
-            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-        " style="
-            display:block;width:100%;background:#c0392b;color:#fff;
-            padding:10px 8px;border-radius:8px;font-size:.78rem;
-            font-weight:700;border:none;cursor:pointer;
-            font-family:Inter,system-ui,sans-serif;
-        ">Fechamento dia anterior</button>
-        <button onclick="
-            var msg = '""" + _online_msg + """';
-            """ + _emoji_js + """
-            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-        " style="
-            display:block;width:100%;background:#25d366;color:#fff;
-            padding:10px 8px;border-radius:8px;font-size:.78rem;
-            font-weight:700;border:none;cursor:pointer;
-            font-family:Inter,system-ui,sans-serif;
-        ">Cotacao online (""" + _hora_online + """)</button>
-        </div>
-        """, height=90)
+        if _is_online:
+            # Mercado aberto: vermelho (fechamento anterior) + verde (online)
+            _wa_comp.html("""
+            <div style="display:flex;flex-direction:column;gap:6px;">
+            <button onclick="
+                var msg = '""" + _ant_msg + """';
+                """ + _emoji_js + """
+                window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+            " style="
+                display:block;width:100%;background:#c0392b;color:#fff;
+                padding:10px 8px;border-radius:8px;font-size:.78rem;
+                font-weight:700;border:none;cursor:pointer;
+                font-family:Inter,system-ui,sans-serif;
+            ">Fechamento """ + _data_ant + """</button>
+            <button onclick="
+                var msg = '""" + _online_msg + """';
+                """ + _emoji_js + """
+                window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+            " style="
+                display:block;width:100%;background:#25d366;color:#fff;
+                padding:10px 8px;border-radius:8px;font-size:.78rem;
+                font-weight:700;border:none;cursor:pointer;
+                font-family:Inter,system-ui,sans-serif;
+            ">Online """ + _hora_online + """ (Brasilia)</button>
+            </div>
+            """, height=90)
+        else:
+            # Mercado fechado: vermelho (fechamento de hoje) + cinza (anterior)
+            _wa_comp.html("""
+            <div style="display:flex;flex-direction:column;gap:6px;">
+            <button onclick="
+                var msg = '""" + _close_msg + """';
+                """ + _emoji_js + """
+                window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+            " style="
+                display:block;width:100%;background:#c0392b;color:#fff;
+                padding:10px 8px;border-radius:8px;font-size:.78rem;
+                font-weight:700;border:none;cursor:pointer;
+                font-family:Inter,system-ui,sans-serif;
+            ">Fechamento """ + _data_ref + """</button>
+            <button onclick="
+                var msg = '""" + _ant_msg + """';
+                """ + _emoji_js + """
+                window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+            " style="
+                display:block;width:100%;background:#484f58;color:#e6edf3;
+                padding:10px 8px;border-radius:8px;font-size:.78rem;
+                font-weight:700;border:none;cursor:pointer;
+                font-family:Inter,system-ui,sans-serif;
+            ">Fechamento anterior """ + _data_ant + """</button>
+            </div>
+            """, height=90)
         st.markdown(
             f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
             f"{T['briefing_source_footer']}</div>",
