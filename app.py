@@ -757,7 +757,7 @@ def _render_briefing(T: dict) -> None:
             + _pad("Prevdow") + _rpad("CDI " + _prev_cdi) + "  Bal. " + _prev_bal + "\\n"
             + _pad("Nitro") + _rpad("CDI " + _nit_cdi) + "  Bal. " + _nit_bal
         )
-        _footer = "_Cortesia YlvorixVHM_\\nequityguard.streamlit.app"
+        _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nequityguard.streamlit.app"
 
         # ── Mensagem base com dados atuais (alinhado em colunas) ────────────
         def _pad(name, width=10):
