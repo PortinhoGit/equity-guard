@@ -441,6 +441,28 @@ def _fetch_full_data(ticker: str, period: str):
     return get_full_data(ticker, period=period)
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_prevdow_live() -> dict:
+    """
+    Scraper PrevDow com cache 1h. Retorna dict merged com PREVDOW_DATA.
+    Se scraper falhar, retorna PREVDOW_DATA do config.
+    """
+    try:
+        from data.prevdow_scraper import get_rentabilidade_prevdow
+        live = get_rentabilidade_prevdow()
+    except Exception:
+        live = None
+    merged = dict(PREVDOW_DATA)
+    if live:
+        if live.get("data_base"):
+            merged["data_base"] = live["data_base"]
+        if live.get("cdi_month") is not None:
+            merged["cdi_month"] = live["cdi_month"]
+        if live.get("balanced_month") is not None:
+            merged["balanced_month"] = live["balanced_month"]
+    return merged
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _fetch_quick_history(ticker: str, period: str) -> Optional[pd.DataFrame]:
     """Cached wrapper for the interactive period chart (5-min TTL)."""
@@ -700,7 +722,7 @@ def _render_briefing(T: dict) -> None:
         # ── WhatsApp share — botões conforme status do mercado ────────────────
         _mkt = get_status_mercado()
         _fx_wa = _fetch_fx_usdbrl()
-        _pd = PREVDOW_DATA
+        _pd = _fetch_prevdow_live()
         _nd = NITRO_DATA
         import streamlit.components.v1 as _wa_comp
 
@@ -968,13 +990,10 @@ def _render_global_bar(T: dict) -> None:
 def _render_prevdow_panel(T: dict) -> None:
     """
     Prevdow — Previdência Complementar.
-    Branded sidebar card (vermelho/branco) with monthly and YTD returns for
-    CDI and Balanced profiles, plus a link to the official rentabilidade
-    portal and a WhatsApp share button. Values come from config.PREVDOW_DATA
-    and are meant to be updated manually once a month.
+    Tenta scraper live; fallback para config.PREVDOW_DATA.
     """
     import urllib.parse as _url
-    d = PREVDOW_DATA
+    d = _fetch_prevdow_live()
 
     # ── Branded header (red bar, white text) ──────────────────────────────────
     st.markdown(
