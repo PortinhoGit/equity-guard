@@ -336,8 +336,8 @@ _PT: dict = {
     # ── Prevdow — Previdência Complementar ────────────────────────────────────
     "prevdow_title":       "🏦 PrevDow",
     "prevdow_subtitle":    "Data-base {ref}",
-    "prevdow_cdi_label":   "Perfil CDI",
-    "prevdow_balanced_label": "Perfil Balanceado",
+    "prevdow_cdi_label":   "Carteira DI",
+    "prevdow_balanced_label": "Carteira Balanceada",
     "prevdow_month":       "no mês",
     "prevdow_year":        "no ano",
     "prevdow_link":        "📊 Ver rentabilidade completa",

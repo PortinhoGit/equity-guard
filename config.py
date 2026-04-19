@@ -52,11 +52,20 @@ PREVDOW_DATA: dict = {
 # ── Nitro Prev (IFM Previdência / Votorantim) — atualização manual mensal ────
 NITRO_DATA: dict = {
     "url":          "https://ifmprev.participante.com.br/login",
-    "data_base":    "N/D",
-    "cdi_month":    None,
-    "balanced_month": None,
-    "cdi_year":     None,
-    "balanced_year": None,
+    "data_base":    "03/2026",
+    # NitroPrev tem 4 perfis: C (Conservador), M (Moderado), A (Arrojado), S (Super)
+    # Mantemos 2 campos "cdi/balanced" para compatibilidade visual:
+    #   cdi = NitroPrev C (mais conservador)
+    #   balanced = NitroPrev M (moderado)
+    "cdi_month":    1.16,
+    "balanced_month": 0.87,
+    "cdi_year":     3.41,
+    "balanced_year": 5.85,
+    # Perfis adicionais (Arrojado e Super) para exibicao opcional
+    "arrojado_month": 0.54,
+    "super_month":    0.37,
+    "arrojado_year":  8.41,
+    "super_year":     9.70,
 }
 
 # ── Identidade do app ─────────────────────────────────────────────────────────

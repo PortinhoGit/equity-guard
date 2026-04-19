@@ -765,7 +765,8 @@ def _render_briefing(T: dict) -> None:
             msg = msg.replace('*Commodities*', String.fromCodePoint(0x1F6E2)+' *Commodities*');
             msg = msg.replace('*Dolar Comercial*', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
             msg = msg.replace('*Bolsas*', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
-            msg = msg.replace('*Previd\\u00eancia', String.fromCodePoint(0x1F3E6)+' *Previd\\u00eancia');
+            msg = msg.replace('*Prevdow', String.fromCodePoint(0x1F3E6)+' *Prevdow');
+            msg = msg.replace('*NitroPrev', String.fromCodePoint(0x1F3E6)+' *NitroPrev');
             msg = msg.replace('*Briefing', String.fromCodePoint(0x1F4CA)+' *Briefing');
             msg = msg.replace('*Equity Guard*', String.fromCodePoint(0x1F449)+' *Equity Guard*');
         """
@@ -778,14 +779,20 @@ def _render_briefing(T: dict) -> None:
         )
         def _fmt_pct(v):
             return f"{v:+.2f}%" if v is not None else "N/D"
-        _prev_cdi = _fmt_pct(_pd.get('cdi_month'))
+        _prev_di = _fmt_pct(_pd.get('cdi_month'))
         _prev_bal = _fmt_pct(_pd.get('balanced_month'))
-        _nit_cdi = _fmt_pct(_nd.get('cdi_month'))
-        _nit_bal = _fmt_pct(_nd.get('balanced_month'))
+        _prev_di_y = _fmt_pct(_pd.get('cdi_year'))
+        _prev_bal_y = _fmt_pct(_pd.get('balanced_year'))
+        _nit_c = _fmt_pct(_nd.get('cdi_month'))
+        _nit_m = _fmt_pct(_nd.get('balanced_month'))
+        _nit_a = _fmt_pct(_nd.get('arrojado_month'))
+        _nit_s = _fmt_pct(_nd.get('super_month'))
         _prev_block = (
-            "*Previd\u00eancia " + _pd['data_base'] + "*\\n"
-            + "Prevdow: CDI " + _prev_cdi + " | Bal. " + _prev_bal + "\\n"
-            + "Nitro: CDI " + _nit_cdi + " | Bal. " + _nit_bal
+            "*Prevdow " + _pd['data_base'] + "*\\n"
+            + "DI: " + _prev_di + " mes | " + _prev_di_y + " ano\\n"
+            + "Balanceada: " + _prev_bal + " mes | " + _prev_bal_y + " ano\\n\\n"
+            + "*NitroPrev " + _nd['data_base'] + "*\\n"
+            + "C: " + _nit_c + " | M: " + _nit_m + " | A: " + _nit_a + " | S: " + _nit_s
         )
         _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
@@ -1096,7 +1103,23 @@ def _render_nitro_panel(T: dict) -> None:
         return f"<span style='font-weight:800;color:{c};'>{v:+.2f}%</span>"
 
     _hdr = "color:#6e7681;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;"
-    _cell = "padding:6px 0;font-size:.82rem;"
+    _cell = "padding:5px 0;font-size:.80rem;"
+    _rows_html = ""
+    _nitro_rows = [
+        ("NitroPrev C", d.get('cdi_month'), d.get('cdi_year')),
+        ("NitroPrev M", d.get('balanced_month'), d.get('balanced_year')),
+        ("NitroPrev A", d.get('arrojado_month'), d.get('arrojado_year')),
+        ("NitroPrev S", d.get('super_month'), d.get('super_year')),
+    ]
+    for i, (_lbl, _m, _y) in enumerate(_nitro_rows):
+        _border = "border-bottom:1px dashed #21262d;" if i < len(_nitro_rows) - 1 else ""
+        _rows_html += (
+            f"<tr style='{_border}'>"
+            f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{_lbl}</td>"
+            f"<td style='{_cell}text-align:right;'>{_val_html(_m)}</td>"
+            f"<td style='{_cell}text-align:right;'>{_val_html(_y)}</td>"
+            f"</tr>"
+        )
     st.markdown(
         f"<div style='background:#161b22;border:1px solid {NAVY};"
         f"border-top:none;border-radius:0 0 10px 10px;padding:8px 14px 10px;'>"
@@ -1106,16 +1129,7 @@ def _render_nitro_panel(T: dict) -> None:
         f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_month']}</td>"
         f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_year']}</td>"
         f"</tr>"
-        f"<tr style='border-bottom:1px dashed #21262d;'>"
-        f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_cdi_label']}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('cdi_month'))}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('cdi_year'))}</td>"
-        f"</tr>"
-        f"<tr>"
-        f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_balanced_label']}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('balanced_month'))}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('balanced_year'))}</td>"
-        f"</tr>"
+        f"{_rows_html}"
         "</table></div>",
         unsafe_allow_html=True,
     )
