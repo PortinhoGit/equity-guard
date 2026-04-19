@@ -52,11 +52,11 @@ PREVDOW_DATA: dict = {
 # ── Nitro Prev (IFM Previdência / Votorantim) — atualização manual mensal ────
 NITRO_DATA: dict = {
     "url":          "https://ifmprev.participante.com.br/login",
-    "data_base":    "02/2026",
-    "cdi_month":    0.94,
-    "balanced_month": 1.42,
-    "cdi_year":     2.85,
-    "balanced_year": 3.78,
+    "data_base":    "N/D",
+    "cdi_month":    None,
+    "balanced_month": None,
+    "cdi_year":     None,
+    "balanced_year": None,
 }
 
 # ── Identidade do app ─────────────────────────────────────────────────────────

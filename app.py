@@ -776,10 +776,12 @@ def _render_briefing(T: dict) -> None:
             + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (FOMC " + _fmt_date_br(FED_NEXT_MEETING) + ")\\n"
             + "BR Selic: " + f"{SELIC_RATE:.2f}%" + " (COPOM " + _fmt_date_br(SELIC_NEXT_MEETING) + ")"
         )
-        _prev_cdi = f"{_pd['cdi_month']:+.2f}%"
-        _prev_bal = f"{_pd['balanced_month']:+.2f}%"
-        _nit_cdi = f"{_nd['cdi_month']:+.2f}%"
-        _nit_bal = f"{_nd['balanced_month']:+.2f}%"
+        def _fmt_pct(v):
+            return f"{v:+.2f}%" if v is not None else "N/D"
+        _prev_cdi = _fmt_pct(_pd.get('cdi_month'))
+        _prev_bal = _fmt_pct(_pd.get('balanced_month'))
+        _nit_cdi = _fmt_pct(_nd.get('cdi_month'))
+        _nit_bal = _fmt_pct(_nd.get('balanced_month'))
         _prev_block = (
             "*Previd\u00eancia " + _pd['data_base'] + "*\\n"
             + "Prevdow: CDI " + _prev_cdi + " | Bal. " + _prev_bal + "\\n"
@@ -1010,7 +1012,9 @@ def _render_prevdow_panel(T: dict) -> None:
     )
 
     # ── Returns table (Perfil | No mês | No ano) ──────────────────────────────
-    def _val_html(v: float) -> str:
+    def _val_html(v) -> str:
+        if v is None:
+            return "<span style='font-weight:800;color:#6e7681;'>N/D</span>"
         c = "#58a6ff" if v > 0 else ("#dc2626" if v < 0 else "#8b949e")
         return f"<span style='font-weight:800;color:{c};'>{v:+.2f}%</span>"
 
@@ -1027,13 +1031,13 @@ def _render_prevdow_panel(T: dict) -> None:
         f"</tr>"
         f"<tr style='border-bottom:1px dashed #21262d;'>"
         f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_cdi_label']}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d['cdi_month'])}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d['cdi_year'])}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('cdi_month'))}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('cdi_year'))}</td>"
         f"</tr>"
         f"<tr>"
         f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_balanced_label']}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d['balanced_month'])}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d['balanced_year'])}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('balanced_month'))}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('balanced_year'))}</td>"
         f"</tr>"
         "</table></div>",
         unsafe_allow_html=True,
@@ -1085,7 +1089,9 @@ def _render_nitro_panel(T: dict) -> None:
     )
 
     # ── Returns table (Perfil | No mês | No ano) ──────────────────────────────
-    def _val_html(v: float) -> str:
+    def _val_html(v) -> str:
+        if v is None:
+            return "<span style='font-weight:800;color:#6e7681;'>N/D</span>"
         c = "#58a6ff" if v > 0 else ("#dc2626" if v < 0 else "#8b949e")
         return f"<span style='font-weight:800;color:{c};'>{v:+.2f}%</span>"
 
@@ -1102,13 +1108,13 @@ def _render_nitro_panel(T: dict) -> None:
         f"</tr>"
         f"<tr style='border-bottom:1px dashed #21262d;'>"
         f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_cdi_label']}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d['cdi_month'])}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d['cdi_year'])}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('cdi_month'))}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('cdi_year'))}</td>"
         f"</tr>"
         f"<tr>"
         f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{T['prevdow_balanced_label']}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d['balanced_month'])}</td>"
-        f"<td style='{_cell}text-align:right;'>{_val_html(d['balanced_year'])}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('balanced_month'))}</td>"
+        f"<td style='{_cell}text-align:right;'>{_val_html(d.get('balanced_year'))}</td>"
         f"</tr>"
         "</table></div>",
         unsafe_allow_html=True,
