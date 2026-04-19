@@ -5,5 +5,5 @@ numpy>=1.24.0
 plotly>=5.17.0
 requests>=2.31.0
 pytz>=2024.1
-beautifulsoup4>=4.12.0
+beautifulsoup4>=4.12.2
 # pandas-ta>=0.3.14b  -- requires Python >=3.12; app uses manual fallbacks on 3.9
