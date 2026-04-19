@@ -198,7 +198,7 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 /* Beta badge + aviso */
 .eg-beta-badge { display:inline-block; background:linear-gradient(135deg,#f85149,#d4af37); color:#0d1117; font-size:.66rem; font-weight:900; letter-spacing:1.6px; padding:3px 10px; border-radius:20px; margin-left:10px; vertical-align:middle; animation:eg-beta-pulse 2.2s infinite; }
 @keyframes eg-beta-pulse { 0%,100% { box-shadow:0 0 0 0 rgba(248,81,73,.55); } 50% { box-shadow:0 0 0 6px rgba(248,81,73,0); } }
-.eg-beta-notice { background:rgba(248,81,73,.08); border:1px dashed #f85149; border-radius:8px; padding:7px 14px; color:#f0a5a1; font-size:.76rem; text-align:center; margin:8px 0 10px; }
+.eg-beta-notice { background:rgba(248,81,73,.08); border:1px dashed #f85149; border-radius:8px; padding:7px 14px; color:#ffffff; font-size:.76rem; text-align:center; margin:8px 0 10px; }
 /* Feedback box */
 .eg-fb-wrap { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px 16px; margin:14px 0; }
 .eg-fb-title { font-size:.82rem; font-weight:800; letter-spacing:.8px; color:#d4af37; text-transform:uppercase; margin-bottom:4px; }
@@ -542,73 +542,90 @@ def _render_share_buttons(T: dict) -> None:
     )
 
 
-def _render_feedback_box() -> None:
-    """Caixa de feedback: envia a mensagem direto pro WhatsApp / e-mail dos mantenedores.
+_FEEDBACK_TO = ["portinho@icloud.com", "vhmonje@gmail.com"]
 
-    Não publica nada no site — o link mailto: / wa.me abre o cliente do usuário
-    com a mensagem pré-preenchida.
+
+def _send_feedback_email(msg_text: str) -> tuple[bool, str]:
+    """Envia feedback via SMTP. Credenciais em st.secrets. Fallback: mailto: (retorna False)."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.utils import formatdate
+
+    try:
+        _secrets = st.secrets
+        smtp_host = _secrets.get("SMTP_HOST", "smtp.gmail.com")
+        smtp_port = int(_secrets.get("SMTP_PORT", 587))
+        smtp_user = _secrets.get("SMTP_USER")
+        smtp_pass = _secrets.get("SMTP_PASS")
+        smtp_from = _secrets.get("SMTP_FROM", smtp_user)
+    except Exception:
+        return False, "SMTP não configurado nos secrets."
+
+    if not smtp_user or not smtp_pass:
+        return False, "SMTP não configurado (SMTP_USER/SMTP_PASS)."
+
+    body = f"{msg_text}\n\n— enviado via https://equityguard.streamlit.app"
+    mime = MIMEText(body, "plain", "utf-8")
+    mime["Subject"] = "[Equity Guard] Feedback do usuário"
+    mime["From"] = smtp_from
+    mime["To"] = ", ".join(_FEEDBACK_TO)
+    mime["Date"] = formatdate(localtime=True)
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, _FEEDBACK_TO, mime.as_string())
+        return True, "ok"
+    except Exception as e:
+        return False, f"Falha SMTP: {e}"
+
+
+def _render_feedback_box() -> None:
+    """Caixa de feedback: 1 botão envia e-mail via SMTP para os mantenedores.
+
+    Se SMTP não estiver configurado nos secrets, cai num fallback mailto: que
+    abre o cliente de e-mail do usuário com ambos destinatários já preenchidos.
     """
     import urllib.parse as _url
-
-    _wa_numbers = [
-        ("WhatsApp 1", "5511999767040"),
-        ("WhatsApp 2", "5511999381625"),
-    ]
-    _emails = [
-        ("E-mail 1", "portinho@icloud.com"),
-        ("E-mail 2", "vhmonje@gmail.com"),
-    ]
 
     st.markdown(
         "<div class='eg-fb-wrap'>"
         "<div class='eg-fb-title'>💬 Caixa de feedback</div>"
         "<div class='eg-fb-sub'>Versão beta — envie sugestões, elogios ou reporte problemas. "
-        "Sua mensagem <b>não é publicada</b> no site: vai direto para o WhatsApp ou e-mail dos mantenedores.</div>"
+        "Sua mensagem <b>não é publicada</b> no site. Um clique envia e-mail para os mantenedores.</div>"
         "</div>",
         unsafe_allow_html=True,
     )
 
-    _msg = st.text_area(
-        "Sua mensagem",
-        key="eg_feedback_msg",
-        placeholder="Ex.: achei a análise de BBAS3 muito útil, mas faltou o histórico de JCP…",
-        height=110,
-        label_visibility="collapsed",
-    )
-
-    _msg_clean = (_msg or "").strip()
-    _has_msg = bool(_msg_clean)
-
-    _prefix = "[Equity Guard · Feedback Beta]\n\n"
-    _suffix = "\n\n— enviado via https://equityguard.streamlit.app"
-    _wa_text = _url.quote(f"{_prefix}{_msg_clean}{_suffix}") if _has_msg else ""
-    _subject = _url.quote("[Equity Guard] Feedback do usuário")
-    _body = _url.quote(f"{_msg_clean}{_suffix}") if _has_msg else ""
-
-    _btns = []
-    for _label, _num in _wa_numbers:
-        _href = f"https://wa.me/{_num}?text={_wa_text}" if _has_msg else "#"
-        _cls = "eg-fb-btn eg-fb-wa" + ("" if _has_msg else " eg-fb-btn-off")
-        _btns.append(
-            f"<a class='{_cls}' href='{_href}' target='_blank' rel='noopener'>📱 {_label}</a>"
+    with st.form(key="eg_feedback_form", clear_on_submit=True):
+        _msg = st.text_area(
+            "Sua mensagem",
+            key="eg_feedback_msg",
+            placeholder="Ex.: achei a análise de BBAS3 muito útil, mas faltou o histórico de JCP…",
+            height=110,
+            label_visibility="collapsed",
         )
-    for _label, _addr in _emails:
-        _href = f"mailto:{_addr}?subject={_subject}&body={_body}" if _has_msg else "#"
-        _cls = "eg-fb-btn eg-fb-mail" + ("" if _has_msg else " eg-fb-btn-off")
-        _btns.append(
-            f"<a class='{_cls}' href='{_href}'>✉️ {_label}</a>"
-        )
+        _clicked = st.form_submit_button("📨 Enviar feedback", use_container_width=False)
 
-    _hint = (
-        "Clique em um canal para abrir o app com sua mensagem pronta."
-        if _has_msg
-        else "<i>Digite uma mensagem acima para habilitar os canais.</i>"
-    )
-    st.markdown(
-        f"<div class='eg-fb-sub' style='margin-top:6px;'>{_hint}</div>"
-        f"<div class='eg-fb-btns'>{''.join(_btns)}</div>",
-        unsafe_allow_html=True,
-    )
+    if _clicked:
+        _msg_clean = (_msg or "").strip()
+        if not _msg_clean:
+            st.warning("Digite uma mensagem antes de enviar.")
+            return
+        with st.spinner("Enviando…"):
+            ok, detail = _send_feedback_email(_msg_clean)
+        if ok:
+            st.success("✓ Feedback enviado! Obrigado.")
+        else:
+            _subject = _url.quote("[Equity Guard] Feedback do usuário")
+            _body = _url.quote(f"{_msg_clean}\n\n— enviado via https://equityguard.streamlit.app")
+            _mailto = f"mailto:{','.join(_FEEDBACK_TO)}?subject={_subject}&body={_body}"
+            st.warning(
+                "Envio automático indisponível no momento. "
+                f"[Clique aqui para abrir seu e-mail com a mensagem pronta]({_mailto})."
+            )
+            st.caption(f"_Detalhe técnico: {detail}_")
 
 
 @st.cache_data(ttl=300, show_spinner=False)
