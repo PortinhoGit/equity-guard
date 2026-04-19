@@ -195,6 +195,20 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 .eg-best-badge { display:inline-block; background:rgba(212,175,55,.12); border:1px solid #d4af37; color:#d4af37; padding:2px 12px; border-radius:20px; font-size:.76rem; font-weight:700; letter-spacing:.5px; vertical-align:middle; margin-left:8px; }
 /* Dev badge */
 .eg-dev-badge { display:inline-block; background:rgba(212,175,55,.10); border:1px dashed #d4af37; color:#d4af37; padding:2px 10px; border-radius:20px; font-size:.72rem; font-weight:700; letter-spacing:.5px; vertical-align:middle; margin-left:8px; }
+/* Beta badge + aviso */
+.eg-beta-badge { display:inline-block; background:linear-gradient(135deg,#f85149,#d4af37); color:#0d1117; font-size:.66rem; font-weight:900; letter-spacing:1.6px; padding:3px 10px; border-radius:20px; margin-left:10px; vertical-align:middle; animation:eg-beta-pulse 2.2s infinite; }
+@keyframes eg-beta-pulse { 0%,100% { box-shadow:0 0 0 0 rgba(248,81,73,.55); } 50% { box-shadow:0 0 0 6px rgba(248,81,73,0); } }
+.eg-beta-notice { background:rgba(248,81,73,.08); border:1px dashed #f85149; border-radius:8px; padding:7px 14px; color:#ffffff; font-size:.76rem; text-align:center; margin:8px 0 10px; }
+/* Feedback box */
+.eg-fb-wrap { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px 16px; margin:14px 0; }
+.eg-fb-title { font-size:.82rem; font-weight:800; letter-spacing:.8px; color:#d4af37; text-transform:uppercase; margin-bottom:4px; }
+.eg-fb-sub { font-size:.72rem; color:#8b949e; margin-bottom:10px; }
+.eg-fb-btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.eg-fb-btn { padding:7px 14px; border-radius:8px; text-decoration:none !important; font-weight:700; font-size:.78rem; letter-spacing:.3px; display:inline-flex; align-items:center; gap:6px; transition:transform .15s, box-shadow .2s; }
+.eg-fb-btn:hover { transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.3); }
+.eg-fb-wa { background:#25d366; color:#0d1117 !important; }
+.eg-fb-mail { background:#d4af37; color:#0d1117 !important; }
+.eg-fb-btn-off { opacity:.45; pointer-events:none; }
 /* Section header */
 .eg-section-header { font-size:.72rem; font-weight:700; letter-spacing:1.8px; text-transform:uppercase; color:#8b949e; margin:1.2rem 0 .6rem; }
 /* Trend */
@@ -526,6 +540,92 @@ def _render_share_buttons(T: dict) -> None:
         f"padding:6px 0;'>{btns}</div>",
         unsafe_allow_html=True,
     )
+
+
+_FEEDBACK_TO = ["portinho@icloud.com", "vhmonje@gmail.com"]
+
+
+def _send_feedback_email(msg_text: str) -> tuple[bool, str]:
+    """Envia feedback via SMTP. Credenciais em st.secrets. Fallback: mailto: (retorna False)."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.utils import formatdate
+
+    try:
+        _secrets = st.secrets
+        smtp_host = _secrets.get("SMTP_HOST", "smtp.gmail.com")
+        smtp_port = int(_secrets.get("SMTP_PORT", 587))
+        smtp_user = _secrets.get("SMTP_USER")
+        smtp_pass = _secrets.get("SMTP_PASS")
+        smtp_from = _secrets.get("SMTP_FROM", smtp_user)
+    except Exception:
+        return False, "SMTP não configurado nos secrets."
+
+    if not smtp_user or not smtp_pass:
+        return False, "SMTP não configurado (SMTP_USER/SMTP_PASS)."
+
+    body = f"{msg_text}\n\n— enviado via https://equityguard.streamlit.app"
+    mime = MIMEText(body, "plain", "utf-8")
+    mime["Subject"] = "[Equity Guard] Feedback do usuário"
+    mime["From"] = smtp_from
+    mime["To"] = ", ".join(_FEEDBACK_TO)
+    mime["Date"] = formatdate(localtime=True)
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, _FEEDBACK_TO, mime.as_string())
+        return True, "ok"
+    except Exception as e:
+        return False, f"Falha SMTP: {e}"
+
+
+def _render_feedback_box() -> None:
+    """Caixa de feedback: 1 botão envia e-mail via SMTP para os mantenedores.
+
+    Se SMTP não estiver configurado nos secrets, cai num fallback mailto: que
+    abre o cliente de e-mail do usuário com ambos destinatários já preenchidos.
+    """
+    import urllib.parse as _url
+
+    st.markdown(
+        "<div class='eg-fb-wrap'>"
+        "<div class='eg-fb-title'>💬 Caixa de feedback</div>"
+        "<div class='eg-fb-sub'>Versão beta — envie sugestões, elogios ou reporte problemas. "
+        "Sua mensagem <b>não é publicada</b> no site. Um clique envia e-mail para os mantenedores.</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.form(key="eg_feedback_form", clear_on_submit=True):
+        _msg = st.text_area(
+            "Sua mensagem",
+            key="eg_feedback_msg",
+            placeholder="Ex.: achei a análise de BBAS3 muito útil, mas faltou o histórico de JCP…",
+            height=110,
+            label_visibility="collapsed",
+        )
+        _clicked = st.form_submit_button("📨 Enviar feedback", use_container_width=False)
+
+    if _clicked:
+        _msg_clean = (_msg or "").strip()
+        if not _msg_clean:
+            st.warning("Digite uma mensagem antes de enviar.")
+            return
+        with st.spinner("Enviando…"):
+            ok, detail = _send_feedback_email(_msg_clean)
+        if ok:
+            st.success("✓ Feedback enviado! Obrigado.")
+        else:
+            _subject = _url.quote("[Equity Guard] Feedback do usuário")
+            _body = _url.quote(f"{_msg_clean}\n\n— enviado via https://equityguard.streamlit.app")
+            _mailto = f"mailto:{','.join(_FEEDBACK_TO)}?subject={_subject}&body={_body}"
+            st.warning(
+                "Envio automático indisponível no momento. "
+                f"[Clique aqui para abrir seu e-mail com a mensagem pronta]({_mailto})."
+            )
+            st.caption(f"_Detalhe técnico: {detail}_")
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -2743,6 +2843,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         f"</div>",
         unsafe_allow_html=True,
     )
+    _render_feedback_box()
     _render_share_buttons(T)
 
 
@@ -2836,7 +2937,12 @@ def main() -> None:
         "<h1 style='font-size:1.7rem;font-weight:900;letter-spacing:-.5px;margin-bottom:0;'>"
         "<span style='color:#d4af37;'>EQUITY</span>"
         "<span style='color:#e6edf3;'> GUARD</span>"
-        "</h1>",
+        "<span class='eg-beta-badge'>BETA</span>"
+        "</h1>"
+        "<div class='eg-beta-notice'>"
+        "⚠️ Site em desenvolvimento &middot; versão beta &middot; dados e funcionalidades podem mudar sem aviso. "
+        "Envie sugestões pela caixa de feedback no rodapé."
+        "</div>",
         unsafe_allow_html=True,
     )
     _render_share_buttons(T)
