@@ -9,7 +9,7 @@ import sys
 import os
 from typing import Optional
 from analytics import register_visit, get_stats, get_daily_series
-from market_status import get_status_mercado
+from market_status import get_status_mercado, dia_util_anterior
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -1430,7 +1430,14 @@ def _render_macro_panel(T: dict) -> None:
     _gold_cell = "padding:3px 0;font-size:.88rem;text-align:right;font-weight:800;color:#d4af37;"
     _t_com = T.get("fx_commercial", "Comercial")
     _t_tur = T.get("fx_tourism", "Turismo")
-    _t_prev = T.get("fx_prev_close", "Fech. ontem")
+    # Label dinamico: ultimo dia util anterior a hoje (ignora fins de semana
+    # e feriados B3). Ex.: se hoje = segunda, aponta sexta; se hoje = terca apos
+    # feriado, aponta sexta anterior.
+    _today_brt = pd.Timestamp.now(tz="America/Sao_Paulo").date()
+    _prev_bday = dia_util_anterior(_today_brt)
+    _t_prev = T.get("fx_prev_close", "Fech. {date}").format(
+        date=_prev_bday.strftime("%d/%m")
+    )
     _fx_ytd = fx.get("chg_ytd")
     _fx_1y = fx.get("chg_1y")
     _ytd_str = f"{_fx_ytd:+.1f}%" if _fx_ytd is not None else "—"
