@@ -726,6 +726,92 @@ def _send_feedback_email(msg_text: str) -> tuple[bool, str]:
         return False, f"Falha SMTP: {e}"
 
 
+def _render_subscribe_box() -> None:
+    """Formulario de opt-in para receber briefing diario por e-mail (6h BRT, seg-sex)."""
+    from auth.subscribers import subscribe, is_subscribed
+
+    st.markdown(
+        "<div class='eg-fb-wrap' style='margin-top:18px;'>"
+        "<div class='eg-fb-title'>📬 Briefing diário por e-mail</div>"
+        "<div class='eg-fb-sub'>Receba o resumo do mercado todo dia útil às <b>6h BRT</b> "
+        "direto no seu e-mail. Cancele quando quiser (link no rodapé do e-mail).</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.form(key="eg_subscribe_form", clear_on_submit=False):
+        _sub_email = st.text_input(
+            "Seu e-mail",
+            key="eg_sub_email",
+            placeholder="voce@exemplo.com",
+            label_visibility="collapsed",
+        )
+        _sub_consent = st.checkbox(
+            "Concordo em receber o briefing diário às 6h (dias úteis) "
+            "e sei que posso cancelar a qualquer momento.",
+            key="eg_sub_consent",
+        )
+        _sub_clicked = st.form_submit_button("📨 Assinar briefing")
+
+    if _sub_clicked:
+        _e = (_sub_email or "").strip().lower()
+        if not _e or "@" not in _e or "." not in _e:
+            st.warning("Informe um e-mail válido.")
+            return
+        if not _sub_consent:
+            st.warning("Marque a caixinha de consentimento para assinar.")
+            return
+        if is_subscribed(_e):
+            st.info("Este e-mail já está inscrito. Você receberá o próximo briefing.")
+            return
+        token = subscribe(_e)
+        if token:
+            st.success(
+                "✓ Assinatura confirmada! O próximo briefing chega no próximo dia útil às 6h."
+            )
+        else:
+            st.error(
+                "Falha ao registrar assinatura. Tente de novo em alguns minutos "
+                "ou entre em contato pela caixa de feedback."
+            )
+
+
+def _render_unsubscribe_page(token: str) -> None:
+    """Pagina simples de cancelamento acessada via ?unsub=TOKEN."""
+    from auth.subscribers import unsubscribe
+
+    st.markdown(
+        "<h1 style='font-size:1.6rem;font-weight:900;letter-spacing:-.5px;margin:2rem 0 1rem;'>"
+        "<span style='color:#d4af37;'>EQUITY</span>"
+        "<span style='color:#e6edf3;'> GUARD</span>"
+        "</h1>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<h2 style='font-size:1.2rem;color:#e6edf3;'>Cancelar assinatura do briefing diário</h2>",
+        unsafe_allow_html=True,
+    )
+
+    if not token or len(token) < 8:
+        st.error("Link de cancelamento inválido.")
+        return
+
+    # Desativa na primeira visita; chamadas subsequentes sao idempotentes.
+    ok = unsubscribe(token)
+    if ok:
+        st.success(
+            "✓ Assinatura cancelada. Você não receberá mais e-mails do briefing diário."
+        )
+    else:
+        st.info(
+            "Sua assinatura já estava cancelada ou o link expirou. "
+            "Se quiser voltar a receber, visite o site e assine novamente."
+        )
+    if st.button("← Voltar ao Equity Guard", key="unsub_back"):
+        st.query_params.clear()
+        st.rerun()
+
+
 def _render_feedback_box() -> None:
     """Caixa de feedback: 1 botão envia e-mail via SMTP para os mantenedores.
 
@@ -3237,6 +3323,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         f"</div>",
         unsafe_allow_html=True,
     )
+    _render_subscribe_box()
     _render_feedback_box()
     _render_share_buttons(T)
 
@@ -3255,6 +3342,12 @@ def main() -> None:
             render_privacy_page()
         else:
             render_terms_page()
+        return
+
+    # ── Router: cancelamento de assinatura via ?unsub=TOKEN ──────────────────
+    _unsub_token = _q.get("unsub")
+    if _unsub_token:
+        _render_unsubscribe_page(_unsub_token)
         return
 
     # ── Session defaults ─────────────────────────────────────────────────────
