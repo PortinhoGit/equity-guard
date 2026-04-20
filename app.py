@@ -1229,8 +1229,8 @@ def _render_briefing(T: dict) -> None:
             brent_val = _fmt_val("Brent")
             wti_val = _fmt_val("WTI")
             _aa = T.get("rate_annual", "a.a.")
-            _fed_label = f"🇺🇸 Fed Funds · FOMC {_fmt_date_br(FED_NEXT_MEETING)}"
-            _selic_label = f"🇧🇷 Selic · COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}"
+            _fed_label = f"🇺🇸 Fed Funds · próximo anúncio FOMC {_fmt_date_br(FED_NEXT_MEETING)}"
+            _selic_label = f"🇧🇷 Selic · próximo anúncio COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}"
             st.markdown(
                 f"<div style='background:#161b22;border:1px solid #30363d;"
                 f"border-radius:10px;padding:14px 16px;'>"
@@ -1323,8 +1323,8 @@ def _render_briefing(T: dict) -> None:
         # Formato: nome: valor variacao (sem tentativa de alinhar colunas — WhatsApp usa fonte proporcional)
         _juros_block = (
             "*Juros*\\n"
-            + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (FOMC " + _fmt_date_br(FED_NEXT_MEETING) + ")\\n"
-            + "BR Selic: " + f"{SELIC_RATE:.2f}%" + " (COPOM " + _fmt_date_br(SELIC_NEXT_MEETING) + ")"
+            + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (proximo FOMC " + _fmt_date_br(FED_NEXT_MEETING) + ")\\n"
+            + "BR Selic: " + f"{SELIC_RATE:.2f}%" + " (proximo COPOM " + _fmt_date_br(SELIC_NEXT_MEETING) + ")"
         )
         def _fmt_pct(v):
             return f"{v:+.2f}%" if v is not None else "N/D"
@@ -3818,11 +3818,11 @@ def main() -> None:
     # ── Busca de ticker no topo (prioridade mobile — sidebar fica escondido) ─
     _render_quick_ticker_search(T)
 
+    # ── 🗞️ Briefing de Fechamento (juros, commodities, dolar, bolsas) ──────
+    _render_briefing(T)
+
     # ── 📊 Mercado B3 (top altas, baixas, mais negociadas) ──────────────────
     _render_market_movers(T)
-
-    # ── 🗞️ Briefing de Fechamento (expander aberto por default) ────────────
-    _render_briefing(T)
 
     # ── Sidebar + analysis ───────────────────────────────────────────────────
     ticker, period, target_yield, clicked = render_sidebar(user, T)
