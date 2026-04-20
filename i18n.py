@@ -325,7 +325,7 @@ _PT: dict = {
     "macro_updated_at":    "Atualizado em {date} às {time} (Brasília)",
     # ── Painel Global (índices + commodities + juros) ─────────────────────────
     "global_title":        "🌍 Indicadores Globais",
-    "global_next_meeting": "Próxima reunião",
+    "global_next_meeting": "Próximo anúncio",
     "global_source":       "Fonte: BCB · Fed · Yahoo Finance",
     "global_no_data":      "Indicadores indisponíveis.",
     # ── Briefing de Fechamento ────────────────────────────────────────────────
@@ -711,7 +711,7 @@ _EN: dict = {
     "macro_updated_at":    "Updated {date} at {time} (BRT)",
     # ── Global panel (indices + commodities + rates) ──────────────────────────
     "global_title":        "🌍 Global Indicators",
-    "global_next_meeting": "Next meeting",
+    "global_next_meeting": "Next announcement",
     "global_source":       "Source: BCB · Fed · Yahoo Finance",
     "global_no_data":      "Indicators unavailable.",
     # ── Closing Briefing ──────────────────────────────────────────────────────
@@ -1096,7 +1096,7 @@ _ES: dict = {
     "macro_updated_at":    "Actualizado el {date} a las {time} (Brasilia)",
     # ── Panel global (índices + commodities + tasas) ──────────────────────────
     "global_title":        "🌍 Indicadores Globales",
-    "global_next_meeting": "Próxima reunión",
+    "global_next_meeting": "Próximo anuncio",
     "global_source":       "Fuente: BCB · Fed · Yahoo Finance",
     "global_no_data":      "Indicadores no disponibles.",
     # ── Briefing de Cierre ────────────────────────────────────────────────────

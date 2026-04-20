@@ -33,10 +33,10 @@ DEMO_TICKER: str = "BBAS3"
 
 # ── Taxas de juros (atualização manual baseada em decisões dos BCs) ──────────
 # Atualize estes valores após cada decisão do COPOM / FOMC.
-SELIC_RATE: float              = 11.25         # % a.a. — última decisão COPOM
-SELIC_NEXT_MEETING: str        = "2026-04-30"  # próxima reunião COPOM
-FED_FUNDS_RATE: float          = 4.50          # % a.a. — Fed upper bound
-FED_NEXT_MEETING: str          = "2026-05-07"  # próxima reunião FOMC
+SELIC_RATE: float              = 14.75         # % a.a. — última decisão COPOM (atual)
+SELIC_NEXT_MEETING: str        = "2026-04-29"  # próxima reunião COPOM (28-29/04)
+FED_FUNDS_RATE: float          = 3.75          # % a.a. — Fed upper bound (3,50-3,75)
+FED_NEXT_MEETING: str          = "2026-04-29"  # próxima reunião FOMC (28-29/04)
 
 # ── Prevdow — Previdência Complementar (atualização manual mensal) ───────────
 # Atualize os valores abaixo copiando do portal oficial uma vez por mês.
@@ -72,4 +72,4 @@ NITRO_DATA: dict = {
 APP_NAME: str = "Equity Guard"
 APP_TAGLINE: str = "Análise Fundamentalista + Técnica · B3"
 APP_ICON: str = "⚡"
-APP_VERSION: str = "2.12.0"
+APP_VERSION: str = "2.12.1"
