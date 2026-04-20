@@ -54,6 +54,27 @@ from config import (
     SELIC_RATE, SELIC_NEXT_MEETING, FED_FUNDS_RATE, FED_NEXT_MEETING,
     PREVDOW_DATA, NITRO_DATA,
 )
+from rates import get_selic as _get_selic_auto, next_copom as _next_copom_auto, next_fomc as _next_fomc_auto
+
+
+def _selic_now() -> float:
+    """Selic vigente (auto via BCB SGS 432, cache 6h, fallback config.SELIC_RATE)."""
+    val, _src = _get_selic_auto(fallback=SELIC_RATE)
+    return val
+
+
+def _copom_next_iso() -> str:
+    """Proximo COPOM em formato YYYY-MM-DD, usando calendario hardcoded em rates.py."""
+    d = _next_copom_auto()
+    return d.strftime("%Y-%m-%d") if d else SELIC_NEXT_MEETING
+
+
+def _fomc_next_iso() -> str:
+    """Proximo FOMC em formato YYYY-MM-DD, usando calendario hardcoded em rates.py."""
+    d = _next_fomc_auto()
+    return d.strftime("%Y-%m-%d") if d else FED_NEXT_MEETING
+
+
 from i18n import get_translator, TRANSLATIONS, SUPPORTED_LANGS
 from auth.manager import (
     get_or_create_user, load_user, use_credit, has_credits, get_all_users,
@@ -1229,8 +1250,8 @@ def _render_briefing(T: dict) -> None:
             brent_val = _fmt_val("Brent")
             wti_val = _fmt_val("WTI")
             _aa = T.get("rate_annual", "a.a.")
-            _fed_label = f"🇺🇸 Fed Funds · próximo anúncio FOMC {_fmt_date_br(FED_NEXT_MEETING)}"
-            _selic_label = f"🇧🇷 Selic · próximo anúncio COPOM {_fmt_date_br(SELIC_NEXT_MEETING)}"
+            _fed_label = f"🇺🇸 Fed Funds · próximo anúncio FOMC {_fmt_date_br(_fomc_next_iso())}"
+            _selic_label = f"🇧🇷 Selic · próximo anúncio COPOM {_fmt_date_br(_copom_next_iso())}"
             st.markdown(
                 f"<div style='background:#161b22;border:1px solid #30363d;"
                 f"border-radius:10px;padding:14px 16px;'>"
@@ -1238,7 +1259,7 @@ def _render_briefing(T: dict) -> None:
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
                 f"{T['briefing_juros']}</div>"
                 f"{_card(_fed_label, f'{FED_FUNDS_RATE:.2f}% {_aa}', '')}"
-                f"{_card(_selic_label, f'{SELIC_RATE:.2f}% {_aa}', '')}"
+                f"{_card(_selic_label, f'{_selic_now():.2f}% {_aa}', '')}"
                 f"<div style='height:8px;'></div>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
@@ -1323,8 +1344,8 @@ def _render_briefing(T: dict) -> None:
         # Formato: nome: valor variacao (sem tentativa de alinhar colunas — WhatsApp usa fonte proporcional)
         _juros_block = (
             "*Juros*\\n"
-            + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (proximo FOMC " + _fmt_date_br(FED_NEXT_MEETING) + ")\\n"
-            + "BR Selic: " + f"{SELIC_RATE:.2f}%" + " (proximo COPOM " + _fmt_date_br(SELIC_NEXT_MEETING) + ")"
+            + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (proximo FOMC " + _fmt_date_br(_fomc_next_iso()) + ")\\n"
+            + "BR Selic: " + f"{_selic_now():.2f}%" + " (proximo COPOM " + _fmt_date_br(_copom_next_iso()) + ")"
         )
         def _fmt_pct(v):
             return f"{v:+.2f}%" if v is not None else "N/D"
@@ -1621,9 +1642,9 @@ def _render_global_bar(T: dict) -> None:
         f"font-size:.76rem;color:#8b949e;display:flex;"
         f"justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;'>"
         f"<span>🇺🇸 <b style='color:#58a6ff;'>Fed {FED_FUNDS_RATE:.2f}%</b> · "
-        f"{T['global_next_meeting']}: <b style='color:#e6edf3;'>{_fmt_date(FED_NEXT_MEETING)}</b></span>"
-        f"<span>🇧🇷 <b style='color:#58a6ff;'>SELIC {SELIC_RATE:.2f}%</b> · "
-        f"{T['global_next_meeting']}: <b style='color:#e6edf3;'>{_fmt_date(SELIC_NEXT_MEETING)}</b></span>"
+        f"{T['global_next_meeting']}: <b style='color:#e6edf3;'>{_fmt_date(_fomc_next_iso())}</b></span>"
+        f"<span>🇧🇷 <b style='color:#58a6ff;'>SELIC {_selic_now():.2f}%</b> · "
+        f"{T['global_next_meeting']}: <b style='color:#e6edf3;'>{_fmt_date(_copom_next_iso())}</b></span>"
         f"<span style='color:#6e7681;font-size:.7rem;'>{T['global_source']}</span>"
         f"</div>",
         unsafe_allow_html=True,
