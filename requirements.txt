@@ -7,4 +7,5 @@ requests>=2.31.0
 pytz>=2024.1
 beautifulsoup4>=4.12.2
 supabase>=2.0.0
+sentry-sdk>=2.0.0
 # pandas-ta>=0.3.14b  -- requires Python >=3.12; app uses manual fallbacks on 3.9
