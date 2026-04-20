@@ -1,6 +1,6 @@
 """
 auth/subscribers.py — Equity Guard
-Gerencia assinaturas do briefing diario por e-mail.
+Gerencia assinaturas do briefing diario por e-mail com multiplos horarios.
 """
 
 import secrets
@@ -11,38 +11,29 @@ from auth.supabase_client import get_client
 
 
 def _gen_token() -> str:
-    """Gera um token URL-safe de 32 chars para unsubscribe."""
     return secrets.token_urlsafe(24)
 
 
 def subscribe(email: str) -> Optional[str]:
     """
-    Registra um e-mail para receber o briefing diario.
-    Retorna o token de cancelamento, ou None em falha.
-    Se o e-mail ja existe, reativa a inscricao (is_active=True) e retorna o token existente.
+    Cria ou reativa inscricao do e-mail. Retorna o token (sempre), nao mexe nos horarios.
     """
     email = (email or "").strip().lower()
     if not email or "@" not in email:
         return None
-
     client = get_client()
     if client is None:
         return None
-
     try:
         existing = client.table("subscribers").select("*").eq("email", email).limit(1).execute()
         if existing.data:
             row = existing.data[0]
-            # Reativa se estiver inativo
             if not row["is_active"]:
                 client.table("subscribers").update({"is_active": True}).eq("email", email).execute()
             return row["token"]
-
         token = _gen_token()
         client.table("subscribers").insert({
-            "email": email,
-            "token": token,
-            "is_active": True,
+            "email": email, "token": token, "is_active": True,
         }).execute()
         return token
     except Exception:
@@ -50,26 +41,20 @@ def subscribe(email: str) -> Optional[str]:
 
 
 def unsubscribe(token: str) -> bool:
-    """Desativa a inscricao por token. True se encontrou e desativou."""
+    """Desativa assinatura pelo token. Horarios sao preservados mas ignorados (is_active=false)."""
     if not token:
         return False
     client = get_client()
     if client is None:
         return False
     try:
-        res = (
-            client.table("subscribers")
-            .update({"is_active": False})
-            .eq("token", token)
-            .execute()
-        )
+        res = client.table("subscribers").update({"is_active": False}).eq("token", token).execute()
         return bool(res.data)
     except Exception:
         return False
 
 
 def is_subscribed(email: str) -> bool:
-    """Retorna True se o e-mail tem inscricao ativa."""
     email = (email or "").strip().lower()
     if not email:
         return False
@@ -77,31 +62,81 @@ def is_subscribed(email: str) -> bool:
     if client is None:
         return False
     try:
-        res = (
-            client.table("subscribers")
-            .select("is_active")
-            .eq("email", email)
-            .limit(1)
-            .execute()
-        )
+        res = client.table("subscribers").select("is_active").eq("email", email).limit(1).execute()
         return bool(res.data) and bool(res.data[0]["is_active"])
     except Exception:
         return False
 
 
-def get_active_subscribers() -> List[Dict[str, Any]]:
-    """Lista de assinantes ativos para o job de envio diario."""
+def get_user_hours(email: str) -> List[int]:
+    """Lista de horarios BRT (0-23) que o usuario escolheu receber."""
+    email = (email or "").strip().lower()
+    client = get_client()
+    if not email or client is None:
+        return []
+    try:
+        res = (
+            client.table("subscriber_hours")
+            .select("send_hour")
+            .eq("email", email)
+            .execute()
+        )
+        return sorted({int(r["send_hour"]) for r in (res.data or [])})
+    except Exception:
+        return []
+
+
+def set_user_hours(email: str, hours: List[int]) -> bool:
+    """
+    Substitui todos os horarios do usuario pela lista fornecida.
+    Retorna True em sucesso, False em falha.
+    """
+    email = (email or "").strip().lower()
+    client = get_client()
+    if not email or client is None:
+        return False
+    # Filtra e valida
+    clean = sorted({int(h) for h in hours if 0 <= int(h) <= 23})
+    try:
+        # Remove tudo
+        client.table("subscriber_hours").delete().eq("email", email).execute()
+        # Insere novo
+        if clean:
+            rows = [{"email": email, "send_hour": h} for h in clean]
+            client.table("subscriber_hours").insert(rows).execute()
+        return True
+    except Exception:
+        return False
+
+
+def get_subscribers_for_hour(hour: int) -> List[Dict[str, Any]]:
+    """
+    Retorna assinantes ATIVOS que pediram para receber naquele horario.
+    Cada item: {'email': ..., 'token': ...}
+    """
     client = get_client()
     if client is None:
         return []
     try:
-        res = (
+        # 1) emails que querem este horario
+        hrs = (
+            client.table("subscriber_hours")
+            .select("email")
+            .eq("send_hour", int(hour))
+            .execute()
+        )
+        emails = list({r["email"] for r in (hrs.data or [])})
+        if not emails:
+            return []
+        # 2) apenas os que ainda estao ativos
+        subs = (
             client.table("subscribers")
             .select("email, token")
+            .in_("email", emails)
             .eq("is_active", True)
             .execute()
         )
-        return list(res.data or [])
+        return list(subs.data or [])
     except Exception:
         return []
 

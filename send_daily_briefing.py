@@ -1,25 +1,27 @@
 """
 send_daily_briefing.py — Equity Guard
-Job diario que envia briefing por e-mail aos assinantes ativos.
+Job que envia briefing por e-mail apenas aos assinantes cadastrados para
+a hora BRT atual (ou hora forcada via env TEST_HOUR).
 
 Executado via GitHub Actions cron (ver .github/workflows/daily-briefing.yml).
-Le dados de mercado via data.provider e envia via SMTP configurado em env vars.
+O workflow tem 6 entradas de cron — cada uma dispara este script e ele filtra
+assinantes pelo campo send_hour da tabela subscriber_hours.
 
-Variaveis de ambiente esperadas (setadas como GitHub Actions secrets):
+Variaveis de ambiente:
   SUPABASE_URL, SUPABASE_SERVICE_KEY
   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+  TEST_HOUR (opcional, 0-23): forca o filtro de hora para teste manual
 """
 
 import os
 import sys
 import smtplib
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate
 
-# Torna import relativo funcional tanto em dev quanto no runner
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -30,8 +32,46 @@ def _env(name: str, default: str = "") -> str:
     return v
 
 
-def _build_html(today_str: str, data: dict, unsub_url: str) -> str:
-    """Monta HTML simples do e-mail com o briefing."""
+def _now_brt() -> datetime:
+    """Hora atual em America/Sao_Paulo, funciona com ou sem pytz."""
+    try:
+        import pytz
+        return datetime.now(pytz.timezone("America/Sao_Paulo"))
+    except Exception:
+        # Fallback: UTC - 3h (BRT sem horario de verao atual no Brasil)
+        return datetime.utcnow() - timedelta(hours=3)
+
+
+def _current_hour_brt() -> int:
+    test_hour = os.environ.get("TEST_HOUR")
+    if test_hour is not None and test_hour.strip():
+        try:
+            return int(test_hour) % 24
+        except ValueError:
+            pass
+    return _now_brt().hour
+
+
+def _ref_trading_date(hour_brt: int) -> datetime:
+    """
+    Data de referencia do fechamento exibido no e-mail.
+      * Envios >= 18h BRT: mercado fechou hoje -> usa data de hoje
+      * Envios < 18h BRT: mercado ainda nao abriu -> usa ultimo dia util anterior
+    """
+    try:
+        from market_status import ultimo_dia_util, dia_util_anterior
+    except Exception:
+        ultimo_dia_util = lambda d: d
+        dia_util_anterior = lambda d: d - timedelta(days=1)
+    today = _now_brt().date()
+    if hour_brt >= 18:
+        ref = ultimo_dia_util(today)
+    else:
+        ref = dia_util_anterior(today)
+    return datetime.combine(ref, datetime.min.time())
+
+
+def _build_html(ref_date: datetime, hour_brt: int, data: dict, unsub_url: str) -> str:
     def fmt_pct(v):
         if v is None:
             return "—"
@@ -48,7 +88,7 @@ def _build_html(today_str: str, data: dict, unsub_url: str) -> str:
     fx = data.get("fx", {})
     bolsas = data.get("bolsas", {})
 
-    def section_row(label, value, change):
+    def row(label, value, change=""):
         return (
             f'<tr>'
             f'<td style="padding:6px 10px;color:#334155;">{label}</td>'
@@ -58,19 +98,20 @@ def _build_html(today_str: str, data: dict, unsub_url: str) -> str:
         )
 
     juros_rows = [
-        section_row("Fed Funds (EUA)", fmt_val(juros.get("fed")) + "%", ""),
-        section_row("Selic (BR)", fmt_val(juros.get("selic")) + "%", ""),
+        row("Fed Funds (EUA)", fmt_val(juros.get("fed")) + "%"),
+        row("Selic (BR)", fmt_val(juros.get("selic")) + "%"),
     ]
     comm_rows = [
-        section_row("Brent (US$/barril)", fmt_val(commodities.get("brent_val")), fmt_pct(commodities.get("brent_chg"))),
-        section_row("WTI (US$/barril)", fmt_val(commodities.get("wti_val")), fmt_pct(commodities.get("wti_chg"))),
+        row("Brent (US$/barril)", fmt_val(commodities.get("brent_val")), fmt_pct(commodities.get("brent_chg"))),
+        row("WTI (US$/barril)", fmt_val(commodities.get("wti_val")), fmt_pct(commodities.get("wti_chg"))),
     ]
     fx_rows = [
-        section_row("USD/BRL (venda comercial)", fmt_val(fx.get("usd_brl"), "R$ ", 4), fmt_pct(fx.get("change"))),
+        row("USD/BRL (comercial)", fmt_val(fx.get("usd_brl"), "R$ ", 4), fmt_pct(fx.get("change"))),
     ]
     bolsa_rows = [
-        section_row(b["name"], fmt_val(b.get("last"), digits=0 if b.get("locale") == "br" else 2),
-                    fmt_pct(b.get("change")))
+        row(b["name"],
+            fmt_val(b.get("last"), digits=0 if b.get("locale") == "br" else 2),
+            fmt_pct(b.get("change")))
         for b in bolsas.get("items", [])
     ]
 
@@ -82,7 +123,12 @@ def _build_html(today_str: str, data: dict, unsub_url: str) -> str:
             f'{"".join(rows)}</table>'
         )
 
-    html = f"""<!DOCTYPE html>
+    ref_str = ref_date.strftime("%d/%m/%Y")
+    header_label = (
+        f"Fechamento de <b>{ref_str}</b> · enviado às {hour_brt:02d}h BRT"
+    )
+
+    return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#0f172a;">
@@ -92,9 +138,7 @@ def _build_html(today_str: str, data: dict, unsub_url: str) -> str:
       <span style="font-size:22px;font-weight:900;letter-spacing:-.5px;color:#0f172a;"> GUARD</span>
       <span style="background:#d4af37;color:#0f172a;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:2px 8px;border-radius:12px;margin-left:8px;">BRIEFING</span>
     </div>
-    <p style="color:#64748b;font-size:13px;margin:16px 0 0;">
-      <b>{today_str}</b> · 6h BRT · resumo do mercado
-    </p>
+    <p style="color:#64748b;font-size:13px;margin:16px 0 0;">{header_label}</p>
     {table(juros_rows, "Juros", "🏦")}
     {table(comm_rows, "Commodities", "🛢️")}
     {table(fx_rows, "Dólar Comercial", "💵")}
@@ -108,7 +152,7 @@ def _build_html(today_str: str, data: dict, unsub_url: str) -> str:
     </div>
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:28px 0 16px;">
     <p style="color:#94a3b8;font-size:11px;text-align:center;line-height:1.6;">
-      Você recebeu este e-mail porque assinou o briefing diário do Equity Guard.<br>
+      Você recebeu este e-mail porque pediu o briefing diário do Equity Guard no horário das {hour_brt:02d}h BRT.<br>
       <a href="{unsub_url}" style="color:#64748b;">Cancelar assinatura</a> &middot;
       <a href="https://equityguard.streamlit.app/?page=privacidade" style="color:#64748b;">Política de Privacidade</a>
     </p>
@@ -118,25 +162,21 @@ def _build_html(today_str: str, data: dict, unsub_url: str) -> str:
   </div>
 </body></html>
 """
-    return html
 
 
 def _gather_market_data() -> dict:
-    """Coleta dados de mercado para o briefing. Usa o mesmo provider do app."""
     from data.provider import get_global_indicators, get_fx_usdbrl
     from config import FED_FUNDS_RATE, SELIC_RATE
 
     inds = get_global_indicators() or []
     by_name = {i["name"]: i for i in inds}
 
-    # USD/BRL
     fx = get_fx_usdbrl() or {}
     fx_data = {
         "usd_brl": fx.get("com_ask") or fx.get("ask"),
         "change": fx.get("change"),
     }
 
-    # Commodities
     commodities = {
         "brent_val": (by_name.get("Brent") or {}).get("last"),
         "brent_chg": (by_name.get("Brent") or {}).get("change"),
@@ -144,7 +184,6 @@ def _gather_market_data() -> dict:
         "wti_chg": (by_name.get("WTI") or {}).get("change"),
     }
 
-    # Bolsas (principais)
     bolsa_names = ["IBOV", "S&P 500", "NASDAQ", "FTSE"]
     bolsa_items = []
     for n in bolsa_names:
@@ -184,7 +223,6 @@ def _send_email(to_email: str, subject: str, html: str, smtp_cfg: dict) -> bool:
 
 
 def main() -> None:
-    # Carrega config
     smtp_cfg = {
         "host": _env("SMTP_HOST", "smtp.gmail.com"),
         "port": int(_env("SMTP_PORT", "587")),
@@ -193,44 +231,36 @@ def main() -> None:
         "from": _env("SMTP_FROM", os.environ.get("SMTP_USER", "")),
     }
 
-    # Lista de assinantes via Supabase
-    from supabase import create_client
-    client = create_client(_env("SUPABASE_URL"), _env("SUPABASE_SERVICE_KEY"))
-    res = client.table("subscribers").select("email, token").eq("is_active", True).execute()
-    subs = res.data or []
+    hour_brt = _current_hour_brt()
+    print(f"Hora BRT alvo: {hour_brt}h")
+
+    from auth.subscribers import get_subscribers_for_hour, mark_sent
+    subs = get_subscribers_for_hour(hour_brt)
     if not subs:
-        print("Nenhum assinante ativo. Saindo.")
+        print(f"Nenhum assinante ativo para {hour_brt}h. Saindo.")
         return
 
-    # Monta payload de mercado 1x (mesmo pra todos)
-    print(f"Coletando dados de mercado...")
+    print(f"Coletando dados de mercado para {len(subs)} assinantes...")
     data = _gather_market_data()
+    ref_date = _ref_trading_date(hour_brt)
 
-    today_str = datetime.now().strftime("%d/%m/%Y (%A)").replace(
-        "Monday", "segunda").replace("Tuesday", "terça").replace(
-        "Wednesday", "quarta").replace("Thursday", "quinta").replace(
-        "Friday", "sexta").replace("Saturday", "sábado").replace("Sunday", "domingo")
+    subject = f"📊 Briefing Equity Guard — {ref_date.strftime('%d/%m/%Y')} ({hour_brt:02d}h)"
 
-    subject = f"📊 Briefing Equity Guard — {datetime.now().strftime('%d/%m/%Y')}"
-
-    # Envia um a um (com pequeno delay pra nao estourar SMTP rate limit)
     sent = 0
     failed = 0
     for sub in subs:
         email = sub["email"]
         token = sub["token"]
         unsub_url = f"https://equityguard.streamlit.app/?unsub={token}"
-        html = _build_html(today_str, data, unsub_url)
+        html = _build_html(ref_date, hour_brt, data, unsub_url)
         if _send_email(email, subject, html, smtp_cfg):
-            client.table("subscribers").update({
-                "last_email_sent_at": datetime.utcnow().isoformat(),
-            }).eq("email", email).execute()
+            mark_sent(email)
             sent += 1
         else:
             failed += 1
-        time.sleep(1)   # rate limit Gmail: ~20/seg max. 1s/envio é ultra seguro.
+        time.sleep(1)
 
-    print(f"Briefing enviado para {sent}/{len(subs)} assinantes. Falhas: {failed}.")
+    print(f"Briefing {hour_brt}h: {sent}/{len(subs)} enviados. Falhas: {failed}.")
 
 
 if __name__ == "__main__":

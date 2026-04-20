@@ -727,14 +727,26 @@ def _send_feedback_email(msg_text: str) -> tuple[bool, str]:
 
 
 def _render_subscribe_box() -> None:
-    """Formulario de opt-in para receber briefing diario por e-mail (6h BRT, seg-sex)."""
-    from auth.subscribers import subscribe, is_subscribed
+    """Opt-in do briefing diario: usuario escolhe 1 ou mais horarios BRT."""
+    from auth.subscribers import (
+        subscribe, is_subscribed, get_user_hours, set_user_hours,
+    )
+
+    _HOUR_OPTIONS = [
+        (20, "20h — fechamento do dia"),
+        (4,  "4h — madrugada"),
+        (5,  "5h"),
+        (6,  "6h"),
+        (7,  "7h"),
+        (8,  "8h — antes da abertura"),
+    ]
 
     st.markdown(
         "<div class='eg-fb-wrap' style='margin-top:18px;'>"
         "<div class='eg-fb-title'>📬 Briefing diário por e-mail</div>"
-        "<div class='eg-fb-sub'>Receba o resumo do mercado todo dia útil às <b>6h BRT</b> "
-        "direto no seu e-mail. Cancele quando quiser (link no rodapé do e-mail).</div>"
+        "<div class='eg-fb-sub'>Escolha 1 ou mais horários (dias úteis, BRT) para receber o "
+        "resumo do mercado. Cancele quando quiser — o link está no rodapé de cada e-mail. "
+        "Sua seleção abaixo <b>substitui</b> quaisquer horários anteriores deste e-mail.</div>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -744,36 +756,75 @@ def _render_subscribe_box() -> None:
             "Seu e-mail",
             key="eg_sub_email",
             placeholder="voce@exemplo.com",
-            label_visibility="collapsed",
         )
+        st.markdown(
+            "<div style='font-size:.78rem;color:#8b949e;margin:10px 0 6px;'>"
+            "Horários desejados:</div>",
+            unsafe_allow_html=True,
+        )
+        _sub_sel = {}
+        _cols = st.columns(2)
+        for i, (h, lbl) in enumerate(_HOUR_OPTIONS):
+            with _cols[i % 2]:
+                _sub_sel[h] = st.checkbox(lbl, key=f"eg_sub_h_{h}")
         _sub_consent = st.checkbox(
-            "Concordo em receber o briefing diário às 6h (dias úteis) "
+            "Concordo em receber o briefing nos horários selecionados (dias úteis) "
             "e sei que posso cancelar a qualquer momento.",
             key="eg_sub_consent",
         )
-        _sub_clicked = st.form_submit_button("📨 Assinar briefing")
+        _sub_clicked = st.form_submit_button("📨 Salvar preferências")
 
-    if _sub_clicked:
-        _e = (_sub_email or "").strip().lower()
-        if not _e or "@" not in _e or "." not in _e:
-            st.warning("Informe um e-mail válido.")
-            return
-        if not _sub_consent:
-            st.warning("Marque a caixinha de consentimento para assinar.")
-            return
-        if is_subscribed(_e):
-            st.info("Este e-mail já está inscrito. Você receberá o próximo briefing.")
-            return
-        token = subscribe(_e)
-        if token:
-            st.success(
-                "✓ Assinatura confirmada! O próximo briefing chega no próximo dia útil às 6h."
-            )
-        else:
-            st.error(
-                "Falha ao registrar assinatura. Tente de novo em alguns minutos "
-                "ou entre em contato pela caixa de feedback."
-            )
+    if not _sub_clicked:
+        return
+
+    _e = (_sub_email or "").strip().lower()
+    if not _e or "@" not in _e or "." not in _e:
+        st.warning("Informe um e-mail válido.")
+        return
+    if not _sub_consent:
+        st.warning("Marque a caixinha de consentimento para continuar.")
+        return
+    _chosen = sorted([h for h, v in _sub_sel.items() if v])
+    if not _chosen:
+        st.warning("Escolha pelo menos um horário.")
+        return
+
+    _had_before = is_subscribed(_e)
+    _prev = get_user_hours(_e) if _had_before else []
+
+    token = subscribe(_e)
+    if not token:
+        st.error("Falha ao registrar assinatura. Tente de novo em alguns minutos.")
+        return
+    if not set_user_hours(_e, _chosen):
+        st.error("Falha ao salvar horários. Tente de novo.")
+        return
+
+    _set_prev = set(_prev)
+    _set_new = set(_chosen)
+    _added = sorted(_set_new - _set_prev)
+    _removed = sorted(_set_prev - _set_new)
+
+    _fmt = lambda hs: ", ".join(f"{h}h" for h in hs)
+
+    if not _had_before:
+        st.success(
+            f"✓ Assinatura criada! Você receberá o briefing às **{_fmt(_chosen)} BRT** (seg–sex)."
+        )
+    elif not _added and not _removed:
+        st.info(
+            f"Nenhuma mudança. Seus horários continuam: **{_fmt(_chosen)} BRT**."
+        )
+    else:
+        parts = []
+        if _added:
+            parts.append(f"adicionados: {_fmt(_added)}")
+        if _removed:
+            parts.append(f"removidos: {_fmt(_removed)}")
+        st.success(
+            f"✓ Preferências atualizadas ({' · '.join(parts)}). "
+            f"Horários ativos: **{_fmt(_chosen)} BRT**."
+        )
 
 
 def _render_unsubscribe_page(token: str) -> None:
