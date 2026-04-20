@@ -997,6 +997,158 @@ def _maybe_pension_alert(T: dict) -> None:
     st.session_state[seen_key] = True
 
 
+def _render_quick_ticker_search(T: dict) -> None:
+    """
+    Barra compacta no topo da area principal para trocar ticker rapidamente.
+    Critico no mobile — iPhone colapsa o sidebar e o seletor ficava inacessivel.
+    Reaproveita session_state 'eg_ticker_input' para sincronizar com o sidebar.
+    """
+    st.markdown(
+        "<style>"
+        ".eg-quick-search { margin: 0 0 10px; }"
+        ".eg-quick-search input { background:#0d1117 !important; color:#e6edf3 !important; "
+        "border:1px solid #30363d !important; }"
+        "</style>",
+        unsafe_allow_html=True,
+    )
+    _sc1, _sc2 = st.columns([5, 1])
+    with _sc1:
+        _cur = st.session_state.get("eg_ticker_input", "BBAS3")
+        _q = st.text_input(
+            T.get("quick_search_label", "Buscar ticker"),
+            value="",
+            key="eg_quick_search_input",
+            placeholder=f"Digite o ticker (atual: {_cur}) — ex: VALE3, PETR4, AAPL",
+            label_visibility="collapsed",
+        )
+    with _sc2:
+        _go = st.button("🔍", key="eg_quick_search_btn", use_container_width=True)
+    if _go and _q.strip():
+        _t = _q.strip().upper().replace(".SA", "")
+        st.session_state["eg_ticker_input"] = _t
+        st.session_state["eg_custom_ticker"] = _t
+        st.session_state["_eg_auto_analyze"] = True
+        st.rerun()
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_market_movers(tickers: tuple) -> dict:
+    """
+    Fetch paralelo de last/prev/volume dos tickers B3 via yfinance.fast_info.
+    TTL 15 min. Retorna {gainers, losers, actives} ordenados.
+    """
+    import yfinance as yf
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _safe(fi, k, default=None):
+        """fast_info.get() esta bugado em algumas versoes. Acessa via attr/indexing."""
+        try:
+            v = getattr(fi, k, None)
+            if v is None:
+                v = fi[k]
+            return v
+        except Exception:
+            return default
+
+    def _one(sym: str):
+        try:
+            tk = yf.Ticker(f"{sym}.SA")
+            fi = tk.fast_info
+            last = _safe(fi, "last_price")
+            prev = _safe(fi, "previous_close")
+            vol = _safe(fi, "last_volume", 0) or _safe(fi, "ten_day_average_volume", 0) or 0
+            if last is None or prev is None or float(prev) <= 0:
+                return None
+            last = float(last)
+            prev = float(prev)
+            chg = (last - prev) / prev * 100.0
+            return {"ticker": sym, "last": last, "chg": chg, "volume": int(vol or 0)}
+        except Exception:
+            return None
+
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        results = [r for r in ex.map(_one, tickers) if r]
+
+    gainers = sorted(results, key=lambda x: -x["chg"])[:8]
+    losers = sorted(results, key=lambda x: x["chg"])[:8]
+    actives = sorted(results, key=lambda x: -x["volume"])[:8]
+    return {"gainers": gainers, "losers": losers, "actives": actives}
+
+
+def _render_market_movers(T: dict) -> None:
+    """
+    3 colunas com maiores altas, maiores baixas e mais negociadas da B3.
+    Clicar em qualquer ticker dispara analise via ?t=XXXX.
+    """
+    from data.tickers_b3 import ACOES
+
+    _mkt = get_status_mercado()
+    _is_online = _mkt["estado"] == "ONLINE"
+    _ref_date = _mkt["data_ref"]
+    _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
+
+    if _is_online:
+        _status_label = f"🔴 ONLINE · {_now_brt.strftime('%H:%M')}"
+        _status_color = "#3fb950"
+    else:
+        _status_label = f"⚪ FECHAMENTO · {_ref_date.strftime('%d/%m/%Y')}"
+        _status_color = "#8b949e"
+
+    st.markdown(
+        f"<div style='display:flex;align-items:center;justify-content:space-between;"
+        f"margin:14px 0 8px;'>"
+        f"<span style='font-size:.82rem;font-weight:800;letter-spacing:1.5px;"
+        f"text-transform:uppercase;color:#d4af37;'>📊 Mercado B3</span>"
+        f"<span style='font-size:.74rem;font-weight:700;color:{_status_color};'>"
+        f"{_status_label}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    try:
+        _data = _fetch_market_movers(tuple(ACOES))
+    except Exception:
+        st.caption("Dados de mercado indisponíveis no momento. Tente recarregar em alguns minutos.")
+        return
+
+    if not any([_data["gainers"], _data["losers"], _data["actives"]]):
+        st.caption("Sem dados de mercado no momento.")
+        return
+
+    def _render_row(r: dict) -> str:
+        _color = "#3fb950" if r["chg"] >= 0 else "#dc2626"
+        _chg = f"{r['chg']:+.2f}%"
+        _price = f"R$ {r['last']:.2f}"
+        return (
+            f"<a href='?t={r['ticker']}' target='_self' style='text-decoration:none;'>"
+            f"<div style='display:flex;justify-content:space-between;align-items:center;"
+            f"padding:7px 10px;background:#161b22;border:1px solid #21262d;border-radius:6px;"
+            f"margin-bottom:4px;font-size:.82rem;transition:border-color .15s;'>"
+            f"<span style='font-weight:800;color:#e6edf3;letter-spacing:.3px;'>{r['ticker']}</span>"
+            f"<span style='display:flex;gap:8px;align-items:baseline;'>"
+            f"<span style='color:#6e7681;font-size:.72rem;'>{_price}</span>"
+            f"<span style='color:{_color};font-weight:800;min-width:64px;text-align:right;'>{_chg}</span>"
+            f"</span></div></a>"
+        )
+
+    def _render_col(title: str, items: list) -> str:
+        rows = "".join(_render_row(r) for r in items) if items else \
+               "<div style='color:#6e7681;font-size:.78rem;padding:10px;'>Sem dados.</div>"
+        return (
+            f"<div style='font-size:.78rem;font-weight:800;color:#c9d1d9;"
+            f"margin:0 0 8px;letter-spacing:.3px;'>{title}</div>"
+            f"{rows}"
+        )
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(_render_col("📈 Maiores Altas", _data["gainers"]), unsafe_allow_html=True)
+    with c2:
+        st.markdown(_render_col("📉 Maiores Baixas", _data["losers"]), unsafe_allow_html=True)
+    with c3:
+        st.markdown(_render_col("🔥 Mais Negociadas", _data["actives"]), unsafe_allow_html=True)
+
+
 def _render_briefing(T: dict) -> None:
     """
     🗞️ Briefing de Fechamento — layout em duas colunas: Bolsas e Commodities.
@@ -3401,6 +3553,17 @@ def main() -> None:
         _render_unsubscribe_page(_unsub_token)
         return
 
+    # ── Router: click em ticker do painel de movers via ?t=XXXX ──────────────
+    _t_param = _q.get("t")
+    if _t_param:
+        _t_clean = _t_param.strip().upper()
+        if _t_clean:
+            st.session_state["eg_ticker_input"] = _t_clean
+            st.session_state["eg_custom_ticker"] = _t_clean
+            st.session_state["_eg_auto_analyze"] = True
+        st.query_params.clear()
+        st.rerun()
+
     # ── Session defaults ─────────────────────────────────────────────────────
     if "lang" not in st.session_state:
         st.session_state.lang = "pt"
@@ -3651,6 +3814,12 @@ def main() -> None:
     }});
     </script>
     """, height=52)
+
+    # ── Busca de ticker no topo (prioridade mobile — sidebar fica escondido) ─
+    _render_quick_ticker_search(T)
+
+    # ── 📊 Mercado B3 (top altas, baixas, mais negociadas) ──────────────────
+    _render_market_movers(T)
 
     # ── 🗞️ Briefing de Fechamento (expander aberto por default) ────────────
     _render_briefing(T)
