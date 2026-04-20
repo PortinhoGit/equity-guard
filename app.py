@@ -211,6 +211,22 @@ h1, h2, h3, h4 { color: #e6edf3 !important; }
 .eg-fb-btn-off { opacity:.45; pointer-events:none; }
 /* Section header */
 .eg-section-header { font-size:.72rem; font-weight:700; letter-spacing:1.8px; text-transform:uppercase; color:#8b949e; margin:1.2rem 0 .6rem; }
+/* Ticker chip — aparece antes de cada seção para identificar a ação analisada */
+.eg-ticker-chip {
+    display:inline-flex; align-items:center; gap:8px;
+    background:#0d1117; border:1px solid #30363d; border-left:3px solid #d4af37;
+    border-radius:6px; padding:5px 12px;
+    font-size:.72rem; font-weight:700; color:#e6edf3;
+    letter-spacing:.2px; margin:14px 0 8px;
+    font-family:'Inter',system-ui,sans-serif;
+}
+.eg-ticker-chip-sym {
+    color:#d4af37;
+    font-family:'SF Mono','Consolas','Monaco',monospace;
+    font-size:.7rem; font-weight:800;
+    padding:2px 7px; border-radius:4px;
+    background:rgba(212,175,55,.08);
+}
 /* Trend */
 .eg-trend-box { border-radius:10px; padding:12px; text-align:center; font-weight:700; font-size:1rem; margin-bottom:12px; border:1px solid rgba(255,255,255,.06); }
 /* MA row */
@@ -993,33 +1009,124 @@ def _render_briefing(T: dict) -> None:
             "📲 Enviar briefing para meu WhatsApp</div></div>",
             unsafe_allow_html=True,
         )
-        _phone_col, _send_col = st.columns([3, 2])
-        with _phone_col:
-            _phone = st.text_input(
-                "Seu WhatsApp",
-                placeholder="5511999381625",
-                key="eg_wa_phone",
-                label_visibility="collapsed",
-                help="DDD + numero, sem espacos. Ex: 5511999381625",
-            )
-        with _send_col:
-            if st.button("Enviar para mim", use_container_width=True, key="eg_wa_send"):
-                _clean = "".join(c for c in _phone if c.isdigit())
-                if len(_clean) >= 10:
-                    if not _clean.startswith("55"):
-                        _clean = "55" + _clean
-                    _wa_comp.html("""
-                    <script>
-                    var msg = '""" + _online_msg + """';
-                    msg = msg.replace('--- *Bolsas* ---', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
-                    msg = msg.replace('--- *Previd\\u00eancia', String.fromCodePoint(0x1F3E6)+' *Previd\\u00eancia');
-                    msg = msg.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA)+' *Briefing Equity Guard*');
-                    msg = msg.replace('*Equity Guard*', String.fromCodePoint(0x1F449)+' *Equity Guard*');
-                    window.parent.open('https://wa.me/""" + _clean + """?text=' + encodeURIComponent(msg), '_blank');
-                    </script>
-                    """, height=0)
-                else:
-                    st.error("Número inválido. Use formato: 5511999381625")
+        # Formulario HTML/JS puro — nao depende de rerender Streamlit,
+        # nao sofre popup blocker (window.open vem do click direto do usuario),
+        # e permite type="tel"/autocomplete="off" (Streamlit nao expoe).
+        import json as _json
+        _plain_msg = (
+            _online_msg
+            .replace("\\n", "\n")
+            .replace("\\u00e2", "â").replace("\\u00e1", "á")
+            .replace("\\u00e9", "é").replace("\\u00e7", "ç")
+            .replace("\\u00e3", "ã").replace("\\u00ea", "ê")
+            .replace("\\u00ed", "í").replace("\\u00f3", "ó")
+            .replace("\\u00f4", "ô").replace("\\u00f5", "õ")
+            .replace("\\u00fa", "ú").replace("\\u00fc", "ü")
+        )
+        # Emojis sao injetados no JS via String.fromCodePoint — isso sobrevive
+        # melhor ao forward do WhatsApp Desktop do que emojis nativos em Python
+        # (que podem virar "?" apos re-encoding do cliente desktop).
+        _msg_js = _json.dumps(_plain_msg)
+        _wa_comp.html(f"""
+        <style>
+        .eg-wa-wrap {{ display:flex; gap:10px; font-family:Inter,system-ui,sans-serif; }}
+        .eg-wa-phone {{
+            flex:3; padding:9px 14px; border-radius:8px;
+            background:#0d1117; color:#e6edf3; font-size:.88rem;
+            border:1px solid #30363d; outline:none;
+            font-family:Inter,system-ui,sans-serif;
+        }}
+        .eg-wa-phone:focus {{ border-color:#d4af37; box-shadow:0 0 0 2px rgba(212,175,55,.15); }}
+        .eg-wa-btn {{
+            flex:2; padding:9px 14px; border-radius:8px;
+            font-size:.82rem; font-weight:700; letter-spacing:.3px;
+            cursor:pointer; transition:all .15s;
+            display:flex; align-items:center; justify-content:center; gap:6px;
+            font-family:Inter,system-ui,sans-serif;
+        }}
+        .eg-wa-btn.eg-wa-ready {{
+            background:#25d366; color:#0d1117; border:1px solid #1cbf5a;
+        }}
+        .eg-wa-btn.eg-wa-ready:hover {{ filter:brightness(1.08); transform:translateY(-1px); }}
+        .eg-wa-btn.eg-wa-off {{
+            background:#161b22; color:#6e7681; border:1px solid #30363d;
+            cursor:not-allowed;
+        }}
+        .eg-wa-err {{ color:#f85149; font-size:.72rem; margin-top:6px; min-height:16px; }}
+        </style>
+        <div class="eg-wa-wrap">
+            <input type="tel" inputmode="tel" autocomplete="off"
+                   name="eg-wa-phone-anon" id="eg-wa-phone"
+                   class="eg-wa-phone" placeholder="Ex.: 11 99999-9999 (BR) ou +1 415 555 2671">
+            <button id="eg-wa-send" class="eg-wa-btn eg-wa-off" disabled>Digite seu numero</button>
+        </div>
+        <div id="eg-wa-err" class="eg-wa-err"></div>
+        <script>
+        (function() {{
+            var msg = {_msg_js};
+            var inp = document.getElementById('eg-wa-phone');
+            var btn = document.getElementById('eg-wa-send');
+            var err = document.getElementById('eg-wa-err');
+
+            function cleanDigits(v) {{ return (v || '').replace(/\\D/g, ''); }}
+            function hasPlus(v) {{ return /^\\s*\\+/.test(v || ''); }}
+            // 8 a 15 digitos cobrem todos os paises (ITU-T E.164).
+            function isValid(d) {{ return d.length >= 8 && d.length <= 15; }}
+
+            function normalize(raw) {{
+                var d = cleanDigits(raw);
+                if (hasPlus(raw)) return d;          // usuario informou DDI
+                if (d.length >= 12) return d;         // provavel DDI ja incluso
+                return '55' + d;                      // default Brasil
+            }}
+
+            function update() {{
+                var d = cleanDigits(inp.value);
+                if (isValid(d)) {{
+                    btn.disabled = false;
+                    btn.className = 'eg-wa-btn eg-wa-ready';
+                    btn.textContent = 'Enviar para mim →';
+                    err.textContent = '';
+                }} else {{
+                    btn.disabled = true;
+                    btn.className = 'eg-wa-btn eg-wa-off';
+                    btn.textContent = 'Digite seu numero';
+                }}
+            }}
+            inp.addEventListener('input', update);
+            btn.addEventListener('click', function() {{
+                var d = cleanDigits(inp.value);
+                if (!isValid(d)) {{
+                    err.textContent = 'Numero invalido. Digite DDD + numero ou +DDI numero.';
+                    return;
+                }}
+                d = normalize(inp.value);
+                // Detecta mobile. Em computador (Desktop/Windows/Mac), WhatsApp
+                // costuma corromper emojis 4-byte no forward, entao enviamos sem.
+                var ua = (navigator.userAgent || '') + ' ' + (navigator.platform || '');
+                var isMobile = /iPhone|iPad|iPod|Android|Mobile|IEMobile|Opera Mini/i.test(ua);
+                var m = msg;
+                if (isMobile) {{
+                    // Injeta emojis via String.fromCodePoint — preserva UTF-8 correto na URL.
+                    m = m.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA) + ' *Briefing Equity Guard*');
+                    m = m.replace('*Juros*', String.fromCodePoint(0x1F3E6) + ' *Juros*');
+                    m = m.replace('US Fed:', String.fromCodePoint(0x1F1FA, 0x1F1F8) + ' Fed:');
+                    m = m.replace('BR Selic:', String.fromCodePoint(0x1F1E7, 0x1F1F7) + ' Selic:');
+                    m = m.replace('*Commodities*', String.fromCodePoint(0x1F6E2) + ' *Commodities*');
+                    m = m.replace('*Dolar Comercial*', String.fromCodePoint(0x1F4B5) + ' *Dolar Comercial*');
+                    m = m.replace('*Bolsas*', String.fromCodePoint(0x1F4C8) + ' *Bolsas*');
+                    m = m.replace('*Prevdow', String.fromCodePoint(0x1F3E6) + ' *Prevdow');
+                    m = m.replace('*Equity Guard*', String.fromCodePoint(0x1F449) + ' *Equity Guard*');
+                }}
+                // Em desktop nao substituimos: mensagem fica com markdown puro
+                // (WhatsApp ainda renderiza *negrito* normalmente).
+                var url = 'https://wa.me/' + d + '?text=' + encodeURIComponent(m);
+                window.open(url, '_blank', 'noopener');
+            }});
+            update();
+        }})();
+        </script>
+        """, height=100)
 
 
 def _render_global_bar(T: dict) -> None:
@@ -2073,6 +2180,17 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ── Currency symbol (USD/GBP/EUR/BRL…) ────────────────────────────────────
     cs = _currency_symbol(fundamentals.get("currency", "BRL"))
 
+    # ── Ticker chip HTML — repetido antes de cada secao para que prints
+    #    da pagina sempre mostrem qual acao esta sendo analisada.
+    _chip_name = fundamentals.get("name", ticker)
+    _chip_sym = normalize_ticker(ticker)
+    _ticker_chip_html = (
+        f'<div class="eg-ticker-chip">'
+        f'{_chip_name}'
+        f'<span class="eg-ticker-chip-sym">{_chip_sym}</span>'
+        f'</div>'
+    )
+
     # ── Calculations ──────────────────────────────────────────────────────────
     avg_div = calculate_avg_dividends(dividends) if dividends is not None else 0.0
     teto    = calculate_teto_barsi(avg_div, target_yield)
@@ -2115,16 +2233,15 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         _name_col, _star_col = st.columns([9, 1])
         with _name_col:
             st.markdown(
-                f"<h3 style='margin-bottom:2px;'>{name} &nbsp;"
-                f"<code style='font-size:.75rem;background:#161b22;padding:3px 8px;"
-                f"border-radius:6px;border:1px solid #30363d;'>{normalize_ticker(ticker)}</code>"
-                f"&nbsp;{best_badge}{dev_badge}</h3>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f"<span style='color:#8b949e;font-size:.84rem;'>"
+                f"<h3 style='margin:0 0 4px;display:flex;align-items:center;"
+                f"gap:6px;flex-wrap:wrap;font-size:1.25rem;font-weight:800;'>"
+                f"<span>{name}</span>"
+                f"<span class='eg-ticker-chip-sym'>{normalize_ticker(ticker)}</span>"
+                f"{best_badge}{dev_badge}"
+                f"</h3>"
+                f"<div style='color:#8b949e;font-size:.8rem;margin-bottom:6px;'>"
                 f"{fundamentals.get('sector','—')} › {fundamentals.get('industry','—')}"
-                f"</span>",
+                f"</div>",
                 unsafe_allow_html=True,
             )
         with _star_col:
@@ -2179,6 +2296,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # 📈 INTERACTIVE QUOTE — right below the signal (primary scroll experience)
     # ══════════════════════════════════════════════════════════════════════════
+    # Sem ticker chip aqui: o cabecalho da empresa acima ja identifica a acao.
     st.markdown('<div class="eg-nav-anchor" id="sec-cotacao"></div>', unsafe_allow_html=True)
     _render_interactive_quote(ticker, df, T, cs)
 
@@ -2187,7 +2305,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # 🔮 FUTURE-FOCUS BLOCK — projection + monthly map at the top of the page
     # ══════════════════════════════════════════════════════════════════════════
-    st.markdown('<div class="eg-nav-anchor" id="sec-projecao"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-projecao"></div>' + _ticker_chip_html, unsafe_allow_html=True)
     _fut_left, _fut_right = st.columns([3, 2])
 
     with _fut_left:
@@ -2214,7 +2332,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
 
     with _fut_right:
         st.markdown(
-            f'<div class="eg-section-header">{T["month_map_title"]}</div>',
+            _ticker_chip_html + f'<div class="eg-section-header">{T["month_map_title"]}</div>',
             unsafe_allow_html=True,
         )
 
@@ -2277,32 +2395,48 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # 🎯 INCOME GOAL CALCULATOR
     # ══════════════════════════════════════════════════════════════════════════
-    st.markdown('<div class="eg-nav-anchor" id="sec-dividendos"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-dividendos"></div>' + _ticker_chip_html, unsafe_allow_html=True)
     st.markdown(
         f'<div class="eg-section-header">{T["goal_title"]}</div>',
         unsafe_allow_html=True,
     )
     if avg_div > 0 and price and price > 0:
+        _lang = st.session_state.get("lang", "pt")
+        _br_locale = _lang in ("pt", "es")
+
+        def _parse_money(s: str, default: float = 1000.0) -> float:
+            """Aceita 'R$ 1.000,00', 'US$ 1,000.00', '1000', etc."""
+            if not s:
+                return default
+            s = str(s).strip()
+            for p in ("R$", "US$", "U$S", "€", "£", "$", " "):
+                s = s.replace(p, "")
+            if "," in s and "." in s:
+                if s.rfind(",") > s.rfind("."):
+                    s = s.replace(".", "").replace(",", ".")
+                else:
+                    s = s.replace(",", "")
+            elif "," in s and s.count(",") == 1:
+                s = s.replace(",", ".")
+            try:
+                return max(0.0, float(s))
+            except ValueError:
+                return default
+
+        if _br_locale:
+            _default_str = f"{cs} 1.000,00"
+        else:
+            _default_str = f"{cs} 1,000.00"
+
         _g1, _g2, _g3 = st.columns([2, 2, 3])
         with _g1:
-            _goal_raw = st.number_input(
-                f"{T['goal_input_label']} ({cs})",
-                min_value=0.0, value=1000.0, step=100.0,
-                key="goal_target", format="%.2f",
-                label_visibility="collapsed",
+            _goal_str = st.text_input(
+                T["goal_input_label"],
+                value=st.session_state.get("goal_target_str", _default_str),
+                key="goal_target_str",
+                placeholder=_default_str,
             )
-            _lang = st.session_state.get("lang", "pt")
-            if _lang in ("pt", "es"):
-                _goal_display = f"{cs}{_goal_raw:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            else:
-                _goal_display = f"{cs}{_goal_raw:,.2f}"
-            st.markdown(
-                f"<div style='background:#161b22;border:1px solid #30363d;border-radius:8px;"
-                f"padding:10px 14px;text-align:right;font-size:1rem;font-weight:700;"
-                f"color:#e6edf3;margin-top:-10px;'>{_goal_display}</div>",
-                unsafe_allow_html=True,
-            )
-            _goal_target = _goal_raw
+            _goal_target = _parse_money(_goal_str, default=1000.0)
         with _g2:
             _freq_opts = T["goal_freq_options"]
             _freq_idx  = st.selectbox(
@@ -2320,7 +2454,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             _invest_total = _shares_lot * price
             st.markdown(
                 f"<div style='background:rgba(212,175,55,.10);border:1px solid #d4af37;"
-                f"border-radius:10px;padding:14px 18px;margin-top:24px;font-size:.9rem;"
+                f"border-radius:10px;padding:14px 18px;margin-top:28px;font-size:.9rem;"
                 f"color:#e6edf3;line-height:1.55;text-align:right;'>"
                 f"{T['goal_result'].format(shares=_fmt_int(_shares_lot, cs), money=_fmt_money(_invest_total, cs))}"
                 f"</div>",
@@ -2332,7 +2466,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Key metrics ───────────────────────────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-metricas"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-metricas"></div>' + _ticker_chip_html, unsafe_allow_html=True)
     st.markdown(f'<div class="eg-section-header">{T["current_price"][:2]} {T["nav_metricas"]}</div>', unsafe_allow_html=True)
     dy = fundamentals.get("dividend_yield")
     _dy_s = f"{dy*100:.2f}%" if dy else T["na"]
@@ -2385,7 +2519,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Performance Report ────────────────────────────────────────────────────
-    st.markdown(f'<div class="eg-section-header">{T["perf_title"]}</div>', unsafe_allow_html=True)
+    st.markdown(_ticker_chip_html + f'<div class="eg-section-header">{T["perf_title"]}</div>', unsafe_allow_html=True)
     _perf = get_price_performance(df)
     if _perf:
         _perf_data = [
@@ -2438,8 +2572,9 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         _curr    = _perf.get("current")
         if _w52_min and _w52_max and _curr and _w52_max > _w52_min:
             _pos_pct = max(0.0, min(100.0, (_curr - _w52_min) / (_w52_max - _w52_min) * 100))
+            st.markdown(_ticker_chip_html, unsafe_allow_html=True)
             st.markdown(
-                f"<div style='margin-top:14px;background:#161b22;border:1px solid #21262d;"
+                f"<div style='margin-top:4px;background:#161b22;border:1px solid #21262d;"
                 f"border-radius:10px;padding:14px 20px;'>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
@@ -2470,50 +2605,51 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Financial health + Trend ──────────────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-saude"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-saude"></div>' + _ticker_chip_html, unsafe_allow_html=True)
     col_h, col_t = st.columns(2)
 
     with col_h:
         st.markdown(f'<div class="eg-section-header">{T["health_title"]}</div>', unsafe_allow_html=True)
 
         pv = health["payout_value"]
-        st.metric(
-            f"📤 {T['payout']}",
-            f"{pv:.1f}%" if pv is not None else T["na"],
-            delta=T["payout_hint"], delta_color="off",
-            help=T["tooltip_payout"],
-        )
-
         dv = health["debt_ebitda_value"]
-        if best_name == "Bancos" and dv is None:
-            st.metric(
-                f"🏦 {T['debt_ebitda']}",
-                T["na"],
-                help=T["tooltip_debt"],
-            )
-            st.caption(T["bank_ebitda_note"])
-        else:
-            st.metric(
-                f"🏦 {T['debt_ebitda']}",
-                f"{dv:.2f}×" if dv is not None else T["na"],
-                delta=T["debt_ebitda_hint"], delta_color="off",
-                help=T["tooltip_debt"],
-            )
-
         rv = health["roe_value"]
-        st.metric(
-            f"📊 {T['roe']}",
-            f"{rv:.1f}%" if rv is not None else T["na"],
-            delta=T["roe_hint"], delta_color="off",
-            help=T["tooltip_roe"],
-        )
-
         pe = fundamentals.get("pe_ratio")
-        if pe:
-            st.metric(f"🔢 {T['pe_label']}", f"{pe:.1f}×", help=T["tooltip_pe"])
         pb = fundamentals.get("pb_ratio")
+
+        _is_bank_no_ebitda = (best_name == "Bancos" and dv is None)
+        _health_items = [
+            (f"📤 {T['payout']}", f"{pv:.1f}%" if pv is not None else T["na"], T["payout_hint"], "#e6edf3"),
+            (f"🏦 {T['debt_ebitda']}",
+             T["na"] if dv is None else f"{dv:.2f}×",
+             "" if _is_bank_no_ebitda else T["debt_ebitda_hint"],
+             "#8b949e" if dv is None else "#e6edf3"),
+            (f"📊 {T['roe']}", f"{rv:.1f}%" if rv is not None else T["na"], T["roe_hint"], "#e6edf3"),
+        ]
+        if pe:
+            _health_items.append((f"🔢 {T['pe_label']}", f"{pe:.1f}×", "", "#e6edf3"))
         if pb:
-            st.metric(f"📚 {T['pb_label']}", f"{pb:.2f}×", help=T["tooltip_pb"])
+            _health_items.append((f"📚 {T['pb_label']}", f"{pb:.2f}×", "", "#e6edf3"))
+
+        _health_html = (
+            "<style>.eq-health{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}"
+            "@media(max-width:768px){.eq-health{grid-template-columns:repeat(2,1fr)}}</style>"
+            "<div class='eq-health'>"
+        )
+        for _hl, _hv, _hd, _hc in _health_items:
+            _delta = f"<div style='font-size:.6rem;color:#6e7681;margin-top:2px;line-height:1.2;'>{_hd}</div>" if _hd else ""
+            _health_html += (
+                f"<div style='background:#161b22;border:1px solid #30363d;"
+                f"border-radius:10px;padding:8px 6px;text-align:center;'>"
+                f"<div style='font-size:.6rem;color:#6e7681;margin-bottom:3px;line-height:1.2;'>{_hl}</div>"
+                f"<div style='font-size:.95rem;font-weight:800;color:{_hc};'>{_hv}</div>"
+                f"{_delta}</div>"
+            )
+        _health_html += "</div>"
+        st.markdown(_health_html, unsafe_allow_html=True)
+
+        if _is_bank_no_ebitda:
+            st.caption(T["bank_ebitda_note"])
 
     with col_t:
         st.markdown(f'<div class="eg-section-header">{T["trend_title"]}</div>', unsafe_allow_html=True)
@@ -2529,22 +2665,69 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             f"<div class='eg-trend-box' style='background:{t_bg};color:{t_color};'>{t_label}</div>",
             unsafe_allow_html=True,
         )
-        _ma_cols = st.columns(2)
-        for _i, (ma_val, ma_lbl) in enumerate([
-            (trend.get("ma20"),  "MA20"),
-            (trend.get("ma200"), "MA200"),
-        ]):
+
+        # ── Explicacao curta do "porque" da tendencia ─────────────────────────
+        _ma20 = trend.get("ma20")
+        _ma200 = trend.get("ma200")
+        _why = None
+        if _ma20 and _ma200:
+            _spread = ((_ma20 - _ma200) / _ma200) * 100
+            if ov == "TENDÊNCIA DE ALTA FORTE":
+                _why = (
+                    f"A média dos últimos <b>20 dias</b> ({cs} {_ma20:.2f}) está <b>{_spread:+.1f}%</b> "
+                    f"acima da média dos últimos <b>200 dias</b> ({cs} {_ma200:.2f}) — "
+                    f"compradores dominam no curto e longo prazo."
+                )
+            elif ov == "TENDÊNCIA DE ALTA":
+                _why = (
+                    f"MA20 ({cs} {_ma20:.2f}) ligeiramente acima da MA200 ({cs} {_ma200:.2f}), "
+                    f"diferença de <b>{_spread:+.1f}%</b> — momentum positivo, mas ainda moderado."
+                )
+            elif ov == "TENDÊNCIA DE BAIXA FORTE":
+                _why = (
+                    f"A média dos últimos <b>20 dias</b> ({cs} {_ma20:.2f}) está <b>{_spread:+.1f}%</b> "
+                    f"abaixo da média dos últimos <b>200 dias</b> ({cs} {_ma200:.2f}) — "
+                    f"vendedores pressionando tanto o curto quanto o longo prazo."
+                )
+            elif ov == "TENDÊNCIA DE BAIXA":
+                _why = (
+                    f"MA20 ({cs} {_ma20:.2f}) ligeiramente abaixo da MA200 ({cs} {_ma200:.2f}), "
+                    f"diferença de <b>{_spread:+.1f}%</b> — pressão vendedora moderada."
+                )
+            else:
+                _why = (
+                    f"MA20 ({cs} {_ma20:.2f}) e MA200 ({cs} {_ma200:.2f}) praticamente coladas "
+                    f"(<b>{_spread:+.1f}%</b>) — mercado sem direção clara no momento."
+                )
+        if _why:
+            st.markdown(
+                f"<div style='font-size:.78rem;color:#8b949e;line-height:1.5;"
+                f"margin:-4px 0 10px;padding:8px 12px;background:#161b22;"
+                f"border-left:2px solid {t_color};border-radius:4px;'>{_why}</div>",
+                unsafe_allow_html=True,
+            )
+        _ma_items = []
+        for ma_val, ma_lbl in [(trend.get("ma20"), "MA20"), (trend.get("ma200"), "MA200")]:
             if ma_val:
-                diff    = ((price - ma_val) / ma_val) * 100
-                _ma_tip = T["tooltip_ma20"] if ma_lbl == "MA20" else T["tooltip_ma200"]
-                with _ma_cols[_i]:
-                    st.metric(
-                        ma_lbl,
-                        f"{cs} {ma_val:.2f}",
-                        delta=f"{diff:+.1f}%",
-                        delta_color="normal" if diff > 0 else "inverse",
-                        help=_ma_tip,
-                    )
+                diff = ((price - ma_val) / ma_val) * 100
+                _diff_c = "#58a6ff" if diff > 0 else "#dc2626"
+                _ma_items.append((ma_lbl, f"{cs} {ma_val:.2f}", f"{diff:+.1f}%", _diff_c))
+        if _ma_items:
+            _ma_html = (
+                "<style>.eq-ma{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}</style>"
+                "<div class='eq-ma'>"
+            )
+            for _ml, _mv, _md, _mc in _ma_items:
+                _ma_html += (
+                    f"<div style='background:#161b22;border:1px solid #30363d;"
+                    f"border-radius:10px;padding:8px 6px;text-align:center;'>"
+                    f"<div style='font-size:.6rem;color:#6e7681;margin-bottom:3px;line-height:1.2;'>{_ml}</div>"
+                    f"<div style='font-size:.95rem;font-weight:800;color:#e6edf3;'>{_mv}</div>"
+                    f"<div style='font-size:.68rem;color:{_mc};margin-top:2px;font-weight:700;'>{_md}</div>"
+                    f"</div>"
+                )
+            _ma_html += "</div>"
+            st.markdown(_ma_html, unsafe_allow_html=True)
         if trend.get("golden_cross"):
             st.success(T["golden_cross"])
         elif trend.get("death_cross"):
@@ -2567,7 +2750,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Main chart ────────────────────────────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-tecnico"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-tecnico"></div>' + _ticker_chip_html, unsafe_allow_html=True)
     st.markdown(f'<div class="eg-section-header">{T["chart_title"]}</div>', unsafe_allow_html=True)
     try:
         st.plotly_chart(
@@ -2581,7 +2764,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # 🧠 ANÁLISE ESTRUTURADA — unified narrative (trend + technicals + valuation)
     # ══════════════════════════════════════════════════════════════════════════
-    st.markdown('<div class="eg-nav-anchor" id="sec-inteligencia"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-inteligencia"></div>' + _ticker_chip_html, unsafe_allow_html=True)
     st.markdown(
         f'<div class="eg-section-header" style="margin-top:12px;">{T["narrative_title"]}</div>',
         unsafe_allow_html=True,
@@ -2679,7 +2862,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Dividends (historical bar chart) ──────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-proventos"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-proventos"></div>' + _ticker_chip_html, unsafe_allow_html=True)
     st.markdown(f'<div class="eg-section-header">{T["dividends_title"]}</div>', unsafe_allow_html=True)
     if dividends is not None and not dividends.empty:
         st.plotly_chart(
@@ -2692,7 +2875,8 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             T["div_summary"].format(
                 avg=avg_div, hi=float(annual_d.max()),
                 lo=float(annual_d.min()), n=len(annual_d), cs=cs,
-            )
+            ),
+            unsafe_allow_html=True,
         )
     else:
         st.info(T["no_dividends"])
@@ -2700,7 +2884,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Dividend Calendar ─────────────────────────────────────────────────────
-    st.markdown(f'<div class="eg-section-header">{T["cal_title"]}</div>', unsafe_allow_html=True)
+    st.markdown(_ticker_chip_html + f'<div class="eg-section-header">{T["cal_title"]}</div>', unsafe_allow_html=True)
     _cal = get_dividend_calendar(ticker)
     if _cal.empty and dividends is not None and not dividends.empty:
         _today = pd.Timestamp.now().normalize()
@@ -2746,17 +2930,18 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         st.info(T["cal_no_data"])
 
     # ── Glossary expander ─────────────────────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-indicadores"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-indicadores"></div>' + _ticker_chip_html, unsafe_allow_html=True)
     with st.expander(T["glossary_title"], expanded=True):
         _g1, _g2 = st.columns(2)
         _gitems = T["glossary_items"]
         _gmid   = len(_gitems) // 2 + len(_gitems) % 2
+        # Escapa "$" para evitar modo LaTeX do markdown do Streamlit.
         with _g1:
             for _gterm, _gdesc in _gitems[:_gmid]:
-                st.markdown(f"**{_gterm}** — {_gdesc}")
+                st.markdown(f"**{_gterm}** — {_gdesc}".replace("$", "\\$"))
         with _g2:
             for _gterm, _gdesc in _gitems[_gmid:]:
-                st.markdown(f"**{_gterm}** — {_gdesc}")
+                st.markdown(f"**{_gterm}** — {_gdesc}".replace("$", "\\$"))
 
     # ── Footer / Disclaimer ───────────────────────────────────────────────────
     st.divider()

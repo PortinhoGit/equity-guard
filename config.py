@@ -72,4 +72,4 @@ NITRO_DATA: dict = {
 APP_NAME: str = "Equity Guard"
 APP_TAGLINE: str = "Análise Fundamentalista + Técnica · B3"
 APP_ICON: str = "⚡"
-APP_VERSION: str = "2.4.0"
+APP_VERSION: str = "2.5.0"
