@@ -1,0 +1,36 @@
+name: Daily Briefing Email
+
+# Executa as 09:00 UTC = 06:00 BRT, segunda a sexta.
+on:
+  schedule:
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:   # permite disparar manualmente para testar
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install supabase yfinance pandas numpy requests pytz beautifulsoup4
+
+      - name: Send daily briefing
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SMTP_HOST:            ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:            ${{ secrets.SMTP_PORT }}
+          SMTP_USER:            ${{ secrets.SMTP_USER }}
+          SMTP_PASS:            ${{ secrets.SMTP_PASS }}
+          SMTP_FROM:            ${{ secrets.SMTP_FROM }}
+        run: python send_daily_briefing.py
