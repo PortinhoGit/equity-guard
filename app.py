@@ -1778,12 +1778,12 @@ def render_sidebar(user: dict, T: dict) -> tuple:
         _render_macro_panel(T)
 
         # ══════════════════════════════════════════════════════════════════════
-        # 2. HUB DE PREVIDÊNCIA — só PrevDow (publico).
-        # NitroPrev (IFM) suspenso ate termos autorizacao formal do portal.
+        # 2. HUB DE PREVIDÊNCIA — PrevDow completo, NitroPrev só com botão
+        # de acesso (indices do IFM ocultos ate termos autorizacao formal).
         # ══════════════════════════════════════════════════════════════════════
         st.markdown('<div id="sidebar-prevdow"></div>', unsafe_allow_html=True)
         _render_prevdow_panel(T)
-        # _render_nitro_panel(T)  # desligado ate termos confirmacao dos ToS do IFM
+        _render_nitro_panel(T)
 
         st.divider()
 
