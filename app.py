@@ -823,7 +823,7 @@ def _render_briefing(T: dict) -> None:
         _mkt = get_status_mercado()
         _fx_wa = _fetch_fx_usdbrl()
         _pd = _fetch_prevdow_live()
-        _nd = NITRO_DATA
+        # NitroPrev (IFM) suspenso no briefing — conteudo de portal privado.
         import streamlit.components.v1 as _wa_comp
 
         def _fx_fmt_wa(v):
@@ -883,16 +883,10 @@ def _render_briefing(T: dict) -> None:
         _prev_bal = _fmt_pct(_pd.get('balanced_month'))
         _prev_di_y = _fmt_pct(_pd.get('cdi_year'))
         _prev_bal_y = _fmt_pct(_pd.get('balanced_year'))
-        _nit_c = _fmt_pct(_nd.get('cdi_month'))
-        _nit_m = _fmt_pct(_nd.get('balanced_month'))
-        _nit_a = _fmt_pct(_nd.get('arrojado_month'))
-        _nit_s = _fmt_pct(_nd.get('super_month'))
         _prev_block = (
             "*Prevdow " + _pd['data_base'] + "*\\n"
             + "DI: " + _prev_di + " mes | " + _prev_di_y + " ano\\n"
-            + "Balanceada: " + _prev_bal + " mes | " + _prev_bal_y + " ano\\n\\n"
-            + "*NitroPrev " + _nd['data_base'] + "*\\n"
-            + "C: " + _nit_c + " | M: " + _nit_m + " | A: " + _nit_a + " | S: " + _nit_s
+            + "Balanceada: " + _prev_bal + " mes | " + _prev_bal_y + " ano"
         )
         _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
@@ -1101,7 +1095,6 @@ def _render_prevdow_panel(T: dict) -> None:
     Prevdow — Previdência Complementar.
     Tenta scraper live; fallback para config.PREVDOW_DATA.
     """
-    import urllib.parse as _url
     d = _fetch_prevdow_live()
 
     # ── Branded header (red bar, white text) ──────────────────────────────────
@@ -1150,7 +1143,7 @@ def _render_prevdow_panel(T: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    # ── Login button — same style as Nitro ──────────────────────────────────────
+    # ── Login button ──────────────────────────────────────────────────────────
     st.markdown(
         f"<a href='{d['url']}' target='_blank' style='display:block;"
         f"text-align:center;background:#c0392b;color:#fff;"
@@ -1171,83 +1164,26 @@ def _render_prevdow_panel(T: dict) -> None:
 def _render_nitro_panel(T: dict) -> None:
     """
     Nitro Prev (IFM Previdência / Votorantim).
-    Branded sidebar card (azul marinho + dourado) with monthly and YTD
-    returns for CDI and Balanced profiles, plus a direct login link to the
-    official participant portal. Values come from config.NITRO_DATA and are
-    meant to be updated manually once a month.
+    Apenas link de acesso ao portal oficial. Divulgacao dos indices
+    suspensa ate termos autorizacao formal do IFM.
     """
-    d = NITRO_DATA
+    url = NITRO_DATA.get("url", "https://ifmprev.participante.com.br/login")
     NAVY = "#003366"
     NAVY_HI = "#004488"
     GOLD = "#FFCC00"
-
-    # ── Branded header (navy gradient, gold text) ─────────────────────────────
     st.markdown(
         f"<div style='background:linear-gradient(135deg,{NAVY},{NAVY_HI});"
-        f"border-radius:10px 10px 0 0;padding:10px 14px;margin-top:14px;"
-        f"border:1px solid {NAVY};border-bottom:none;'>"
-        f"<div style='display:flex;align-items:center;justify-content:space-between;'>"
-        f"<span style='font-size:.88rem;font-weight:800;color:{GOLD};"
-        f"letter-spacing:.3px;'>{T['nitro_title']}</span>"
-        f"<span style='font-size:.68rem;color:rgba(255,204,0,.85);'>"
-        f"{T['prevdow_subtitle'].format(ref=d['data_base'])}</span>"
-        f"</div></div>",
-        unsafe_allow_html=True,
-    )
-
-    # ── Returns table (Perfil | No mês | No ano) ──────────────────────────────
-    def _val_html(v) -> str:
-        if v is None:
-            return "<span style='font-weight:800;color:#6e7681;'>N/D</span>"
-        c = "#58a6ff" if v > 0 else ("#dc2626" if v < 0 else "#8b949e")
-        return f"<span style='font-weight:800;color:{c};'>{v:+.2f}%</span>"
-
-    _hdr = "color:#6e7681;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;"
-    _cell = "padding:5px 0;font-size:.80rem;"
-    _rows_html = ""
-    _nitro_rows = [
-        ("NitroPrev C", d.get('cdi_month'), d.get('cdi_year')),
-        ("NitroPrev M", d.get('balanced_month'), d.get('balanced_year')),
-        ("NitroPrev A", d.get('arrojado_month'), d.get('arrojado_year')),
-        ("NitroPrev S", d.get('super_month'), d.get('super_year')),
-    ]
-    for i, (_lbl, _m, _y) in enumerate(_nitro_rows):
-        _border = "border-bottom:1px dashed #21262d;" if i < len(_nitro_rows) - 1 else ""
-        _rows_html += (
-            f"<tr style='{_border}'>"
-            f"<td style='{_cell}color:#e6edf3;font-weight:600;'>{_lbl}</td>"
-            f"<td style='{_cell}text-align:right;'>{_val_html(_m)}</td>"
-            f"<td style='{_cell}text-align:right;'>{_val_html(_y)}</td>"
-            f"</tr>"
-        )
-    st.markdown(
-        f"<div style='background:#161b22;border:1px solid {NAVY};"
-        f"border-top:none;border-radius:0 0 10px 10px;padding:8px 14px 10px;'>"
-        "<table style='width:100%;border-collapse:collapse;'>"
-        f"<tr style='border-bottom:1px solid #30363d;'>"
-        f"<td style='{_hdr}padding-bottom:6px;'>{T['prevdow_profile_col']}</td>"
-        f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_month']}</td>"
-        f"<td style='{_hdr}padding-bottom:6px;text-align:right;'>{T['prevdow_year']}</td>"
-        f"</tr>"
-        f"{_rows_html}"
-        "</table></div>",
-        unsafe_allow_html=True,
-    )
-
-    # ── Login button — navy bg + gold text (custom HTML to enforce branding) ─
-    st.markdown(
-        f"<a href='{d['url']}' target='_blank' style='display:block;"
+        f"border-radius:10px;padding:10px 14px;margin-top:14px;"
+        f"border:1px solid {NAVY};'>"
+        f"<div style='font-size:.88rem;font-weight:800;color:{GOLD};"
+        f"letter-spacing:.3px;margin-bottom:8px;'>{T['nitro_title']}</div>"
+        f"<a href='{url}' target='_blank' style='display:block;"
         f"text-align:center;background:{NAVY};color:{GOLD};"
-        f"padding:10px 8px;border-radius:8px;font-size:.78rem;"
-        f"font-weight:800;text-decoration:none;margin-top:6px;"
+        f"padding:9px 8px;border-radius:6px;font-size:.78rem;"
+        f"font-weight:800;text-decoration:none;"
         f"border:1px solid {GOLD};letter-spacing:.3px;'>"
-        f"{T['nitro_link']}</a>",
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:2px;'>"
-        f"{T['nitro_source']}</div>",
+        f"{T['nitro_link']}</a>"
+        "</div>",
         unsafe_allow_html=True,
     )
 
@@ -1842,11 +1778,12 @@ def render_sidebar(user: dict, T: dict) -> tuple:
         _render_macro_panel(T)
 
         # ══════════════════════════════════════════════════════════════════════
-        # 2. HUB DE PREVIDÊNCIA — Prevdow + Nitro Prev (IFM)
+        # 2. HUB DE PREVIDÊNCIA — só PrevDow (publico).
+        # NitroPrev (IFM) suspenso ate termos autorizacao formal do portal.
         # ══════════════════════════════════════════════════════════════════════
         st.markdown('<div id="sidebar-prevdow"></div>', unsafe_allow_html=True)
         _render_prevdow_panel(T)
-        _render_nitro_panel(T)
+        # _render_nitro_panel(T)  # desligado ate termos confirmacao dos ToS do IFM
 
         st.divider()
 
