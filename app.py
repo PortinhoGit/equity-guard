@@ -729,6 +729,21 @@ def _render_feedback_box() -> None:
         if not _msg_clean:
             st.warning("Digite uma mensagem antes de enviar.")
             return
+        # Rate limit: max 5 envios por sessao em 24h (anti-spam basico).
+        import time as _time
+        _now_ts = _time.time()
+        _window = 24 * 3600  # 24h
+        _max_per_window = 5
+        _hist = st.session_state.get("eg_feedback_history", [])
+        _hist = [t for t in _hist if _now_ts - t < _window]
+        if len(_hist) >= _max_per_window:
+            st.error(
+                f"Limite de {_max_per_window} envios a cada 24h atingido. "
+                f"Aguarde um pouco antes de enviar outro feedback."
+            )
+            return
+        _hist.append(_now_ts)
+        st.session_state.eg_feedback_history = _hist
         with st.spinner("Enviando…"):
             ok, detail = _send_feedback_email(_msg_clean)
         if ok:
@@ -3133,6 +3148,39 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
 
     # ── Footer / Disclaimer ───────────────────────────────────────────────────
     st.divider()
+
+    # ── Guia de instalacao na tela inicial (iPhone + Android) ────────────────
+    with st.expander("📱 Instalar o app na tela do seu celular", expanded=False):
+        _install_col1, _install_col2 = st.columns(2)
+        with _install_col1:
+            st.markdown(
+                "#### 🍎 iPhone (Safari)\n"
+                "1. Abra o site **no Safari** (não funciona no Chrome/Firefox no iPhone)\n"
+                "2. Toque no botão de **compartilhar** (quadradinho com ⬆ na barra inferior)\n"
+                "3. Role a lista pra baixo\n"
+                "4. Toque em **Adicionar à Tela de Início**\n"
+                "5. Nome já vem preenchido como *Equity Guard* → toque **Adicionar**\n\n"
+                "O ícone dourado aparece na sua tela inicial. Ao abrir, roda em modo "
+                "app (sem barra do Safari)."
+            )
+        with _install_col2:
+            st.markdown(
+                "#### 🤖 Android (Chrome ou Samsung Internet)\n"
+                "**Chrome:**\n"
+                "1. Abra o site no Chrome\n"
+                "2. Toque no **menu ⋮** (três pontinhos no canto superior direito)\n"
+                "3. Toque em **Adicionar à tela inicial** ou **Instalar app**\n"
+                "4. Confirme o nome → **Adicionar**\n\n"
+                "**Samsung Internet:**\n"
+                "1. Abra o site\n"
+                "2. Toque no **menu ☰**\n"
+                "3. **Adicionar página a** → **Tela inicial**"
+            )
+        st.caption(
+            "💡 Depois de instalado, o app abre em tela cheia sem barra do navegador — "
+            "experiência igual a um app nativo. E atualiza sozinho quando você abre (PWA)."
+        )
+
     st.markdown(
         f'<div class="eg-disclaimer">{T["disclaimer"]}</div>',
         unsafe_allow_html=True,
@@ -3150,6 +3198,13 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.markdown(
         f"<div style='text-align:center;color:#484f58;font-size:.6rem;margin-top:4px;'>"
         f"{T['footer_visits'].format(total=_visits_total, today=_visits_today)}"
+        f"</div>"
+        f"<div style='text-align:center;color:#8b949e;font-size:.72rem;margin-top:10px;'>"
+        f"<a href='?page=privacidade' target='_self' "
+        f"style='color:#8b949e;text-decoration:underline;'>Política de Privacidade</a>"
+        f" &middot; "
+        f"<a href='?page=termos' target='_self' "
+        f"style='color:#8b949e;text-decoration:underline;'>Termos de Uso</a>"
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -3161,6 +3216,17 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
 
 def main() -> None:
     _inject_css()
+
+    # ── Router: paginas legais via ?page=privacidade|termos ──────────────────
+    _q = st.query_params
+    _page_param = _q.get("page")
+    if _page_param in ("privacidade", "termos"):
+        from legal_pages import render_privacy_page, render_terms_page
+        if _page_param == "privacidade":
+            render_privacy_page()
+        else:
+            render_terms_page()
+        return
 
     # ── Session defaults ─────────────────────────────────────────────────────
     if "lang" not in st.session_state:
@@ -3230,26 +3296,67 @@ def main() -> None:
         """, height=0)
         st.session_state.home_icon_injected = True
 
-    # ── Google Analytics (injeta no parent DOM para garantir execução) ────────
-    if "ga_injected" not in st.session_state:
-        import streamlit.components.v1 as _ga_comp
-        _ga_comp.html("""
+    # ── Cookie banner LGPD + Google Analytics condicional ─────────────────────
+    # Banner aparece na primeira visita. Se usuario aceitar, GA carrega no
+    # parent DOM. Se recusar, nada de analytics. Estado em localStorage.
+    if "cookie_banner_injected" not in st.session_state:
+        import streamlit.components.v1 as _cb_comp
+        _cb_comp.html("""
         <script>
         (function() {
             var doc = window.parent.document;
-            if (doc.getElementById('eg-ga-script')) return;
-            var s1 = doc.createElement('script');
-            s1.id = 'eg-ga-script';
-            s1.async = true;
-            s1.src = 'https://www.googletagmanager.com/gtag/js?id=G-BBKMK9TL6P';
-            doc.head.appendChild(s1);
-            var s2 = doc.createElement('script');
-            s2.textContent = "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-BBKMK9TL6P');";
-            doc.head.appendChild(s2);
+            var pwin = window.parent;
+            if (doc.getElementById('eg-cookie-banner') || doc.getElementById('eg-ga-script')) return;
+
+            function loadGA() {
+                if (doc.getElementById('eg-ga-script')) return;
+                var s1 = doc.createElement('script');
+                s1.id = 'eg-ga-script';
+                s1.async = true;
+                s1.src = 'https://www.googletagmanager.com/gtag/js?id=G-BBKMK9TL6P';
+                doc.head.appendChild(s1);
+                var s2 = doc.createElement('script');
+                s2.textContent = "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-BBKMK9TL6P');";
+                doc.head.appendChild(s2);
+            }
+
+            var consent = null;
+            try { consent = pwin.localStorage.getItem('eg_cookie_consent'); } catch (e) {}
+
+            if (consent === 'accepted') { loadGA(); return; }
+            if (consent === 'rejected') { return; }
+
+            // Mostra banner
+            var bar = doc.createElement('div');
+            bar.id = 'eg-cookie-banner';
+            bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:999997;' +
+                'background:#161b22;border-top:1px solid #d4af37;padding:14px 18px;' +
+                'color:#e6edf3;font-family:Inter,system-ui,sans-serif;font-size:.84rem;' +
+                'display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;' +
+                'box-shadow:0 -4px 16px rgba(0,0,0,.5);';
+            bar.innerHTML =
+                '<div style="flex:1;min-width:260px;">' +
+                  'Usamos cookies para manter sua sessao e analisar uso agregado (Google Analytics). ' +
+                  'Voce pode recusar analytics. ' +
+                  '<a href="?page=privacidade" target="_self" style="color:#d4af37;text-decoration:underline;">Politica de Privacidade</a>' +
+                '</div>' +
+                '<button id="eg-cookie-reject" style="background:transparent;color:#8b949e;border:1px solid #30363d;border-radius:6px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:Inter,system-ui,sans-serif;">Recusar</button>' +
+                '<button id="eg-cookie-accept" style="background:#d4af37;color:#0d1117;border:none;border-radius:6px;padding:7px 16px;font-weight:800;cursor:pointer;font-family:Inter,system-ui,sans-serif;">Aceitar</button>';
+            doc.body.appendChild(bar);
+
+            doc.getElementById('eg-cookie-accept').onclick = function() {
+                try { pwin.localStorage.setItem('eg_cookie_consent', 'accepted'); } catch (e) {}
+                bar.remove();
+                loadGA();
+            };
+            doc.getElementById('eg-cookie-reject').onclick = function() {
+                try { pwin.localStorage.setItem('eg_cookie_consent', 'rejected'); } catch (e) {}
+                bar.remove();
+            };
         })();
         </script>
         """, height=0)
-        st.session_state.ga_injected = True
+        st.session_state.cookie_banner_injected = True
 
     # ── FAB — botão flutuante que abre/fecha sidebar no mobile ─────────────
     import streamlit.components.v1 as _components
