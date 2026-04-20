@@ -70,6 +70,7 @@ st.set_page_config(
 )
 
 _OG_IMAGE_URL = "https://raw.githubusercontent.com/PortinhoGit/equity-guard/main/assets/og-image.png"
+_APPLE_ICON_URL = "https://raw.githubusercontent.com/PortinhoGit/equity-guard/main/assets/apple-touch-icon.png"
 st.markdown(
     f"""<head>
     <meta property="og:title" content="Equity Guard — Terminal Financeiro"/>
@@ -81,6 +82,14 @@ st.markdown(
     <meta name="twitter:title" content="Equity Guard — Terminal Financeiro"/>
     <meta name="twitter:description" content="Análise técnica e fundamentalista de ações da B3 e indicadores macroeconômicos."/>
     <meta name="twitter:image" content="{_OG_IMAGE_URL}"/>
+    <!-- iOS "Adicionar a tela de inicio" — usa apple-touch-icon 180x180 -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{_APPLE_ICON_URL}"/>
+    <link rel="apple-touch-icon" href="{_APPLE_ICON_URL}"/>
+    <link rel="icon" type="image/png" href="{_APPLE_ICON_URL}"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+    <meta name="apple-mobile-web-app-title" content="Equity Guard"/>
+    <meta name="theme-color" content="#0d1117"/>
     </head>
     <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-BBKMK9TL6P"></script>
