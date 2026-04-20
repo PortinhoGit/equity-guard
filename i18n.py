@@ -87,11 +87,31 @@ _PT: dict = {
     "trend_neutral":     "TENDÊNCIA NEUTRA",
     "golden_cross":      "⭐ Golden Cross ativo (MM20 > MM200)",
     "death_cross":       "💀 Death Cross ativo (MM20 < MM200)",
+    "ma_short":          "MM20",
+    "ma_long":           "MM200",
     "overbought":        "Sobrecomprado",
     "oversold":          "Sobrevendido",
     "neutral_rsi":       "Neutro",
     # ── Gráfico ──────────────────────────────────────────────────────────────
     "chart_title":    "Gráfico Técnico — Candlestick + Zona de Valor",
+    "chart_help_title": "Como ler este gráfico",
+    "chart_help_body":  (
+        "Cada <b>vela (candle)</b> resume um período: corpo verde = fechou em alta, "
+        "corpo vermelho = fechou em baixa. Os fios finos (pavios) marcam a máxima e "
+        "a mínima do período.<br><br>"
+        "<b>Tendência pela estrutura dos preços:</b><br>"
+        "• <b>Fundos crescentes</b> (cada vale mais alto que o anterior) = <b>tendência de alta</b> — "
+        "compradores retomam controle antes de o preço recuar ao patamar anterior.<br>"
+        "• <b>Topos decrescentes</b> (cada pico mais baixo que o anterior) = <b>tendência de baixa</b> — "
+        "vendedores vencem antes de o preço superar a alta anterior.<br>"
+        "• <b>Topos e fundos no mesmo nível</b> = mercado lateral (sem direção definida).<br><br>"
+        "<b>Zona de Valor:</b> a <b>linha dourada</b> é o <b>Preço Teto (Barsi)</b> — "
+        "valor justo pela média histórica de dividendos. A <b>faixa verde</b> em volta é a "
+        "<b>Zona de Valor (±8%)</b>. Abaixo da faixa = comprar (desconto); dentro = manter; "
+        "acima = evitar novas compras (caro).<br><br>"
+        "<b>Painel inferior — RSI (14):</b> acima de 70 = sobrecomprado (possível correção); "
+        "abaixo de 30 = sobrevendido (possível repique); entre 30 e 70 = neutro."
+    ),
     "zone_legend":    "Zona de Valor (±8%)",
     "top_marker":     "Topo",
     "bottom_marker":  "Fundo",
@@ -460,10 +480,29 @@ _EN: dict = {
     "trend_neutral":     "NEUTRAL TREND",
     "golden_cross":      "⭐ Golden Cross active (MA20 > MA200)",
     "death_cross":       "💀 Death Cross active (MA20 < MA200)",
+    "ma_short":          "MA20",
+    "ma_long":           "MA200",
     "overbought":        "Overbought",
     "oversold":          "Oversold",
     "neutral_rsi":       "Neutral",
     "chart_title":    "Technical Chart — Candlestick + Value Zone",
+    "chart_help_title": "How to read this chart",
+    "chart_help_body":  (
+        "Each <b>candle</b> summarizes a period: green body = closed up, red body = "
+        "closed down. The thin wicks mark the period's high and low.<br><br>"
+        "<b>Trend by price structure:</b><br>"
+        "• <b>Higher lows</b> (each dip above the previous one) = <b>uptrend</b> — "
+        "buyers regain control before the price retraces to prior levels.<br>"
+        "• <b>Lower highs</b> (each peak below the previous one) = <b>downtrend</b> — "
+        "sellers take over before the price exceeds the previous high.<br>"
+        "• <b>Highs and lows at the same level</b> = sideways market (no clear direction).<br><br>"
+        "<b>Value Zone:</b> the <b>gold line</b> is the <b>Ceiling Price (Barsi)</b> — "
+        "fair value based on historical dividend average. The <b>green band</b> around it "
+        "is the <b>Value Zone (±8%)</b>. Below the band = buy (discount); inside = hold; "
+        "above = avoid new purchases (expensive).<br><br>"
+        "<b>Lower panel — RSI (14):</b> above 70 = overbought (possible pullback); "
+        "below 30 = oversold (possible rebound); 30-70 = neutral."
+    ),
     "zone_legend":    "Value Zone (±8%)",
     "top_marker":     "Top",
     "bottom_marker":  "Bottom",
@@ -826,10 +865,29 @@ _ES: dict = {
     "trend_neutral":     "TENDENCIA NEUTRAL",
     "golden_cross":      "⭐ Golden Cross activo (MM20 > MM200)",
     "death_cross":       "💀 Death Cross activo (MM20 < MM200)",
+    "ma_short":          "MM20",
+    "ma_long":           "MM200",
     "overbought":        "Sobrecomprado",
     "oversold":          "Sobrevendido",
     "neutral_rsi":       "Neutral",
     "chart_title":    "Gráfico Técnico — Candlestick + Zona de Valor",
+    "chart_help_title": "Cómo leer este gráfico",
+    "chart_help_body":  (
+        "Cada <b>vela (candle)</b> resume un período: cuerpo verde = cerró en alza, "
+        "cuerpo rojo = cerró a la baja. Las mechas marcan el máximo y el mínimo.<br><br>"
+        "<b>Tendencia por la estructura de los precios:</b><br>"
+        "• <b>Mínimos crecientes</b> (cada valle más alto que el anterior) = <b>tendencia alcista</b> — "
+        "compradores retoman control antes de que el precio vuelva al nivel anterior.<br>"
+        "• <b>Máximos decrecientes</b> (cada pico más bajo que el anterior) = <b>tendencia bajista</b> — "
+        "vendedores vencen antes de que el precio supere el máximo anterior.<br>"
+        "• <b>Máximos y mínimos en el mismo nivel</b> = mercado lateral (sin dirección definida).<br><br>"
+        "<b>Zona de Valor:</b> la <b>línea dorada</b> es el <b>Precio Techo (Barsi)</b> — "
+        "valor justo según el promedio histórico de dividendos. La <b>banda verde</b> alrededor "
+        "es la <b>Zona de Valor (±8%)</b>. Debajo de la banda = comprar (descuento); dentro = "
+        "mantener; arriba = evitar nuevas compras (caro).<br><br>"
+        "<b>Panel inferior — RSI (14):</b> sobre 70 = sobrecomprado (posible corrección); "
+        "bajo 30 = sobrevendido (posible rebote); 30-70 = neutro."
+    ),
     "zone_legend":    "Zona de Valor (±8%)",
     "top_marker":     "Techo",
     "bottom_marker":  "Piso",

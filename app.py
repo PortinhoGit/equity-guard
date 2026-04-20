@@ -499,6 +499,97 @@ def _fetch_quick_history(ticker: str, period: str) -> Optional[pd.DataFrame]:
     return get_stock_history(ticker, period)
 
 
+@st.cache_data(ttl=120, show_spinner=False)
+def _fetch_intraday(ticker: str, interval: str, period: str) -> Optional[pd.DataFrame]:
+    """
+    Fetch intraday OHLC+Volume. TTL curto (2 min) porque intraday muda rapido.
+    yfinance limits:
+      - 5m: periodo max 60 dias
+      - 15m/30m: 60 dias
+      - 1h: 730 dias
+    """
+    import yfinance as yf
+    ticker_sa = normalize_ticker(ticker)
+    try:
+        tk = yf.Ticker(ticker_sa)
+        df = tk.history(period=period, interval=interval, auto_adjust=True)
+        if df is None or df.empty:
+            return None
+        df.index = pd.to_datetime(df.index)
+        if df.index.tz is not None:
+            df.index = df.index.tz_convert("America/Sao_Paulo").tz_localize(None)
+        return df
+    except Exception:
+        return None
+
+
+def _intraday_chart(df: pd.DataFrame, T: dict, cs: str, interval_label: str) -> "go.Figure":
+    """
+    Grafico intraday estilo TradingView: candles + MM9/MM21 (medias curtas,
+    padrao intraday) + subplot de volume. Sem Preco Teto Barsi, sem Zona
+    de Valor, sem MM longa — esses sao referenciais de longo prazo.
+    """
+    df_i = df.copy()
+    df_i["MM9"] = df_i["Close"].rolling(9).mean()
+    df_i["MM21"] = df_i["Close"].rolling(21).mean()
+    # Labels locale-aware (MM em PT/ES, MA em EN)
+    _mm_prefix = "MM" if T.get("ma_short", "MA20").startswith("MM") else "MA"
+
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True,
+        row_heights=[.76, .24], vertical_spacing=.03,
+        subplot_titles=(f"{T['chart_title']} · {interval_label}", "Volume"),
+    )
+    fig.add_trace(go.Candlestick(
+        x=df_i.index, open=df_i["Open"], high=df_i["High"],
+        low=df_i["Low"], close=df_i["Close"], name="Price",
+        increasing=dict(line=dict(color="#58a6ff"), fillcolor="#58a6ff"),
+        decreasing=dict(line=dict(color="#dc2626"), fillcolor="#dc2626"),
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=df_i.index, y=df_i["MM9"], name=f"{_mm_prefix}9",
+        line=dict(color="#e3b341", width=1.4),
+        hovertemplate=f"{_mm_prefix}9: {cs} %{{y:.2f}}<extra></extra>",
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=df_i.index, y=df_i["MM21"], name=f"{_mm_prefix}21",
+        line=dict(color="#bc8cff", width=1.6),
+        hovertemplate=f"{_mm_prefix}21: {cs} %{{y:.2f}}<extra></extra>",
+    ), row=1, col=1)
+
+    if "Volume" in df_i.columns:
+        _vcolors = [
+            "#58a6ff" if c >= o else "#dc2626"
+            for o, c in zip(df_i["Open"], df_i["Close"])
+        ]
+        fig.add_trace(go.Bar(
+            x=df_i.index, y=df_i["Volume"], name="Volume",
+            marker=dict(color=_vcolors, line=dict(width=0)),
+            hovertemplate="Volume: %{y:,.0f}<extra></extra>",
+        ), row=2, col=1)
+
+    fig.update_layout(
+        height=560, margin=dict(l=10, r=10, t=40, b=10),
+        paper_bgcolor="#0d1117", plot_bgcolor="#0d1117",
+        font=dict(color="#e6edf3", family="Inter, system-ui, sans-serif"),
+        xaxis_rangeslider_visible=False,
+        xaxis2_rangeslider_visible=False,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+        showlegend=True,
+    )
+    # rangebreaks: esconde fins de semana + horas fora de pregao B3 (10h-18h BRT).
+    # Assim candles ficam concentrados nas sessoes reais, sem espacos mortos.
+    fig.update_xaxes(
+        gridcolor="#21262d", zerolinecolor="#21262d",
+        rangebreaks=[
+            dict(bounds=["sat", "mon"]),
+            dict(bounds=[18, 10], pattern="hour"),
+        ],
+    )
+    fig.update_yaxes(gridcolor="#21262d", zerolinecolor="#21262d")
+    return fig
+
+
 @st.cache_data(ttl=600, show_spinner=False)
 def _fetch_fx_usdbrl() -> Optional[dict]:
     """Cached wrapper for the USDBRL macro panel (10-min TTL)."""
@@ -2666,9 +2757,36 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             unsafe_allow_html=True,
         )
 
-        # ── Explicacao curta do "porque" da tendencia ─────────────────────────
+        # ── MM20 / MM200 cards (dados brutos) ─────────────────────────────────
         _ma20 = trend.get("ma20")
         _ma200 = trend.get("ma200")
+        _lbl_short = T.get("ma_short", "MA20")
+        _lbl_long = T.get("ma_long", "MA200")
+        _ma_items = []
+        for ma_val, ma_lbl in [(_ma20, _lbl_short), (_ma200, _lbl_long)]:
+            if ma_val:
+                diff = ((price - ma_val) / ma_val) * 100
+                _diff_c = "#58a6ff" if diff > 0 else "#dc2626"
+                _ma_items.append((ma_lbl, f"{cs} {ma_val:.2f}", f"{diff:+.1f}%", _diff_c))
+        if _ma_items:
+            _ma_html = (
+                "<style>.eq-ma{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}</style>"
+                "<div class='eq-ma'>"
+            )
+            for _ml, _mv, _md, _mc in _ma_items:
+                _ma_html += (
+                    f"<div style='background:#161b22;border:1px solid #30363d;"
+                    f"border-radius:10px;padding:8px 6px;text-align:center;'>"
+                    f"<div style='font-size:.78rem;color:#ffffff;margin-bottom:4px;"
+                    f"line-height:1.2;font-weight:800;letter-spacing:.4px;'>{_ml}</div>"
+                    f"<div style='font-size:.95rem;font-weight:800;color:#e6edf3;'>{_mv}</div>"
+                    f"<div style='font-size:.68rem;color:{_mc};margin-top:2px;font-weight:700;'>{_md}</div>"
+                    f"</div>"
+                )
+            _ma_html += "</div>"
+            st.markdown(_ma_html, unsafe_allow_html=True)
+
+        # ── Veredito consolidado: cruz + explicacao "porque" ──────────────────
         _why = None
         if _ma20 and _ma200:
             _spread = ((_ma20 - _ma200) / _ma200) * 100
@@ -2699,39 +2817,36 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
                     f"MA20 ({cs} {_ma20:.2f}) e MA200 ({cs} {_ma200:.2f}) praticamente coladas "
                     f"(<b>{_spread:+.1f}%</b>) — mercado sem direção clara no momento."
                 )
-        if _why:
+
+        _cross_lbl = None
+        _cross_bg = None
+        _cross_border = None
+        if trend.get("golden_cross"):
+            _cross_lbl = T["golden_cross"]
+            _cross_bg = "rgba(63,185,80,.10)"
+            _cross_border = "#3fb950"
+        elif trend.get("death_cross"):
+            _cross_lbl = T["death_cross"]
+            _cross_bg = "rgba(248,81,73,.10)"
+            _cross_border = "#f85149"
+
+        if _cross_lbl or _why:
+            _header = (
+                f"<div style='font-size:.86rem;font-weight:800;color:#e6edf3;margin-bottom:6px;'>"
+                f"{_cross_lbl}</div>" if _cross_lbl else ""
+            )
+            _body = (
+                f"<div style='font-size:.78rem;color:#c9d1d9;line-height:1.5;'>{_why}</div>"
+                if _why else ""
+            )
+            _bg = _cross_bg or "#161b22"
+            _border = _cross_border or t_color
             st.markdown(
-                f"<div style='font-size:.78rem;color:#8b949e;line-height:1.5;"
-                f"margin:-4px 0 10px;padding:8px 12px;background:#161b22;"
-                f"border-left:2px solid {t_color};border-radius:4px;'>{_why}</div>",
+                f"<div style='margin-top:10px;padding:10px 14px;background:{_bg};"
+                f"border:1px solid {_border};border-radius:8px;'>"
+                f"{_header}{_body}</div>",
                 unsafe_allow_html=True,
             )
-        _ma_items = []
-        for ma_val, ma_lbl in [(trend.get("ma20"), "MA20"), (trend.get("ma200"), "MA200")]:
-            if ma_val:
-                diff = ((price - ma_val) / ma_val) * 100
-                _diff_c = "#58a6ff" if diff > 0 else "#dc2626"
-                _ma_items.append((ma_lbl, f"{cs} {ma_val:.2f}", f"{diff:+.1f}%", _diff_c))
-        if _ma_items:
-            _ma_html = (
-                "<style>.eq-ma{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}</style>"
-                "<div class='eq-ma'>"
-            )
-            for _ml, _mv, _md, _mc in _ma_items:
-                _ma_html += (
-                    f"<div style='background:#161b22;border:1px solid #30363d;"
-                    f"border-radius:10px;padding:8px 6px;text-align:center;'>"
-                    f"<div style='font-size:.6rem;color:#6e7681;margin-bottom:3px;line-height:1.2;'>{_ml}</div>"
-                    f"<div style='font-size:.95rem;font-weight:800;color:#e6edf3;'>{_mv}</div>"
-                    f"<div style='font-size:.68rem;color:{_mc};margin-top:2px;font-weight:700;'>{_md}</div>"
-                    f"</div>"
-                )
-            _ma_html += "</div>"
-            st.markdown(_ma_html, unsafe_allow_html=True)
-        if trend.get("golden_cross"):
-            st.success(T["golden_cross"])
-        elif trend.get("death_cross"):
-            st.error(T["death_cross"])
 
         rsi_bar_c = "#dc2626" if rsi_now > 70 else ("#58a6ff" if rsi_now < 30 else "#e3b341")
         st.markdown(
@@ -2752,12 +2867,69 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ── Main chart ────────────────────────────────────────────────────────────
     st.markdown('<div class="eg-nav-anchor" id="sec-tecnico"></div>' + _ticker_chip_html, unsafe_allow_html=True)
     st.markdown(f'<div class="eg-section-header">{T["chart_title"]}</div>', unsafe_allow_html=True)
-    try:
-        st.plotly_chart(
-            _main_chart(df, teto, ticker, T, cs=cs),
-            use_container_width=True,
-            config={"displayModeBar": False, "displaylogo": False},
+    with st.expander(f"📘 {T['chart_help_title']}", expanded=True):
+        st.markdown(
+            f"<div style='font-size:.84rem;line-height:1.55;color:#c9d1d9;'>"
+            f"{T['chart_help_body']}</div>",
+            unsafe_allow_html=True,
         )
+
+    # Seletor de periodo + agregacao. Intraday (5m/15m/1h) vai direto pra
+    # _intraday_chart (sem Barsi/Zona/MM200 — MMs curtas MM9/MM21). Demais usam
+    # o grafico principal com Barsi e MMs longas.
+    # Layout: tupla = (label, period_arg, granularity, interval_for_fetch)
+    _chart_options = [
+        ("5m",            "1d",  "I", "5m"),   # so sessao atual
+        ("15m",           "5d",  "I", "15m"),  # ultimos 5 pregoes
+        ("1h",            "1mo", "I", "1h"),   # ultimo mes
+        ("1M",            22,    "D", None),
+        ("3M",            66,    "D", None),
+        ("6M",            132,   "D", None),
+        ("1A",            252,   "D", None),
+        ("2A · semanal",  104,   "W", None),
+        ("5A · semanal",  260,   "W", None),
+        ("Tudo · mensal", None,  "M", None),
+    ]
+    _chart_period = st.radio(
+        "Período do gráfico",
+        options=[lbl for lbl, _, _, _ in _chart_options],
+        index=4,  # 3M diario por default (posicao 4 agora que os intraday vieram antes)
+        horizontal=True,
+        key="chart_period_selector",
+        label_visibility="collapsed",
+    )
+    _opt_map = {lbl: (arg, gran, interval) for lbl, arg, gran, interval in _chart_options}
+    _period_arg, _granularity, _interval = _opt_map[_chart_period]
+
+    try:
+        if _granularity == "I":
+            _df_intra = _fetch_intraday(ticker, _interval, _period_arg)
+            if _df_intra is None or _df_intra.empty:
+                st.warning(
+                    f"Sem dados intraday disponiveis para {_chart_period}. "
+                    f"Tente um periodo maior (1M, 3M...) ou aguarde o mercado abrir."
+                )
+            else:
+                st.plotly_chart(
+                    _intraday_chart(_df_intra, T, cs=cs, interval_label=_chart_period),
+                    use_container_width=True,
+                    config={"displayModeBar": False, "displaylogo": False},
+                )
+        else:
+            if _granularity == "D":
+                _df_chart = df.tail(_period_arg) if _period_arg else df
+            else:
+                _rule = "W-FRI" if _granularity == "W" else "ME"
+                _agg = {"Open": "first", "High": "max", "Low": "min", "Close": "last"}
+                if "Volume" in df.columns:
+                    _agg["Volume"] = "sum"
+                _df_resampled = df.resample(_rule).agg(_agg).dropna(how="all")
+                _df_chart = _df_resampled.tail(_period_arg) if _period_arg else _df_resampled
+            st.plotly_chart(
+                _main_chart(_df_chart, teto, ticker, T, cs=cs),
+                use_container_width=True,
+                config={"displayModeBar": False, "displaylogo": False},
+            )
     except Exception as e:
         st.error(f"Chart error: {e}")
 
