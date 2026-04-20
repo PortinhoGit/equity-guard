@@ -533,15 +533,45 @@ def _fetch_full_data(ticker: str, period: str):
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_prevdow_live() -> dict:
     """
-    Scraper PrevDow com cache 1h. Retorna dict merged com PREVDOW_DATA.
-    Se scraper falhar, retorna PREVDOW_DATA do config.
+    Busca rentabilidade PrevDow. Prioridade:
+      1) Supabase (tabela prevdow_history) — mais recente, alimentada por
+         cron job GitHub Actions (check_prevdow.py a partir do dia 15 do mes)
+      2) Scraper ao vivo do portal (fallback em tempo real)
+      3) config.PREVDOW_DATA (fallback ultimo recurso)
+    Retorna dict com mesmo shape do PREVDOW_DATA.
+    Cache 1h.
     """
+    merged = dict(PREVDOW_DATA)
+
+    # 1) Tenta Supabase — pega a linha mais recente (data_base maior)
+    try:
+        from auth.supabase_client import get_client
+        client = get_client()
+        if client is not None:
+            res = (
+                client.table("prevdow_history")
+                .select("*")
+                .order("data_base", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if res.data:
+                row = res.data[0]
+                merged["data_base"] = row.get("data_base") or merged["data_base"]
+                for k in ("cdi_month", "balanced_month", "cdi_year", "balanced_year"):
+                    v = row.get(k)
+                    if v is not None:
+                        merged[k] = float(v)
+                return merged
+    except Exception:
+        pass
+
+    # 2) Scraper ao vivo
     try:
         from data.prevdow_scraper import get_rentabilidade_prevdow
         live = get_rentabilidade_prevdow()
     except Exception:
         live = None
-    merged = dict(PREVDOW_DATA)
     if live:
         if live.get("data_base"):
             merged["data_base"] = live["data_base"]
@@ -549,6 +579,8 @@ def _fetch_prevdow_live() -> dict:
             merged["cdi_month"] = live["cdi_month"]
         if live.get("balanced_month") is not None:
             merged["balanced_month"] = live["balanced_month"]
+
+    # 3) Fallback: config (ja era o valor inicial de merged)
     return merged
 
 

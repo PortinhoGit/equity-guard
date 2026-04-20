@@ -1,0 +1,49 @@
+name: PrevDow Monthly Check
+
+# 4 horarios por dia, em BRT: 06h, 12h, 18h, 24h (0h).
+# BRT = UTC-3, entao: 9h, 15h, 21h, 3h UTC.
+# O script so faz algo a partir do dia 15 do mes (corte interno).
+on:
+  schedule:
+    - cron: '0 9 * * *'    # 06h BRT
+    - cron: '0 15 * * *'   # 12h BRT
+    - cron: '0 21 * * *'   # 18h BRT
+    - cron: '0 3 * * *'    # 00h BRT
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Ignorar corte de dia 15 (testar agora)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install supabase requests beautifulsoup4
+
+      - name: Check PrevDow
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SMTP_HOST:            ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:            ${{ secrets.SMTP_PORT }}
+          SMTP_USER:            ${{ secrets.SMTP_USER }}
+          SMTP_PASS:            ${{ secrets.SMTP_PASS }}
+          SMTP_FROM:            ${{ secrets.SMTP_FROM }}
+          NOTIFY_EMAIL:         ${{ secrets.SMTP_USER }}
+          FORCE_RUN:            ${{ inputs.force && '1' || '' }}
+        run: python check_prevdow.py
