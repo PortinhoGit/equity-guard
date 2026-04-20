@@ -13,6 +13,35 @@ from market_status import get_status_mercado, dia_util_anterior
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# ── Sentry (observabilidade de erros em producao) ────────────────────────────
+# So inicializa se o secret SENTRY_DSN estiver presente. Scrub PII por default.
+def _init_sentry() -> None:
+    try:
+        import streamlit as _st
+        dsn = _st.secrets.get("SENTRY_DSN")
+    except Exception:
+        return
+    if not dsn:
+        return
+    try:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=dsn,
+            # Taxa de amostragem de transacoes (performance). 0.1 = 10% dos requests.
+            traces_sample_rate=0.1,
+            # Nao envia PII do usuario (IP, headers com token) por padrao.
+            send_default_pii=False,
+            # Contexto do release para rastrear erros por versao.
+            release=f"equity-guard@{os.environ.get('APP_VERSION', 'dev')}",
+            environment=os.environ.get("SENTRY_ENV", "production"),
+        )
+    except Exception:
+        # Se Sentry falhar, o app continua funcionando normal.
+        pass
+
+
+_init_sentry()
+
 import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
