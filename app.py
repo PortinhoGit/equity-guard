@@ -3171,6 +3171,65 @@ def main() -> None:
 
     T    = get_translator()
 
+    # ── iOS/Android home-screen metadata (injeta no parent head) ────────────
+    # Streamlit sobrepoe nosso <link rel="apple-touch-icon"> com o dele (barco).
+    # Workaround: via JS, REMOVE o default e INSERT os nossos no head real.
+    if "home_icon_injected" not in st.session_state:
+        import streamlit.components.v1 as _icon_comp
+        _icon_comp.html(f"""
+        <script>
+        (function() {{
+            var doc = window.parent.document;
+            if (doc.getElementById('eg-home-meta')) return;
+            // Remove icones/tags default do Streamlit
+            var selectors = [
+                'link[rel="apple-touch-icon"]',
+                'link[rel="apple-touch-icon-precomposed"]',
+                'link[rel="shortcut icon"]',
+                'link[rel="icon"]',
+                'meta[name="apple-mobile-web-app-title"]',
+                'meta[name="apple-mobile-web-app-capable"]',
+                'meta[name="apple-mobile-web-app-status-bar-style"]',
+                'meta[name="theme-color"]',
+            ];
+            selectors.forEach(function(sel) {{
+                doc.querySelectorAll(sel).forEach(function(n) {{ n.remove(); }});
+            }});
+            // Adiciona os nossos
+            var icon = doc.createElement('link');
+            icon.id = 'eg-home-meta';
+            icon.rel = 'apple-touch-icon';
+            icon.setAttribute('sizes', '180x180');
+            icon.href = '{_APPLE_ICON_URL}';
+            doc.head.appendChild(icon);
+            var icon2 = doc.createElement('link');
+            icon2.rel = 'icon';
+            icon2.type = 'image/png';
+            icon2.href = '{_APPLE_ICON_URL}';
+            doc.head.appendChild(icon2);
+            var m1 = doc.createElement('meta');
+            m1.name = 'apple-mobile-web-app-title';
+            m1.content = 'Equity Guard';
+            doc.head.appendChild(m1);
+            var m2 = doc.createElement('meta');
+            m2.name = 'apple-mobile-web-app-capable';
+            m2.content = 'yes';
+            doc.head.appendChild(m2);
+            var m3 = doc.createElement('meta');
+            m3.name = 'apple-mobile-web-app-status-bar-style';
+            m3.content = 'black-translucent';
+            doc.head.appendChild(m3);
+            var m4 = doc.createElement('meta');
+            m4.name = 'theme-color';
+            m4.content = '#0d1117';
+            doc.head.appendChild(m4);
+            // Forca o titulo da aba tambem (iOS usa como nome default do atalho)
+            doc.title = 'Equity Guard';
+        }})();
+        </script>
+        """, height=0)
+        st.session_state.home_icon_injected = True
+
     # ── Google Analytics (injeta no parent DOM para garantir execução) ────────
     if "ga_injected" not in st.session_state:
         import streamlit.components.v1 as _ga_comp
