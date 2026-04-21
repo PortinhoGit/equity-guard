@@ -1175,20 +1175,32 @@ def _render_market_movers(T: dict) -> None:
         st.caption("Sem dados de mercado no momento.")
         return
 
+    from data.tickers_b3 import popular_name
+
     def _render_row(r: dict) -> str:
         _color = "#3fb950" if r["chg"] >= 0 else "#dc2626"
         _chg = f"{r['chg']:+.2f}%"
         _price = f"R$ {r['last']:.2f}"
+        _popular = popular_name(r["ticker"])
+        _name_line = (
+            f"<div style='color:#8b949e;font-size:.66rem;line-height:1.1;"
+            f"margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+            f"max-width:130px;'>{_popular}</div>"
+            if _popular else ""
+        )
         return (
             f"<a href='?t={r['ticker']}' target='_self' style='text-decoration:none;'>"
             f"<div style='display:flex;justify-content:space-between;align-items:center;"
             f"padding:7px 10px;background:#161b22;border:1px solid #21262d;border-radius:6px;"
-            f"margin-bottom:4px;font-size:.82rem;transition:border-color .15s;'>"
-            f"<span style='font-weight:800;color:#e6edf3;letter-spacing:.3px;'>{r['ticker']}</span>"
-            f"<span style='display:flex;gap:8px;align-items:baseline;'>"
-            f"<span style='color:#6e7681;font-size:.72rem;'>{_price}</span>"
-            f"<span style='color:{_color};font-weight:800;min-width:64px;text-align:right;'>{_chg}</span>"
-            f"</span></div></a>"
+            f"margin-bottom:4px;font-size:.82rem;transition:border-color .15s;gap:8px;'>"
+            f"<div style='min-width:0;flex:1;'>"
+            f"<div style='font-weight:800;color:#e6edf3;letter-spacing:.3px;line-height:1.15;'>{r['ticker']}</div>"
+            f"{_name_line}"
+            f"</div>"
+            f"<div style='display:flex;flex-direction:column;align-items:flex-end;gap:1px;'>"
+            f"<span style='color:{_color};font-weight:800;font-size:.82rem;'>{_chg}</span>"
+            f"<span style='color:#6e7681;font-size:.66rem;'>{_price}</span>"
+            f"</div></div></a>"
         )
 
     def _render_col(title: str, items: list) -> str:
