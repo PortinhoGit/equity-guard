@@ -538,16 +538,20 @@ def _fetch_prevdow_live() -> dict:
          cron job GitHub Actions (check_prevdow.py a partir do dia 15 do mes)
       2) Scraper ao vivo do portal (fallback em tempo real)
       3) config.PREVDOW_DATA (fallback ultimo recurso)
-    Retorna dict com mesmo shape do PREVDOW_DATA.
+    Retorna dict com mesmo shape do PREVDOW_DATA + chave _source com
+    identificador da origem (supabase/scraper/config) pra debug.
     Cache 1h.
     """
     merged = dict(PREVDOW_DATA)
+    merged["_source"] = "config"   # default: fallback
 
     # 1) Tenta Supabase — pega a linha mais recente (data_base maior)
     try:
         from auth.supabase_client import get_client
         client = get_client()
-        if client is not None:
+        if client is None:
+            merged["_source"] = "config (supabase client None)"
+        else:
             res = (
                 client.table("prevdow_history")
                 .select("*")
@@ -562,9 +566,12 @@ def _fetch_prevdow_live() -> dict:
                     v = row.get(k)
                     if v is not None:
                         merged[k] = float(v)
+                merged["_source"] = "supabase"
                 return merged
-    except Exception:
-        pass
+            else:
+                merged["_source"] = "config (supabase vazio)"
+    except Exception as e:
+        merged["_source"] = f"config (supabase erro: {type(e).__name__})"
 
     # 2) Scraper ao vivo
     try:
@@ -579,8 +586,8 @@ def _fetch_prevdow_live() -> dict:
             merged["cdi_month"] = live["cdi_month"]
         if live.get("balanced_month") is not None:
             merged["balanced_month"] = live["balanced_month"]
+        merged["_source"] = "scraper"
 
-    # 3) Fallback: config (ja era o valor inicial de merged)
     return merged
 
 
@@ -1752,6 +1759,12 @@ def _render_prevdow_panel(T: dict) -> None:
         f"{T['prevdow_source']}</div>",
         unsafe_allow_html=True,
     )
+
+    # DEBUG so pra admin: mostra de onde vieram os dados.
+    _u = st.session_state.get("user") or {}
+    if _u.get("is_admin"):
+        _src = d.get("_source", "?")
+        st.caption(f"🔧 admin debug — fonte dos dados PrevDow: `{_src}`")
 
 
 def _render_nitro_panel(T: dict) -> None:
