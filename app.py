@@ -1007,12 +1007,14 @@ def _fmt_index_value(val: float, locale: str) -> str:
 def _maybe_pension_alert(T: dict) -> None:
     """
     After the 15th, shows a clickable banner that opens the sidebar (pension).
-    Resets when PREVDOW_DATA["data_base"] changes.
+    Usa a data_base do Supabase (via _fetch_prevdow_live) para refletir o mes
+    mais recentemente capturado, nao o config estatico. Reset quando ref muda.
     """
     today = pd.Timestamp.now()
     if today.day < 15:
         return
-    ref      = PREVDOW_DATA.get("data_base", "")
+    _live = _fetch_prevdow_live()
+    ref = _live.get("data_base") if _live else PREVDOW_DATA.get("data_base", "")
     seen_key = f"_pension_seen_{ref}"
     if not ref or st.session_state.get(seen_key):
         return
