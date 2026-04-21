@@ -58,3 +58,75 @@ BDRS = [
 ]
 
 ALL_TICKERS_B3 = sorted(set(ACOES + FIIS + ETFS + BDRS))
+
+
+# Nome popular/comercial por ticker — usado nos paineis de mercado para
+# que o usuario reconheca rapidamente a empresa (ex: PETR4 -> "Petrobras").
+POPULAR_NAMES: dict = {
+    # Grandes bancos
+    "BBAS3": "Banco do Brasil", "BBDC3": "Bradesco", "BBDC4": "Bradesco",
+    "ITUB4": "Itaú", "ITSA4": "Itaúsa", "SANB11": "Santander",
+    "BPAC11": "BTG Pactual", "BBSE3": "BB Seguridade",
+    # Petroleo/Energia
+    "PETR3": "Petrobras", "PETR4": "Petrobras",
+    "PRIO3": "PRIO", "RRRP3": "3R Petroleum", "RAIZ4": "Raízen",
+    "UGPA3": "Ultrapar", "VBBR3": "Vibra", "CSAN3": "Cosan",
+    # Eletricas
+    "ELET3": "Eletrobras", "ELET6": "Eletrobras", "CMIG4": "Cemig",
+    "CPFE3": "CPFL", "CPLE6": "Copel", "EGIE3": "Engie", "EQTL3": "Equatorial",
+    "ENEV3": "Eneva", "ENGI11": "Energisa", "TAEE11": "Taesa", "TRPL4": "ISA CTEEP",
+    # Mineracao/Siderurgia
+    "VALE3": "Vale", "CSNA3": "CSN", "CMIN3": "CSN Mineração",
+    "GGBR4": "Gerdau", "GOAU4": "Gerdau Metalúrgica",
+    "USIM5": "Usiminas", "BRAP4": "Bradespar",
+    # Papel/Celulose
+    "SUZB3": "Suzano", "KLBN11": "Klabin", "DXCO3": "Dexco",
+    # Varejo
+    "LREN3": "Lojas Renner", "MGLU3": "Magalu", "AMER3": "Americanas",
+    "SOMA3": "Grupo Soma", "PETZ3": "Petz", "CVCB3": "CVC",
+    "ALPA4": "Alpargatas", "GRND3": "Grendene", "VULC3": "Vulcabras",
+    "CASH3": "Méliuz", "LWSA3": "Locaweb",
+    # Supermercados
+    "PCAR3": "Pão de Açúcar", "CRFB3": "Carrefour", "ASAI3": "Assaí",
+    # Alimentos/Bebidas
+    "ABEV3": "Ambev", "JBSS3": "JBS", "BRFS3": "BRF",
+    "BEEF3": "Minerva", "MRFG3": "Marfrig",
+    "SLCE3": "SLC Agrícola", "SMTO3": "São Martinho",
+    # Construcao/Shoppings
+    "CYRE3": "Cyrela", "MRVE3": "MRV", "EZTC3": "EZTec", "JHSF3": "JHSF",
+    "MULT3": "Multiplan", "IGTI11": "Iguatemi", "ALOS3": "Allos",
+    # Industria/Logistica
+    "WEGE3": "WEG", "EMBR3": "Embraer",
+    "RAIL3": "Rumo", "CCRO3": "CCR", "ECOR3": "EcoRodovias",
+    "AZUL4": "Azul", "GOLL4": "Gol",
+    "TUPY3": "Tupy", "POSI3": "Positivo",
+    # Saude
+    "HAPV3": "Hapvida", "RDOR3": "Rede D'Or", "FLRY3": "Fleury",
+    "RADL3": "Raia Drogasil", "QUAL3": "Qualicorp",
+    "HYPE3": "Hypera", "NTCO3": "Natura",
+    # Educacao
+    "COGN3": "Cogna", "YDUQ3": "Yduqs",
+    # Telecom
+    "VIVT3": "Vivo", "TIMS3": "TIM",
+    # Quimica/Outros
+    "BRKM5": "Braskem", "IRBR3": "IRB Brasil Re",
+    "CIEL3": "Cielo", "B3SA3": "B3",
+    "TOTS3": "Totvs", "RENT3": "Localiza",
+    "SBSP3": "Sabesp",
+    # FIIs mais negociados
+    "BCFF11": "BC Fund", "HGLG11": "CSHG Logística", "HGRE11": "CSHG Real Estate",
+    "KNCR11": "Kinea Rendimentos", "KNRI11": "Kinea Renda Imobiliária",
+    "MXRF11": "Maxi Renda", "XPLG11": "XP Log", "XPML11": "XP Malls",
+    # ETFs
+    "BOVA11": "iShares Ibovespa", "IVVB11": "iShares S&P 500",
+    "SMAL11": "iShares Small Caps",
+    # BDRs
+    "AAPL34": "Apple", "AMZO34": "Amazon", "GOGL34": "Alphabet",
+    "META34": "Meta", "MSFT34": "Microsoft", "NFLX34": "Netflix",
+    "NVDC34": "Nvidia", "TSLA34": "Tesla", "DISB34": "Disney",
+}
+
+
+def popular_name(ticker: str) -> str:
+    """Retorna nome popular/comercial do ticker, ou o proprio ticker se desconhecido."""
+    return POPULAR_NAMES.get(ticker.upper().strip(), "")
