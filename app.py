@@ -1218,15 +1218,23 @@ def _render_economy_overview(T: dict) -> None:
                 st.caption("Dados do BCB indisponíveis no momento.")
             else:
                 import plotly.graph_objects as go
+                import math
+                _MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                             "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
                 _x = [pd.to_datetime(r["data"], format="%d/%m/%Y") for r in _data]
                 _y = [r["valor"] for r in _data]
+                _labels = [[f"{_MESES_PT[d.month - 1]} {d.year}", f"{v:.2f}".replace(".", ",")]
+                           for d, v in zip(_x, _y)]
                 _last = _y[-1]
                 _last_date = _x[-1].strftime("%d/%m/%Y")
+                _y_min = math.floor(min(_y) * 2) / 2 - 0.5
+                _y_max = math.ceil(max(_y) * 2) / 2 + 0.5
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
                     x=_x, y=_y, mode="lines",
                     line=dict(color="#58a6ff", width=2.5, shape="hv"),
-                    hovertemplate="%{x|%d/%m/%Y}: %{y:.2f}%<extra></extra>",
+                    customdata=_labels,
+                    hovertemplate="<b>%{customdata[0]}</b><br>Meta Selic: <b>%{customdata[1]}</b><extra></extra>",
                 ))
                 fig.update_layout(
                     height=280, margin=dict(l=10, r=10, t=30, b=10),
@@ -1234,9 +1242,12 @@ def _render_economy_overview(T: dict) -> None:
                     font=dict(color="#e6edf3", family="Inter, system-ui, sans-serif", size=11),
                     yaxis_title="% a.a.", xaxis_title="",
                     showlegend=False,
+                    hoverlabel=dict(bgcolor="#161b22", bordercolor="#30363d",
+                                    font=dict(color="#e6edf3", size=12)),
                 )
                 fig.update_xaxes(gridcolor="#21262d", zerolinecolor="#21262d")
-                fig.update_yaxes(gridcolor="#21262d", zerolinecolor="#21262d")
+                fig.update_yaxes(gridcolor="#21262d", zerolinecolor="#21262d",
+                                 range=[_y_min, _y_max])
                 st.plotly_chart(fig, use_container_width=True,
                                 config={"displayModeBar": False, "displaylogo": False})
                 st.markdown(
@@ -1414,16 +1425,28 @@ def _render_briefing(T: dict) -> None:
             brent_val = _fmt_val("Brent")
             wti_val = _fmt_val("WTI")
             _aa = T.get("rate_annual", "a.a.")
-            _fed_label = f"🇺🇸 Fed Funds · próximo anúncio FOMC {_fmt_date_br(_fomc_next_iso())}"
-            _selic_label = f"🇧🇷 Selic · próximo anúncio COPOM {_fmt_date_br(_copom_next_iso())}"
+            _fed_sub = f"próxima reunião FOMC {_fmt_date_br(_fomc_next_iso())}"
+            _selic_sub = f"próxima reunião COPOM {_fmt_date_br(_copom_next_iso())}"
+
+            def _rate_card(name: str, val: str, sub: str) -> str:
+                return (
+                    f"<div style='padding:6px 0;border-bottom:1px solid #21262d;'>"
+                    f"<div style='display:flex;justify-content:space-between;align-items:center;'>"
+                    f"<span style='color:#8b949e;font-size:.82rem;'>{name}</span>"
+                    f"<b style='color:#e6edf3;font-size:.88rem;'>{val}</b>"
+                    f"</div>"
+                    f"<div style='color:#6e7681;font-size:.72rem;margin-top:2px;'>{sub}</div>"
+                    f"</div>"
+                )
+
             st.markdown(
                 f"<div style='background:#161b22;border:1px solid #30363d;"
                 f"border-radius:10px;padding:14px 16px;'>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
                 f"{T['briefing_juros']}</div>"
-                f"{_card(_fed_label, f'{FED_FUNDS_RATE:.2f}% {_aa}', '')}"
-                f"{_card(_selic_label, f'{_selic_now():.2f}% {_aa}', '')}"
+                f"{_rate_card('🇺🇸 Fed Funds', f'{FED_FUNDS_RATE:.2f}% {_aa}', _fed_sub)}"
+                f"{_rate_card('🇧🇷 Selic', f'{_selic_now():.2f}% {_aa}', _selic_sub)}"
                 f"<div style='height:8px;'></div>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
@@ -1508,8 +1531,8 @@ def _render_briefing(T: dict) -> None:
         # Formato: nome: valor variacao (sem tentativa de alinhar colunas — WhatsApp usa fonte proporcional)
         _juros_block = (
             "*Juros*\\n"
-            + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (proximo FOMC " + _fmt_date_br(_fomc_next_iso()) + ")\\n"
-            + "BR Selic: " + f"{_selic_now():.2f}%" + " (proximo COPOM " + _fmt_date_br(_copom_next_iso()) + ")"
+            + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (proxima reuniao FOMC " + _fmt_date_br(_fomc_next_iso()) + ")\\n"
+            + "BR Selic: " + f"{_selic_now():.2f}%" + " (proxima reuniao COPOM " + _fmt_date_br(_copom_next_iso()) + ")"
         )
         def _fmt_pct(v):
             return f"{v:+.2f}%" if v is not None else "N/D"

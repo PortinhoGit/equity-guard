@@ -325,7 +325,7 @@ _PT: dict = {
     "macro_updated_at":    "Atualizado em {date} às {time} (Brasília)",
     # ── Painel Global (índices + commodities + juros) ─────────────────────────
     "global_title":        "🌍 Indicadores Globais",
-    "global_next_meeting": "Próximo anúncio",
+    "global_next_meeting": "Próxima reunião",
     "global_source":       "Fonte: BCB · Fed · Yahoo Finance",
     "global_no_data":      "Indicadores indisponíveis.",
     # ── Briefing de Fechamento ────────────────────────────────────────────────
@@ -368,7 +368,7 @@ _PT: dict = {
     "nitro_title":         "🏢 Nitro Prev (IFM)",
     "nitro_link":          "🔐 Acessar Área do Participante",
     "nitro_note":          "IFM Previdência · Atualização manual baseada no portal oficial.",
-    "pension_alert_toast": "🔔 Novo índice PrevDow / Nitro Prev disponível ({ref})",
+    "pension_alert_toast": "🔔 Novo índice PrevDow disponível ({ref})",
     # ── Hardcoded UI labels ──────────────────────────────────────────────────
     "fx_prev_close":       "Fech. {date}",
     "fx_online":           "Cotação online",
@@ -711,7 +711,7 @@ _EN: dict = {
     "macro_updated_at":    "Updated {date} at {time} (BRT)",
     # ── Global panel (indices + commodities + rates) ──────────────────────────
     "global_title":        "🌍 Global Indicators",
-    "global_next_meeting": "Next announcement",
+    "global_next_meeting": "Next meeting",
     "global_source":       "Source: BCB · Fed · Yahoo Finance",
     "global_no_data":      "Indicators unavailable.",
     # ── Closing Briefing ──────────────────────────────────────────────────────
@@ -754,7 +754,7 @@ _EN: dict = {
     "nitro_title":         "🏢 Nitro Prev (IFM)",
     "nitro_link":          "🔐 Access Participant Area",
     "nitro_note":          "IFM Previdência · Manually updated from the official portal.",
-    "pension_alert_toast": "🔔 New PrevDow / Nitro Prev returns available ({ref})",
+    "pension_alert_toast": "🔔 New PrevDow returns available ({ref})",
     "fx_prev_close":       "Prev. close {date}",
     "fx_online":           "Live rate",
     "fx_sell":             "Ask",
@@ -1096,7 +1096,7 @@ _ES: dict = {
     "macro_updated_at":    "Actualizado el {date} a las {time} (Brasilia)",
     # ── Panel global (índices + commodities + tasas) ──────────────────────────
     "global_title":        "🌍 Indicadores Globales",
-    "global_next_meeting": "Próximo anuncio",
+    "global_next_meeting": "Próxima reunión",
     "global_source":       "Fuente: BCB · Fed · Yahoo Finance",
     "global_no_data":      "Indicadores no disponibles.",
     # ── Briefing de Cierre ────────────────────────────────────────────────────
