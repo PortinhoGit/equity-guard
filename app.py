@@ -1135,6 +1135,117 @@ def _fetch_market_movers(tickers: tuple) -> dict:
     return {"gainers": gainers, "losers": losers, "actives": actives}
 
 
+@st.cache_data(ttl=86400, show_spinner=False)
+def _fetch_ipca_chart_data() -> list:
+    """IPCA 12m — lista de dicts ordenada cronologicamente. Cache 24h."""
+    from rates import get_ipca_12m_history
+    return get_ipca_12m_history(n=15)
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _fetch_selic_chart_data() -> list:
+    """Serie Selic meta — cache 24h."""
+    from rates import get_selic_history_range
+    return get_selic_history_range(days=400)
+
+
+def _render_economy_overview(T: dict) -> None:
+    """
+    Panorama Econômico: dois botoes (IPCA e Selic) em expanders com graficos
+    historicos do BCB. Similar ao painel da homepage do bcb.gov.br.
+    """
+    st.markdown(
+        "<div style='display:flex;align-items:center;justify-content:space-between;"
+        "margin:14px 0 8px;'>"
+        "<span style='font-size:.82rem;font-weight:800;letter-spacing:1.5px;"
+        "text-transform:uppercase;color:#d4af37;'>📈 Panorama Econômico</span>"
+        "<span style='font-size:.68rem;color:#6e7681;'>Fonte: Banco Central do Brasil</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    _ec1, _ec2 = st.columns(2)
+
+    with _ec1:
+        with st.expander("📊 Inflação (IPCA 12 meses)", expanded=False):
+            _data = _fetch_ipca_chart_data()
+            if not _data:
+                st.caption("Dados do BCB indisponíveis no momento.")
+            else:
+                import plotly.graph_objects as go
+                _x = [pd.to_datetime(r["data"], format="%d/%m/%Y") for r in _data]
+                _y = [r["valor"] for r in _data]
+                _last = _y[-1]
+                _last_date = _x[-1].strftime("%m/%Y")
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=_x, y=_y, mode="lines+markers",
+                    line=dict(color="#dc2626", width=2.5),
+                    marker=dict(size=6, color="#dc2626"),
+                    hovertemplate="%{x|%b/%Y}: %{y:.2f}%<extra></extra>",
+                ))
+                # Meta 3% ± 1,5 p.p. (faixa)
+                fig.add_hrect(y0=1.5, y1=4.5, fillcolor="rgba(63,185,80,.08)",
+                              line_width=0, annotation_text="Meta BCB 3% ±1,5p.p.",
+                              annotation_position="top left",
+                              annotation=dict(font=dict(size=10, color="#8b949e")))
+                fig.add_hline(y=3.0, line_dash="dot", line_color="#3fb950", line_width=1)
+                fig.update_layout(
+                    height=280, margin=dict(l=10, r=10, t=30, b=10),
+                    paper_bgcolor="#0d1117", plot_bgcolor="#0d1117",
+                    font=dict(color="#e6edf3", family="Inter, system-ui, sans-serif", size=11),
+                    yaxis_title="% a.a.", xaxis_title="",
+                    showlegend=False,
+                )
+                fig.update_xaxes(gridcolor="#21262d", zerolinecolor="#21262d")
+                fig.update_yaxes(gridcolor="#21262d", zerolinecolor="#21262d")
+                st.plotly_chart(fig, use_container_width=True,
+                                config={"displayModeBar": False, "displaylogo": False})
+                st.markdown(
+                    f"<div style='text-align:center;font-size:1.15rem;font-weight:900;"
+                    f"color:#dc2626;'>{_last:.2f}%</div>"
+                    f"<div style='text-align:center;font-size:.7rem;color:#8b949e;'>"
+                    f"IPCA 12 meses · base {_last_date}</div>",
+                    unsafe_allow_html=True,
+                )
+
+    with _ec2:
+        with st.expander("🏦 Meta Selic", expanded=False):
+            _data = _fetch_selic_chart_data()
+            if not _data:
+                st.caption("Dados do BCB indisponíveis no momento.")
+            else:
+                import plotly.graph_objects as go
+                _x = [pd.to_datetime(r["data"], format="%d/%m/%Y") for r in _data]
+                _y = [r["valor"] for r in _data]
+                _last = _y[-1]
+                _last_date = _x[-1].strftime("%d/%m/%Y")
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=_x, y=_y, mode="lines",
+                    line=dict(color="#58a6ff", width=2.5, shape="hv"),
+                    hovertemplate="%{x|%d/%m/%Y}: %{y:.2f}%<extra></extra>",
+                ))
+                fig.update_layout(
+                    height=280, margin=dict(l=10, r=10, t=30, b=10),
+                    paper_bgcolor="#0d1117", plot_bgcolor="#0d1117",
+                    font=dict(color="#e6edf3", family="Inter, system-ui, sans-serif", size=11),
+                    yaxis_title="% a.a.", xaxis_title="",
+                    showlegend=False,
+                )
+                fig.update_xaxes(gridcolor="#21262d", zerolinecolor="#21262d")
+                fig.update_yaxes(gridcolor="#21262d", zerolinecolor="#21262d")
+                st.plotly_chart(fig, use_container_width=True,
+                                config={"displayModeBar": False, "displaylogo": False})
+                st.markdown(
+                    f"<div style='text-align:center;font-size:1.15rem;font-weight:900;"
+                    f"color:#58a6ff;'>{_last:.2f}%</div>"
+                    f"<div style='text-align:center;font-size:.7rem;color:#8b949e;'>"
+                    f"Meta Selic · {_last_date}</div>",
+                    unsafe_allow_html=True,
+                )
+
+
 def _render_market_movers(T: dict) -> None:
     """
     3 colunas com maiores altas, maiores baixas e mais negociadas da B3.
@@ -3900,6 +4011,9 @@ def main() -> None:
 
     # ── 🗞️ Briefing de Fechamento (juros, commodities, dolar, bolsas) ──────
     _render_briefing(T)
+
+    # ── 📈 Panorama Econômico (graficos IPCA e Selic do BCB) ────────────────
+    _render_economy_overview(T)
 
     # ── 📊 Mercado B3 (top altas, baixas, mais negociadas) ──────────────────
     _render_market_movers(T)
