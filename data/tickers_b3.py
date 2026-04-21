@@ -130,3 +130,89 @@ POPULAR_NAMES: dict = {
 def popular_name(ticker: str) -> str:
     """Retorna nome popular/comercial do ticker, ou o proprio ticker se desconhecido."""
     return POPULAR_NAMES.get(ticker.upper().strip(), "")
+
+
+# Setor economico por ticker — usado nos paineis de mercado.
+# Classificacao pragmatica pelo setor B3/Ibovespa; subsetores aglutinados para
+# caber em rotulo curto no card (ex: "Energia", "Financeiro", "Varejo").
+SECTORS: dict = {
+    # Bancos e financeiro
+    "BBAS3": "Bancos", "BBDC3": "Bancos", "BBDC4": "Bancos",
+    "ITUB4": "Bancos", "ITSA4": "Bancos", "SANB11": "Bancos",
+    "BPAC11": "Bancos", "BBSE3": "Seguros",
+    "B3SA3": "Financeiro", "CIEL3": "Financeiro",
+    "IRBR3": "Seguros", "CASH3": "Financeiro",
+    # Petroleo, gas, combustivel
+    "PETR3": "Petróleo", "PETR4": "Petróleo",
+    "PRIO3": "Petróleo", "RRRP3": "Petróleo",
+    "RAIZ4": "Combustíveis", "UGPA3": "Combustíveis", "VBBR3": "Combustíveis",
+    "CSAN3": "Petróleo",
+    # Energia eletrica
+    "ELET3": "Energia", "ELET6": "Energia", "CMIG4": "Energia",
+    "CPFE3": "Energia", "CPLE6": "Energia", "EGIE3": "Energia",
+    "EQTL3": "Energia", "ENEV3": "Energia", "ENGI11": "Energia",
+    "TAEE11": "Energia", "TRPL4": "Energia",
+    # Mineracao e siderurgia
+    "VALE3": "Mineração", "CMIN3": "Mineração", "BRAP4": "Mineração",
+    "CSNA3": "Siderurgia", "GGBR4": "Siderurgia", "GOAU4": "Siderurgia",
+    "USIM5": "Siderurgia",
+    # Papel e celulose
+    "SUZB3": "Papel/Celulose", "KLBN11": "Papel/Celulose", "DXCO3": "Materiais",
+    # Varejo
+    "LREN3": "Varejo", "MGLU3": "Varejo", "AMER3": "Varejo",
+    "SOMA3": "Varejo", "PETZ3": "Varejo", "CVCB3": "Varejo",
+    "ALPA4": "Varejo", "GRND3": "Varejo", "VULC3": "Varejo",
+    "LWSA3": "Tecnologia",
+    # Supermercados
+    "PCAR3": "Supermercados", "CRFB3": "Supermercados", "ASAI3": "Supermercados",
+    # Alimentos e bebidas
+    "ABEV3": "Bebidas",
+    "JBSS3": "Alimentos", "BRFS3": "Alimentos",
+    "BEEF3": "Alimentos", "MRFG3": "Alimentos",
+    "SLCE3": "Agro", "SMTO3": "Agro",
+    # Construcao e shoppings
+    "CYRE3": "Construção", "MRVE3": "Construção",
+    "EZTC3": "Construção", "JHSF3": "Construção",
+    "MULT3": "Shoppings", "IGTI11": "Shoppings", "ALOS3": "Shoppings",
+    # Industria, logistica, transporte
+    "WEGE3": "Bens Industriais", "EMBR3": "Bens Industriais",
+    "RAIL3": "Logística", "CCRO3": "Concessões", "ECOR3": "Concessões",
+    "AZUL4": "Transporte Aéreo", "GOLL4": "Transporte Aéreo",
+    "TUPY3": "Bens Industriais", "POSI3": "Tecnologia",
+    # Saude
+    "HAPV3": "Saúde", "RDOR3": "Saúde", "FLRY3": "Saúde",
+    "RADL3": "Saúde", "QUAL3": "Saúde",
+    "HYPE3": "Farmacêutica", "NTCO3": "Consumo",
+    # Educacao
+    "COGN3": "Educação", "YDUQ3": "Educação",
+    # Telecom
+    "VIVT3": "Telecom", "TIMS3": "Telecom",
+    # Quimica e outros
+    "BRKM5": "Química",
+    "TOTS3": "Tecnologia", "RENT3": "Locação",
+    "SBSP3": "Saneamento",
+    # FIIs — setor "Imobiliário" agregando; detalhes sao sub-segmento do fundo
+    "BCFF11": "FII", "HGLG11": "FII", "HGRE11": "FII",
+    "HSML11": "FII", "HGBS11": "FII",
+    "KNCR11": "FII", "KNRI11": "FII", "KNIP11": "FII",
+    "MXRF11": "FII", "MCCI11": "FII",
+    "XPLG11": "FII", "XPML11": "FII", "XPCI11": "FII",
+    "CPTS11": "FII", "IRDM11": "FII",
+    "PVBI11": "FII", "TGAR11": "FII", "TRXF11": "FII",
+    "VISC11": "FII", "VGIR11": "FII", "VILG11": "FII", "VINO11": "FII",
+    "RBRF11": "FII", "RBRR11": "FII", "RECR11": "FII", "RVBI11": "FII",
+    "BRCR11": "FII", "BTLG11": "FII",
+    # ETFs
+    "BOVA11": "ETF", "BOVV11": "ETF", "DIVO11": "ETF", "HASH11": "ETF",
+    "IMAB11": "ETF", "IVVB11": "ETF", "MATB11": "ETF", "NASD11": "ETF",
+    "SMAL11": "ETF", "SPXI11": "ETF",
+    # BDRs
+    "AAPL34": "BDR", "AMZO34": "BDR", "DISB34": "BDR", "GOGL34": "BDR",
+    "META34": "BDR", "MSFT34": "BDR", "NFLX34": "BDR", "NVDC34": "BDR",
+    "TSLA34": "BDR",
+}
+
+
+def sector(ticker: str) -> str:
+    """Retorna setor economico do ticker, ou string vazia se desconhecido."""
+    return SECTORS.get(ticker.upper().strip(), "")
