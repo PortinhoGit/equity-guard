@@ -1760,13 +1760,6 @@ def _render_prevdow_panel(T: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    # DEBUG so pra admin: mostra de onde vieram os dados.
-    _u = st.session_state.get("user") or {}
-    if _u.get("is_admin"):
-        _src = d.get("_source", "?")
-        st.caption(f"🔧 admin debug — fonte dos dados PrevDow: `{_src}`")
-
-
 def _render_nitro_panel(T: dict) -> None:
     """
     Nitro Prev (IFM Previdência / Votorantim).
@@ -2124,11 +2117,20 @@ def _render_top_auth_bar(user: dict, T: dict) -> None:
         else:
             e_col, l_col = st.columns([2, 1])
             with e_col:
+                _email = user.get("email", "—")
+                _is_admin = user.get("is_admin", False)
+                _icon = "👑" if _is_admin else "👤"
+                _badge_bg = "rgba(212,175,55,.15)" if _is_admin else "rgba(88,166,255,.12)"
+                _badge_border = "#d4af37" if _is_admin else "#58a6ff"
+                _badge_color = "#d4af37" if _is_admin else "#58a6ff"
                 st.markdown(
-                    f"<div style='text-align:right;padding-top:6px;"
-                    f"font-size:.82rem;color:#8b949e;'>"
-                    f"{T['top_user_hi'].format(email=user.get('email','—'))}"
-                    f"</div>",
+                    f"<div style='display:flex;justify-content:flex-end;padding-top:3px;'>"
+                    f"<span style='background:{_badge_bg};border:1px solid {_badge_border};"
+                    f"color:{_badge_color};padding:5px 12px;border-radius:20px;"
+                    f"font-size:.82rem;font-weight:700;white-space:nowrap;"
+                    f"overflow:hidden;text-overflow:ellipsis;max-width:100%;'>"
+                    f"{_icon} {_email}"
+                    f"</span></div>",
                     unsafe_allow_html=True,
                 )
             with l_col:
