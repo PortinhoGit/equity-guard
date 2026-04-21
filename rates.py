@@ -132,3 +132,82 @@ def fed_needs_manual_update(fed_next_meeting: str, tolerance_days: int = 7) -> b
         return False
     today = date.today()
     return (today - d).days > tolerance_days
+
+
+# ═══ Historico de series BCB (IPCA 12m e Selic) ═══════════════════════════════
+
+_history_cache: dict = {}  # key -> (list, fetched_at)
+
+
+def _fetch_bcb_series(series_id: int, n: int = 15) -> list:
+    """
+    Busca as ultimas N observacoes de uma serie BCB SGS.
+    Cache 24h em memoria.
+    Retorna lista [{'data': 'DD/MM/YYYY', 'valor': float}, ...] ou [] em falha.
+    """
+    key = f"sgs_{series_id}_{n}"
+    cached = _history_cache.get(key)
+    if cached:
+        rows, fetched_at = cached
+        if (datetime.now() - fetched_at).total_seconds() < 24 * 3600:
+            return rows
+    try:
+        import requests
+        url = f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series_id}/dados/ultimos/{n}?formato=json"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        rows = r.json() or []
+        # Converte valor para float
+        out = []
+        for row in rows:
+            try:
+                out.append({"data": row["data"], "valor": float(row["valor"])})
+            except (KeyError, ValueError, TypeError):
+                continue
+        _history_cache[key] = (out, datetime.now())
+        return out
+    except Exception:
+        return []
+
+
+def get_ipca_12m_history(n: int = 15) -> list:
+    """IPCA acumulado em 12 meses — serie SGS 13522."""
+    return _fetch_bcb_series(13522, n)
+
+
+def get_selic_history_range(days: int = 400) -> list:
+    """
+    Meta Selic (SGS 432) nos ultimos N dias, via range de datas.
+    Serie 432 tem valor diario (preserva o patamar entre decisoes COPOM).
+    Cache 24h.
+    """
+    key = f"sgs_432_range_{days}"
+    cached = _history_cache.get(key)
+    if cached:
+        rows, fetched_at = cached
+        if (datetime.now() - fetched_at).total_seconds() < 24 * 3600:
+            return rows
+    try:
+        import requests
+        from datetime import timedelta as _td
+        end = date.today()
+        start = end - _td(days=days)
+        url = (
+            "https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados"
+            f"?dataInicial={start.strftime('%d/%m/%Y')}"
+            f"&dataFinal={end.strftime('%d/%m/%Y')}"
+            "&formato=json"
+        )
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        rows = r.json() or []
+        out = []
+        for row in rows:
+            try:
+                out.append({"data": row["data"], "valor": float(row["valor"])})
+            except (KeyError, ValueError, TypeError):
+                continue
+        _history_cache[key] = (out, datetime.now())
+        return out
+    except Exception:
+        return []
