@@ -1221,12 +1221,28 @@ def _render_economy_overview(T: dict) -> None:
                 import math
                 _MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
                              "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-                _x = [pd.to_datetime(r["data"], format="%d/%m/%Y") for r in _data]
-                _y = [r["valor"] for r in _data]
+                _MESES_PT_ABR = ["jan", "fev", "mar", "abr", "mai", "jun",
+                                 "jul", "ago", "set", "out", "nov", "dez"]
+                # Resample diario -> mensal usando "fim de mes" (convencao BCB:
+                # taxa vigente no ultimo dia do mes). Equivalente ao que o BCB
+                # mostra no Panorama Economico.
+                _df_raw = pd.DataFrame(
+                    {"data": pd.to_datetime([r["data"] for r in _data], format="%d/%m/%Y"),
+                     "valor": [r["valor"] for r in _data]}
+                )
+                _df = (_df_raw.set_index("data")
+                              .resample("ME")
+                              .last()
+                              .dropna()
+                              .reset_index())
+                _x = _df["data"].tolist()
+                _y = _df["valor"].tolist()
                 _labels = [[f"{_MESES_PT[d.month - 1]} {d.year}", f"{v:.2f}".replace(".", ",")]
                            for d, v in zip(_x, _y)]
+                _tickvals = _x
+                _ticktext = [f"{_MESES_PT_ABR[d.month - 1]}/{d.year}" for d in _x]
                 _last = _y[-1]
-                _last_date = _x[-1].strftime("%d/%m/%Y")
+                _last_ym = f"{_MESES_PT[_x[-1].month - 1]} {_x[-1].year}"
                 _y_min = math.floor(min(_y) * 2) / 2 - 0.5
                 _y_max = math.ceil(max(_y) * 2) / 2 + 0.5
                 fig = go.Figure()
@@ -1245,7 +1261,9 @@ def _render_economy_overview(T: dict) -> None:
                     hoverlabel=dict(bgcolor="#161b22", bordercolor="#30363d",
                                     font=dict(color="#e6edf3", size=12)),
                 )
-                fig.update_xaxes(gridcolor="#21262d", zerolinecolor="#21262d")
+                fig.update_xaxes(gridcolor="#21262d", zerolinecolor="#21262d",
+                                 tickmode="array", tickvals=_tickvals, ticktext=_ticktext,
+                                 tickangle=-35)
                 fig.update_yaxes(gridcolor="#21262d", zerolinecolor="#21262d",
                                  range=[_y_min, _y_max])
                 st.plotly_chart(fig, use_container_width=True,
@@ -1254,7 +1272,7 @@ def _render_economy_overview(T: dict) -> None:
                     f"<div style='text-align:center;font-size:1.15rem;font-weight:900;"
                     f"color:#58a6ff;'>{_last:.2f}%</div>"
                     f"<div style='text-align:center;font-size:.7rem;color:#8b949e;'>"
-                    f"Meta Selic · {_last_date}</div>",
+                    f"Meta Selic · {_last_ym}</div>",
                     unsafe_allow_html=True,
                 )
 
