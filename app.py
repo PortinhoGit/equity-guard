@@ -1317,24 +1317,18 @@ def _render_market_movers(T: dict) -> None:
         st.caption("Sem dados de mercado no momento.")
         return
 
-    from data.tickers_b3 import popular_name, sector
+    from data.tickers_b3 import popular_name
 
     def _render_row(r: dict) -> str:
         _color = "#3fb950" if r["chg"] >= 0 else "#dc2626"
         _chg = f"{r['chg']:+.2f}%"
         _price = f"R$ {r['last']:.2f}"
         _popular = popular_name(r["ticker"])
-        _sector = sector(r["ticker"])
         _name_line = (
             f"<div style='color:#8b949e;font-size:.66rem;line-height:1.1;"
             f"margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
             f"max-width:130px;'>{_popular}</div>"
             if _popular else ""
-        )
-        _sector_line = (
-            f"<div style='color:#6e7681;font-size:.6rem;line-height:1.1;"
-            f"margin-top:1px;text-transform:uppercase;letter-spacing:.3px;'>{_sector}</div>"
-            if _sector else ""
         )
         return (
             f"<a href='?t={r['ticker']}' target='_self' style='text-decoration:none;'>"
@@ -1344,7 +1338,6 @@ def _render_market_movers(T: dict) -> None:
             f"<div style='min-width:0;flex:1;'>"
             f"<div style='font-weight:800;color:#e6edf3;letter-spacing:.3px;line-height:1.15;'>{r['ticker']}</div>"
             f"{_name_line}"
-            f"{_sector_line}"
             f"</div>"
             f"<div style='display:flex;flex-direction:column;align-items:flex-end;gap:1px;'>"
             f"<span style='color:{_color};font-weight:800;font-size:.82rem;'>{_chg}</span>"
