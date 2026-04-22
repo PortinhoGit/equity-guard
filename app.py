@@ -1211,8 +1211,22 @@ def _render_economy_overview(T: dict) -> None:
     # inflacao; ler da esquerda pra direita conta essa historia.
     _ec2, _ec1 = st.columns(2)
 
+    # Helper: tickvals uniformes para os dois graficos. Tick a cada mes;
+    # ano aparece apenas em Dezembro (marco de virada de ano).
+    # Ex.: mar, abr, mai, ..., nov, dez 2025, jan, fev, mar, abr.
+    _MESES_PT_ABR = ["jan", "fev", "mar", "abr", "mai", "jun",
+                     "jul", "ago", "set", "out", "nov", "dez"]
+
+    def _month_ticks(_xs):
+        _ticks = list(_xs)
+        _texts = []
+        for d in _ticks:
+            _m = _MESES_PT_ABR[d.month - 1]
+            _texts.append(f"{_m} {d.year}" if d.month == 12 else _m)
+        return _ticks, _texts
+
     with _ec1:
-        with st.expander("📊 Inflação (IPCA 12 meses)", expanded=False):
+        with st.expander("📊 Inflação (IPCA 12 meses)", expanded=True):
             _data = _fetch_ipca_chart_data()
             if not _data:
                 st.caption("Dados do BCB indisponíveis no momento.")
@@ -1222,6 +1236,7 @@ def _render_economy_overview(T: dict) -> None:
                 _y = [r["valor"] for r in _data]
                 _last = _y[-1]
                 _last_date = _x[-1].strftime("%m/%Y")
+                _tickvals, _ticktext = _month_ticks(_x)
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
                     x=_x, y=_y, mode="lines+markers",
@@ -1242,8 +1257,18 @@ def _render_economy_overview(T: dict) -> None:
                     yaxis_title="% a.a.", xaxis_title="",
                     showlegend=False,
                 )
-                fig.update_xaxes(gridcolor="#21262d", zerolinecolor="#21262d")
-                fig.update_yaxes(gridcolor="#21262d", zerolinecolor="#21262d")
+                # Eixos uniformes: grid pontilhado em todos os meses, rotulos horizontais.
+                fig.update_xaxes(
+                    showgrid=True, gridcolor="#21262d", griddash="dot",
+                    zerolinecolor="#21262d",
+                    showline=True, linecolor="#30363d", linewidth=1, mirror=False,
+                    tickmode="array", tickvals=_tickvals, ticktext=_ticktext,
+                    tickangle=-35, tickfont=dict(size=10),
+                )
+                fig.update_yaxes(
+                    gridcolor="#21262d", zerolinecolor="#21262d",
+                    showline=True, linecolor="#30363d", linewidth=1, mirror=False,
+                )
                 st.plotly_chart(fig, use_container_width=True,
                                 config={"displayModeBar": False, "displaylogo": False})
                 st.markdown(
@@ -1255,7 +1280,7 @@ def _render_economy_overview(T: dict) -> None:
                 )
 
     with _ec2:
-        with st.expander("🏦 Meta Selic", expanded=False):
+        with st.expander("🏦 Meta Selic", expanded=True):
             _data = _fetch_selic_chart_data()
             if not _data:
                 st.caption("Dados do BCB indisponíveis no momento.")
@@ -1264,8 +1289,6 @@ def _render_economy_overview(T: dict) -> None:
                 import math
                 _MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
                              "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-                _MESES_PT_ABR = ["jan", "fev", "mar", "abr", "mai", "jun",
-                                 "jul", "ago", "set", "out", "nov", "dez"]
                 # Resample diario -> mensal usando "fim de mes" (convencao BCB:
                 # taxa vigente no ultimo dia do mes). Equivalente ao que o BCB
                 # mostra no Panorama Economico.
@@ -1282,16 +1305,16 @@ def _render_economy_overview(T: dict) -> None:
                 _y = _df["valor"].tolist()
                 _labels = [[f"{_MESES_PT[d.month - 1]} {d.year}", f"{v:.2f}".replace(".", ",")]
                            for d, v in zip(_x, _y)]
-                _tickvals = _x
-                _ticktext = [f"{_MESES_PT_ABR[d.month - 1]}/{d.year}" for d in _x]
+                _tickvals, _ticktext = _month_ticks(_x)
                 _last = _y[-1]
                 _last_ym = f"{_MESES_PT[_x[-1].month - 1]} {_x[-1].year}"
                 _y_min = math.floor(min(_y) * 2) / 2 - 0.5
                 _y_max = math.ceil(max(_y) * 2) / 2 + 0.5
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
-                    x=_x, y=_y, mode="lines",
-                    line=dict(color="#58a6ff", width=2.5, shape="hv"),
+                    x=_x, y=_y, mode="lines+markers",
+                    line=dict(color="#3fb950", width=2.5, shape="hv"),
+                    marker=dict(size=6, color="#3fb950"),
                     customdata=_labels,
                     hovertemplate="<b>%{customdata[0]}</b><br>Meta Selic: <b>%{customdata[1]}</b><extra></extra>",
                 ))
@@ -1304,16 +1327,25 @@ def _render_economy_overview(T: dict) -> None:
                     hoverlabel=dict(bgcolor="#161b22", bordercolor="#30363d",
                                     font=dict(color="#e6edf3", size=12)),
                 )
-                fig.update_xaxes(gridcolor="#21262d", zerolinecolor="#21262d",
-                                 tickmode="array", tickvals=_tickvals, ticktext=_ticktext,
-                                 tickangle=-35)
-                fig.update_yaxes(gridcolor="#21262d", zerolinecolor="#21262d",
-                                 range=[_y_min, _y_max])
+                # Mesmo estilo do IPCA: grid pontilhado em todos os meses,
+                # rotulos horizontais, eixos com linha visivel.
+                fig.update_xaxes(
+                    showgrid=True, gridcolor="#21262d", griddash="dot",
+                    zerolinecolor="#21262d",
+                    showline=True, linecolor="#30363d", linewidth=1, mirror=False,
+                    tickmode="array", tickvals=_tickvals, ticktext=_ticktext,
+                    tickangle=-35, tickfont=dict(size=10),
+                )
+                fig.update_yaxes(
+                    gridcolor="#21262d", zerolinecolor="#21262d",
+                    showline=True, linecolor="#30363d", linewidth=1, mirror=False,
+                    range=[_y_min, _y_max],
+                )
                 st.plotly_chart(fig, use_container_width=True,
                                 config={"displayModeBar": False, "displaylogo": False})
                 st.markdown(
                     f"<div style='text-align:center;font-size:1.15rem;font-weight:900;"
-                    f"color:#58a6ff;'>{_last:.2f}%</div>"
+                    f"color:#3fb950;'>{_last:.2f}%</div>"
                     f"<div style='text-align:center;font-size:.7rem;color:#8b949e;'>"
                     f"Meta Selic · {_last_ym}</div>",
                     unsafe_allow_html=True,
@@ -1483,7 +1515,7 @@ def _render_briefing(T: dict) -> None:
         )
 
     today = pd.Timestamp.now(tz="America/Sao_Paulo").strftime("%d/%m/%Y")
-    with st.expander(T["briefing_title"].format(date=today), expanded=True):
+    with st.expander(T["briefing_title"].format(date=today), expanded=False):
 
         _bc1, _bc2 = st.columns(2)
 
@@ -3560,7 +3592,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ── Main chart ────────────────────────────────────────────────────────────
     st.markdown('<div class="eg-nav-anchor" id="sec-tecnico"></div>', unsafe_allow_html=True)
     st.markdown(_chip_header(T["chart_title"]), unsafe_allow_html=True)
-    with st.expander(f"📘 {T['chart_help_title']}", expanded=True):
+    with st.expander(f"📘 {T['chart_help_title']}", expanded=False):
         st.markdown(
             f"<div style='font-size:.84rem;line-height:1.55;color:#c9d1d9;'>"
             f"{T['chart_help_body']}</div>",
@@ -3794,7 +3826,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ── Glossary expander ─────────────────────────────────────────────────────
     st.markdown('<div class="eg-nav-anchor" id="sec-indicadores"></div>', unsafe_allow_html=True)
     st.markdown(_chip_header(T["glossary_title"]), unsafe_allow_html=True)
-    with st.expander(T["glossary_title"], expanded=True):
+    with st.expander(T["glossary_title"], expanded=False):
         _g1, _g2 = st.columns(2)
         _gitems = T["glossary_items"]
         _gmid   = len(_gitems) // 2 + len(_gitems) % 2
