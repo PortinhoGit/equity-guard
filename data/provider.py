@@ -400,6 +400,29 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
     tur_ask = round(ask * (1 + TURISMO_SPREAD), 4)
     prev_tur = round(prev * (1 + TURISMO_SPREAD), 4)
 
+    # ── Yahoo market state + regularMarketTime (best-effort) ─────────────────
+    # tk.info e pesado e sujeito a rate-limit; protegemos com try/except.
+    # Fallback: usa timestamp do ultimo bar intraday (1m) se disponivel.
+    market_state = ""
+    market_time_ts: Optional[int] = None
+    try:
+        _info = getattr(tk, "info", None) or {}
+        market_state = (_info.get("marketState") or "").upper()
+        _rmt = _info.get("regularMarketTime")
+        if _rmt:
+            market_time_ts = int(_rmt)
+    except Exception:
+        pass
+    if market_time_ts is None:
+        try:
+            _intra = tk.history(period="1d", interval="1m")
+            if _intra is not None and not _intra.empty:
+                _last_idx = _intra.index[-1]
+                if hasattr(_last_idx, "timestamp"):
+                    market_time_ts = int(_last_idx.timestamp())
+        except Exception:
+            pass
+
     return {
         "com_bid": bid, "com_ask": ask, "com_prev": prev,
         "tur_bid": tur_bid, "tur_ask": tur_ask, "tur_prev": prev_tur,
@@ -407,6 +430,9 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
         "series": series,
         "last": ask, "prev": prev,
         "fetched_at": pd.Timestamp.now(tz="America/Sao_Paulo").tz_localize(None),
+        "market_state": market_state,
+        "market_time_ts": market_time_ts,
+        "yf_ticker": "USDBRL=X",
     }
 
 
