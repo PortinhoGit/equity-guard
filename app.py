@@ -2304,20 +2304,20 @@ def _render_macro_panel(T: dict) -> None:
         if _b:
             _rows_html += (
                 f"<tr>"
-                f"<td style='padding:2px 0;font-size:.72rem;color:#8b949e;'>{_h}h</td>"
-                f"<td style='padding:2px 0;font-size:.78rem;text-align:right;"
+                f"<td style='padding:3px 0;font-size:.78rem;color:#8b949e;'>{_h}h</td>"
+                f"<td style='padding:3px 0;font-size:.82rem;text-align:right;"
                 f"color:#e6edf3;font-weight:700;'>R$ {_b['ask']:.4f}".replace(".", ",") + "</td>"
-                f"<td style='padding:2px 0 2px 6px;font-size:.68rem;color:#3fb950;"
+                f"<td style='padding:3px 0 3px 6px;font-size:.72rem;color:#3fb950;"
                 f"text-align:right;width:22px;'>✓</td>"
                 f"</tr>"
             )
         else:
             _rows_html += (
                 f"<tr>"
-                f"<td style='padding:2px 0;font-size:.72rem;color:#8b949e;'>{_h}h</td>"
-                f"<td style='padding:2px 0;font-size:.78rem;text-align:right;"
+                f"<td style='padding:3px 0;font-size:.78rem;color:#8b949e;'>{_h}h</td>"
+                f"<td style='padding:3px 0;font-size:.82rem;text-align:right;"
                 f"color:#484f58;'>—</td>"
-                f"<td style='padding:2px 0 2px 6px;font-size:.62rem;color:#6e7681;"
+                f"<td style='padding:3px 0 3px 6px;font-size:.66rem;color:#6e7681;"
                 f"text-align:right;'>{_wait_label}</td>"
                 f"</tr>"
             )
