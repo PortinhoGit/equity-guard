@@ -3703,6 +3703,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         else:
             _default_str = f"{cs} 1,000.00"
 
+        from data.tickers_b3 import ALL_TICKERS_B3
         _g1, _g2, _g3 = st.columns([2, 2, 3])
         with _g1:
             _goal_str = st.text_input(
@@ -3721,17 +3722,133 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
                 index=0, key="goal_freq",
             )
         with _g3:
-            _mult_map     = [12, 4, 1]   # mês, trimestre, ano → fator anual
-            _annual_need  = _goal_target * _mult_map[_freq_idx]
-            _shares_raw   = _annual_need / avg_div if avg_div > 0 else 0
-            # Round UP to nearest 100 (standard B3 lot size)
-            _shares_lot   = int(math.ceil(_shares_raw / 100.0) * 100) if _shares_raw > 0 else 0
-            _invest_total = _shares_lot * price
+            _default_tickers = [ticker.upper()] if ticker else ["BBAS3"]
+            _goal_tickers = st.multiselect(
+                T.get("goal_tickers_label", "Ativos para calcular (até 5)"),
+                options=sorted(set(ALL_TICKERS_B3)),
+                default=_default_tickers,
+                max_selections=5,
+                key="goal_tickers_ms",
+                help=T.get("goal_tickers_help",
+                           "Até 5 ativos (ações e/ou FIIs) para comparar com o CDI."),
+            )
+
+        # Frequencia -> fator anual. Mapeia Por mes/trim/sem/ano (se o i18n
+        # listar menos opcoes, o mapa abaixo se adapta).
+        _fat_full = {0: 12, 1: 4, 2: 2, 3: 1}
+        _annual_need = _goal_target * _fat_full.get(_freq_idx, 1)
+
+        if not _goal_tickers:
+            st.warning(T.get("goal_min_ticker", "Selecione ao menos 1 ativo."))
+        else:
+            # ── Monta a tabela: N ativos + linha fixa CDI ──────────────────
+            rows = []
+            for t in _goal_tickers:
+                _tipo = _classify_ticker(t)
+                _prov = _fetch_proventos_cached(t, 12, True)
+                _px = _fetch_price_cached(t)
+                _prov_12m = _prov.get("liquido_12m") or 0
+                if not _px or _px <= 0 or _prov_12m <= 0:
+                    rows.append({
+                        "Ativo": t, "Tipo": _tipo, "Cotação": _px,
+                        "Qtd": None, "Capital": None,
+                        "_fallback": _prov.get("source") == "yfinance_fallback",
+                        "_most_eff": False,
+                    })
+                    continue
+                _qtd = int(math.ceil(_annual_need / _prov_12m))
+                _capital = _qtd * _px
+                rows.append({
+                    "Ativo": t, "Tipo": _tipo, "Cotação": _px,
+                    "Qtd": _qtd, "Capital": _capital,
+                    "_fallback": _prov.get("source") == "yfinance_fallback",
+                    "_most_eff": False,
+                })
+
+            _cdi_aa = _fetch_cdi_cached() or 0
+            _cdi_liq = _cdi_aa * 0.85
+            _cdi_capital = (_annual_need / _cdi_liq) if _cdi_liq else None
+            rows.append({
+                "Ativo": "CDI (ref.)", "Tipo": "—", "Cotação": None,
+                "Qtd": None, "Capital": _cdi_capital,
+                "_fallback": False, "_most_eff": False,
+            })
+
+            # Marca o ativo mais eficiente (menor capital, excluindo CDI)
+            _valid = [r for r in rows
+                      if r["Ativo"] != "CDI (ref.)" and r["Capital"] is not None]
+            if _valid:
+                _best = min(_valid, key=lambda r: r["Capital"])
+                _best["_most_eff"] = True
+
+            # Header dourado com a meta
+            _freq_lower = _freq_opts[_freq_idx].lower()
+            _header_tpl = T.get(
+                "goal_table_header",
+                "🎯 Para receber <b>{valor}</b> {freq} líquidos:"
+            )
             st.markdown(
-                f"<div style='background:rgba(212,175,55,.10);border:1px solid #d4af37;"
-                f"border-radius:10px;padding:14px 18px;margin-top:28px;font-size:.9rem;"
-                f"color:#e6edf3;line-height:1.55;text-align:right;'>"
-                f"{T['goal_result'].format(shares=_fmt_int(_shares_lot, cs), money=_fmt_money(_invest_total, cs))}"
+                f"<div style='margin:12px 0 6px;color:#e6edf3;font-size:.92rem;'>"
+                + _header_tpl.format(
+                    valor=_fmt_money(_goal_target, cs), freq=_freq_lower,
+                ) +
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            def _fmt_brl_or_dash(v):
+                return _fmt_money(v, cs) if v is not None else "—"
+
+            def _fmt_qtd(v):
+                return f"{v:,}".replace(",", ".") if v is not None else "—"
+
+            # Label do ativo com badges
+            def _label(r):
+                lbl = r["Ativo"]
+                if r["_fallback"]:
+                    lbl += " ⚠️"
+                if r["_most_eff"]:
+                    lbl += " ⬇"
+                return lbl
+
+            _disp = [
+                {
+                    T.get("goal_col_ativo", "Ativo"): _label(r),
+                    T.get("goal_col_tipo", "Tipo"): r["Tipo"],
+                    T.get("goal_col_cotacao", "Cotação"): _fmt_brl_or_dash(r["Cotação"]),
+                    T.get("goal_col_qtd", "Qtd necessária"): _fmt_qtd(r["Qtd"]),
+                    T.get("goal_col_capital", "Capital necessário"): _fmt_brl_or_dash(r["Capital"]),
+                }
+                for r in rows
+            ]
+            import pandas as _pd
+            st.dataframe(_pd.DataFrame(_disp), use_container_width=True, hide_index=True)
+
+            # Linha destaque: opcao mais eficiente vs CDI
+            if _valid and _cdi_capital:
+                _b = min(_valid, key=lambda r: r["Capital"])
+                _economia = _cdi_capital - _b["Capital"]
+                if _economia > 0:
+                    _hl = T.get(
+                        "goal_most_efficient",
+                        "💡 Opção mais eficiente: <b>{ticker}</b> com <b>{capital}</b> "
+                        "(economia de {economia} vs CDI)."
+                    ).format(
+                        ticker=_b["Ativo"],
+                        capital=_fmt_money(_b["Capital"], cs),
+                        economia=_fmt_money(_economia, cs),
+                    )
+                    st.markdown(
+                        f"<div style='background:rgba(63,185,80,.10);border:1px solid "
+                        f"rgba(63,185,80,.35);border-radius:10px;padding:10px 16px;"
+                        f"margin-top:8px;color:#e6edf3;font-size:.88rem;'>{_hl}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+            # Rodape com fonte
+            st.markdown(
+                f"<div style='font-size:.62rem;color:#484f58;margin-top:8px;'>"
+                f"{T.get('goal_source_footer', 'Fonte: Status Invest (ações) · yfinance (FIIs, fallback) · BCB série 12 (CDI) · IR 15% sobre JCP e CDI.')}"
                 f"</div>",
                 unsafe_allow_html=True,
             )
