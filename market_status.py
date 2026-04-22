@@ -1,30 +1,127 @@
 """
 market_status.py — Equity Guard
 Determina se o mercado está aberto ou fechado e qual a data de referência.
+Suporta calendarios B3, NYSE e LSE para tratar assimetria de feriados.
 """
 
 from datetime import date, time, datetime, timedelta
-from typing import Dict
+from typing import Dict, Optional, Tuple, Iterable
 
-# Feriados B3 2026 (dias sem pregão, além de fins de semana)
-FERIADOS_B3_2026 = {
-    date(2026, 1, 1),   # Confraternização Universal
-    date(2026, 2, 16),  # Carnaval
-    date(2026, 2, 17),  # Carnaval
-    date(2026, 2, 18),  # Quarta de Cinzas (até 13h, mas simplificamos)
-    date(2026, 4, 3),   # Sexta-feira Santa
-    date(2026, 4, 21),  # Tiradentes
-    date(2026, 5, 1),   # Dia do Trabalho
-    date(2026, 6, 4),   # Corpus Christi
-    date(2026, 9, 7),   # Independência
-    date(2026, 10, 12), # N. S. Aparecida
-    date(2026, 11, 2),  # Finados
-    date(2026, 11, 15), # Proclamação da República
-    date(2026, 11, 20), # Consciência Negra
-    date(2026, 12, 24), # Véspera de Natal (B3 fechada)
-    date(2026, 12, 25), # Natal
-    date(2026, 12, 31), # Véspera de Ano Novo (B3 fechada)
+# ── B3 (BOVESPA) 2026 ────────────────────────────────────────────────────────
+FERIADOS_B3_2026_NAMED: Dict[date, str] = {
+    date(2026, 1, 1):   "Confraternização Universal",
+    date(2026, 2, 16):  "Carnaval",
+    date(2026, 2, 17):  "Carnaval",
+    date(2026, 2, 18):  "Quarta de Cinzas",
+    date(2026, 4, 3):   "Sexta-feira Santa",
+    date(2026, 4, 21):  "Tiradentes",
+    date(2026, 5, 1):   "Dia do Trabalho",
+    date(2026, 6, 4):   "Corpus Christi",
+    date(2026, 9, 7):   "Independência",
+    date(2026, 10, 12): "N. S. Aparecida",
+    date(2026, 11, 2):  "Finados",
+    date(2026, 11, 15): "Proclamação da República",
+    date(2026, 11, 20): "Consciência Negra",
+    date(2026, 12, 24): "Véspera de Natal",
+    date(2026, 12, 25): "Natal",
+    date(2026, 12, 31): "Véspera de Ano Novo",
 }
+FERIADOS_B3_2026 = set(FERIADOS_B3_2026_NAMED.keys())
+
+# ── NYSE 2026 (NYSE holiday calendar oficial) ────────────────────────────────
+FERIADOS_NYSE_2026_NAMED: Dict[date, str] = {
+    date(2026, 1, 1):   "New Year's Day",
+    date(2026, 1, 19):  "Martin Luther King Jr. Day",
+    date(2026, 2, 16):  "Presidents' Day",
+    date(2026, 4, 3):   "Good Friday",
+    date(2026, 5, 25):  "Memorial Day",
+    date(2026, 6, 19):  "Juneteenth",
+    date(2026, 7, 3):   "Independence Day (observado)",
+    date(2026, 9, 7):   "Labor Day",
+    date(2026, 11, 26): "Thanksgiving",
+    date(2026, 12, 25): "Christmas Day",
+}
+
+# ── LSE 2026 (UK bank holidays) ──────────────────────────────────────────────
+FERIADOS_LSE_2026_NAMED: Dict[date, str] = {
+    date(2026, 1, 1):   "New Year's Day",
+    date(2026, 4, 3):   "Good Friday",
+    date(2026, 4, 6):   "Easter Monday",
+    date(2026, 5, 4):   "Early May Bank Holiday",
+    date(2026, 5, 25):  "Spring Bank Holiday",
+    date(2026, 8, 31):  "Summer Bank Holiday",
+    date(2026, 12, 25): "Christmas Day",
+    date(2026, 12, 28): "Boxing Day (observado)",
+}
+
+_MARKET_HOLIDAYS: Dict[str, Dict[date, str]] = {
+    "B3":   FERIADOS_B3_2026_NAMED,
+    "NYSE": FERIADOS_NYSE_2026_NAMED,
+    "LSE":  FERIADOS_LSE_2026_NAMED,
+}
+
+# Horario de fechamento (em Brasilia) — usado pra decidir se o pregao de "hoje"
+# ja terminou. Valores conservadores:
+#   B3:   20h (inclui after-market)
+#   NYSE: 18h (regular close 17h EST / 16h EDT + margem)
+#   LSE:  14h (16:30 Londres = 13:30-14:30 BRT conforme DST)
+_MARKET_CLOSE_BRT: Dict[str, time] = {
+    "B3":   time(20, 0),
+    "NYSE": time(18, 0),
+    "LSE":  time(14, 0),
+}
+
+_MARKET_FLAG = {"B3": "🇧🇷", "NYSE": "🇺🇸", "LSE": "🇬🇧"}
+_MARKET_LABEL_PT = {"B3": "B3", "NYSE": "NYSE", "LSE": "LSE"}
+
+
+def market_flag(market: str) -> str:
+    return _MARKET_FLAG.get(market, "")
+
+
+def is_market_session(market: str, d: date) -> bool:
+    """True se o mercado opera no dia d (nao e fim de semana nem feriado)."""
+    if d.weekday() >= 5:
+        return False
+    return d not in _MARKET_HOLIDAYS.get(market, {})
+
+
+def last_market_session(market: str, today: date, hora_brt: time) -> date:
+    """Ultima data com pregao efetivamente encerrado dessa bolsa.
+    Se hoje e dia util e o pregao ja fechou (hora_brt >= horario de corte do
+    mercado), retorna hoje; senao volta ate achar um dia util anterior."""
+    close_h = _MARKET_CLOSE_BRT.get(market, time(20, 0))
+    d = today
+    if is_market_session(market, d) and hora_brt >= close_h:
+        return d
+    d -= timedelta(days=1)
+    while not is_market_session(market, d):
+        d -= timedelta(days=1)
+    return d
+
+
+def briefing_date_across_markets(markets: Iterable[str], today: date, hora_brt: time) -> date:
+    """Data de referencia do briefing = max(last_session) entre os mercados
+    rastreados. Reflete a ultima sessao GLOBAL encerrada — evita que um
+    feriado isolado em um mercado atrase o rotulo do briefing inteiro."""
+    return max(last_market_session(m, today, hora_brt) for m in markets)
+
+
+def market_asymmetry(market: str, last_session: date, briefing_date: date) -> Optional[Tuple[date, str]]:
+    """Se o last_session desse mercado e anterior ao briefing_date, busca o
+    feriado do proprio mercado dentro da janela (last_session, briefing_date]
+    que explica o atraso. Retorna (data_feriado, nome) ou None se nao houver
+    assimetria relevante."""
+    if last_session >= briefing_date:
+        return None
+    d = briefing_date
+    holidays = _MARKET_HOLIDAYS.get(market, {})
+    while d > last_session:
+        name = holidays.get(d)
+        if name:
+            return (d, name)
+        d -= timedelta(days=1)
+    return None
 
 
 def is_dst_eua(d: date) -> bool:

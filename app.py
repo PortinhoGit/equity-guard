@@ -9,7 +9,11 @@ import sys
 import os
 from typing import Optional
 from analytics import register_visit, get_stats, get_daily_series
-from market_status import get_status_mercado, dia_util_anterior
+from market_status import (
+    get_status_mercado, dia_util_anterior,
+    briefing_date_across_markets, last_market_session, market_asymmetry,
+    market_flag,
+)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -1514,15 +1518,27 @@ def _render_briefing(T: dict) -> None:
             f"<b style='color:#e6edf3;'>{val}</b> {chg_html}</span></div>"
         )
 
-    # Titulo + data dependem do estado do mercado (fuso America/Sao_Paulo,
-    # feriados B3 tratados em market_status.py):
-    #   ONLINE  (dia util, 10h-20h)  -> "Briefing de Mercado · hoje" (intraday)
-    #   FECHAMENTO (antes das 10h)   -> "Briefing de Fechamento · D-1 util"
-    #   FECHAMENTO (apos 20h/fds/fer)-> "Briefing de Fechamento · ultima sessao"
-    # Evita mostrar "Fechamento 22/04" as 8h quando o pregao nem abriu.
+    # Titulo + data consideram a assimetria de calendarios (B3, NYSE, LSE):
+    # briefing_date = max(last_session) entre os mercados rastreados. Evita
+    # que um feriado isolado (ex.: Tiradentes no BR com NYSE/LSE abertas)
+    # atrase o rotulo do briefing inteiro.
     _mkt_hdr = get_status_mercado()
-    today = pd.Timestamp.now(tz="America/Sao_Paulo").strftime("%d/%m/%Y")
-    _briefing_date = _mkt_hdr["data_ref"].strftime("%d/%m/%Y")
+    _now_ts = pd.Timestamp.now(tz="America/Sao_Paulo")
+    today = _now_ts.strftime("%d/%m/%Y")
+    _today_d = _now_ts.date()
+    _hora_brt = _now_ts.time()
+    _tracked_markets = ("B3", "NYSE", "LSE")
+    _briefing_d = briefing_date_across_markets(_tracked_markets, _today_d, _hora_brt)
+    _briefing_date = _briefing_d.strftime("%d/%m/%Y")
+    _market_info = {
+        m: {
+            "last": last_market_session(m, _today_d, _hora_brt),
+            "asym": market_asymmetry(
+                m, last_market_session(m, _today_d, _hora_brt), _briefing_d
+            ),
+        }
+        for m in _tracked_markets
+    }
     _is_live = _mkt_hdr["estado"] == "ONLINE"
     _title_key = "briefing_title_live" if _is_live else "briefing_title"
     _title = T.get(_title_key, T["briefing_title"]).format(date=_briefing_date)
@@ -1569,18 +1585,43 @@ def _render_briefing(T: dict) -> None:
             )
 
         with _bc2:
+            # Badge de assimetria: se o last_session desse mercado for anterior
+            # ao briefing_date (ex.: IBOV 20/04 vs briefing 21/04 por causa do
+            # Tiradentes), exibe o motivo inline abaixo do nome do ativo.
+            def _asset_name(label: str, market: str) -> str:
+                info = _market_info.get(market)
+                if not info or not info["asym"]:
+                    return label
+                _d, _nome = info["asym"]
+                _flag = market_flag(market)
+                _dstr = _d.strftime("%d/%m")
+                return (
+                    f"{label}"
+                    f"<div style='font-size:.62rem;color:#d4af37;margin-top:2px;'>"
+                    f"{_flag} fech. {info['last'].strftime('%d/%m')} "
+                    f"<span style='color:#8b949e;'>· {_nome} em {_dstr}</span>"
+                    f"</div>"
+                )
+
+            # Rodape com as datas efetivas por mercado.
+            _fmt_mkt = lambda m: _market_info[m]["last"].strftime("%d/%m")
+            _footer_dates = (
+                f"B3 {_fmt_mkt('B3')} · "
+                f"NYSE {_fmt_mkt('NYSE')} · "
+                f"LSE {_fmt_mkt('LSE')}"
+            )
             st.markdown(
                 f"<div style='background:#161b22;border:1px solid #30363d;"
                 f"border-radius:10px;padding:14px 16px;'>"
                 f"<div style='font-size:.78rem;color:#d4af37;font-weight:700;"
                 f"text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;'>"
                 f"{T['briefing_bolsas']}</div>"
-                f"{_card('Ibovespa', _fmt_val('IBOV', 'br'), _chg_trio('IBOV'))}"
-                f"{_card('S&P 500', _fmt_val('S&P 500'), _chg_trio('S&P 500'))}"
-                f"{_card('NASDAQ', _fmt_val('NASDAQ'), _chg_trio('NASDAQ'))}"
-                f"{_card('FTSE', _fmt_val('FTSE'), _chg_trio('FTSE'))}"
+                f"{_card(_asset_name('Ibovespa', 'B3'), _fmt_val('IBOV', 'br'), _chg_trio('IBOV'))}"
+                f"{_card(_asset_name('S&P 500', 'NYSE'), _fmt_val('S&P 500'), _chg_trio('S&P 500'))}"
+                f"{_card(_asset_name('NASDAQ', 'NYSE'), _fmt_val('NASDAQ'), _chg_trio('NASDAQ'))}"
+                f"{_card(_asset_name('FTSE', 'LSE'), _fmt_val('FTSE'), _chg_trio('FTSE'))}"
                 f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:8px;'>"
-                f"{T['briefing_source_right']}</div>"
+                f"{T['briefing_source_right']} · {_footer_dates}</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -1615,7 +1656,6 @@ def _render_briefing(T: dict) -> None:
 
     _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
     _hora_online = _now_brt.strftime("%H:%M:%S")
-    _data_ref = _mkt["data_ref"].strftime("%d/%m/%Y")
 
     _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
     _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
@@ -1661,6 +1701,20 @@ def _render_briefing(T: dict) -> None:
     )
     _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
+    # Quando um mercado esta "atrasado" pelo calendario (ex.: IBOV em 20/04
+    # enquanto NYSE/LSE em 21/04 por causa do Tiradentes), a linha ganha um
+    # sufixo "(fech. DD/MM — motivo)" para explicar a assimetria no share.
+    def _wa_asset_line(label: str, yf_name: str, locale: str, market: str) -> str:
+        base = label + ": " + _wa_val(yf_name, locale) + "  " + _wa_chg(yf_name)
+        info = _market_info.get(market)
+        if info and info["asym"]:
+            _d, _nome = info["asym"]
+            base += (
+                f" (fech. {info['last'].strftime('%d/%m')} — {_nome} em "
+                f"{_d.strftime('%d/%m')})"
+            )
+        return base
+
     _body_block = (
         _juros_block + "\\n\\n"
         + "*Commodities*\\n"
@@ -1669,18 +1723,21 @@ def _render_briefing(T: dict) -> None:
         + "*Dolar Comercial*\\n"
         + "Venda: " + _fx_com + "  " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
         + "*Bolsas*\\n"
-        + "Ibovespa: " + _wa_val('IBOV', 'br') + "  " + _wa_chg('IBOV') + "\\n"
-        + "S&P 500: " + _wa_val('S&P 500') + "  " + _wa_chg('S&P 500') + "\\n"
-        + "NASDAQ: " + _wa_val('NASDAQ') + "  " + _wa_chg('NASDAQ') + "\\n"
-        + "FTSE: " + _wa_val('FTSE') + "  " + _wa_chg('FTSE') + "\\n\\n"
+        + _wa_asset_line('Ibovespa', 'IBOV', 'br', 'B3') + "\\n"
+        + _wa_asset_line('S&P 500', 'S&P 500', 'us', 'NYSE') + "\\n"
+        + _wa_asset_line('NASDAQ', 'NASDAQ', 'us', 'NYSE') + "\\n"
+        + _wa_asset_line('FTSE', 'FTSE', 'us', 'LSE') + "\\n\\n"
         + _prev_block + "\\n\\n"
         + _footer
     )
 
-    # ── Fechamento do último pregão (data_ref) ───────────────────────────
+    # ── Fechamento — usa briefing_date (max entre B3/NYSE/LSE) como rotulo
+    # global; as linhas dos ativos carregam seu proprio sufixo quando a sessao
+    # local foi antes disso (ex.: IBOV 20/04 enquanto briefing = 21/04).
+    _close_global_date = _briefing_date
     _close_msg = (
         "*Briefing Equity Guard*\\n"
-        + "*Fechamento " + _data_ref + ", " + _hora_corte + ".*\\n\\n"
+        + "*Fechamento " + _close_global_date + ", " + _hora_corte + ".*\\n\\n"
         + _body_block
     )
 
@@ -1694,7 +1751,7 @@ def _render_briefing(T: dict) -> None:
     # Sempre dois botoes: Fechamento (ultima sessao encerrada) + Online
     # (snapshot intradia / pos-pregao atual). Elimina a assimetria anterior
     # em que o botao "Online" sumia fora do horario de pregao.
-    _close_label = "Fechamento " + _data_ref + " (" + _hora_corte + ")"
+    _close_label = "Fechamento " + _close_global_date + " (" + _hora_corte + ")"
     _online_label = "Online " + _hora_online + " (Brasilia)"
     _wa_comp.html("""
     <div style="display:flex;flex-direction:column;gap:6px;">
