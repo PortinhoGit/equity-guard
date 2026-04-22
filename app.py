@@ -2126,6 +2126,41 @@ def _render_macro_panel(T: dict) -> None:
         )
         ts_html = f"<div style='font-size:.62rem;color:#6e7681;margin-top:6px;'>🕒 {_ts}</div>"
 
+    # ── Fonte Yahoo + estado do mercado FX (USDBRL=X) ────────────────────────
+    # Exibido logo abaixo da linha "Atualizado em ...". marketState do Yahoo:
+    # REGULAR = pregao corrente; POST/POSTPOST/PRE/CLOSED = fora do horario.
+    _market_state = (fx.get("market_state") or "").upper()
+    _market_ts = fx.get("market_time_ts")
+    _yf_src_html = ""
+    _mkt_status_label = (
+        T.get("fx_market_open", "aberto")
+        if _market_state == "REGULAR"
+        else T.get("fx_market_closed", "fechado")
+    )
+    _mkt_time_str = ""
+    if _market_ts:
+        try:
+            import pytz as _pytz
+            from datetime import datetime as _dt
+            _brt = _dt.fromtimestamp(_market_ts, tz=_pytz.timezone("America/Sao_Paulo"))
+            _gmt = _dt.fromtimestamp(_market_ts, tz=_pytz.UTC)
+            _mkt_time_str = (
+                f"{_brt.strftime('%H:%M')} Brasília / "
+                f"{_gmt.strftime('%H:%M')} GMT"
+            )
+        except Exception:
+            _mkt_time_str = ""
+    _yf_src_line = T.get(
+        "fx_yf_source_line",
+        "Fonte: Yahoo Finance · USDBRL=X · Mercado: {status}",
+    ).format(status=_mkt_status_label)
+    if _mkt_time_str:
+        _yf_src_line += f" · {_mkt_time_str}"
+    _yf_src_html = (
+        f"<div style='font-size:.6rem;color:#6e7681;margin-top:3px;"
+        f"line-height:1.35;'>{_yf_src_line}</div>"
+    )
+
     _hdr = "color:#6e7681;font-size:.62rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;padding-bottom:4px;"
     _cell = "padding:3px 0;font-size:.82rem;text-align:right;"
     _lbl = "padding:3px 0;font-size:.72rem;color:#8b949e;"
@@ -2196,7 +2231,7 @@ def _render_macro_panel(T: dict) -> None:
         f"<span><span style='color:#484f58;'>YTD</span> <span style='font-weight:700;color:{_ytd_color};'>{_ytd_str}</span></span>"
         f"<span><span style='color:#484f58;'>1A</span> <span style='font-weight:700;color:{_y1_color};'>{_y1_str}</span></span>"
         f"</div>"
-        f"{ts_html}</div>",
+        f"{ts_html}{_yf_src_html}</div>",
         unsafe_allow_html=True,
     )
 
