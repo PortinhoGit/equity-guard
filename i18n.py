@@ -330,6 +330,7 @@ _PT: dict = {
     "global_no_data":      "Indicadores indisponíveis.",
     # ── Briefing de Fechamento ────────────────────────────────────────────────
     "briefing_title":      "🗞️ Briefing de Fechamento · {date}",
+    "briefing_title_live": "🗞️ Briefing de Mercado · {date}",
     "briefing_usa":        "🇺🇸 **EUA (locomotiva):** Fed Funds em **{fed:.2f}%**. Próxima reunião FOMC em **{fed_next}**.",
     "briefing_br":         "🇧🇷 **Brasil:** Selic em **{selic:.2f}%**. Próxima reunião COPOM em **{selic_next}**.",
     "briefing_markets":    "🌍 **Fechamento Global:** FTSE {ftse} · Ibovespa {ibov} · S&P 500 {sp} · NASDAQ {nasdaq}.",
@@ -717,6 +718,7 @@ _EN: dict = {
     "global_no_data":      "Indicators unavailable.",
     # ── Closing Briefing ──────────────────────────────────────────────────────
     "briefing_title":      "🗞️ Closing Briefing · {date}",
+    "briefing_title_live": "🗞️ Market Briefing · {date}",
     "briefing_usa":        "🇺🇸 **US (the driver):** Fed Funds at **{fed:.2f}%**. Next FOMC meeting on **{fed_next}**.",
     "briefing_br":         "🇧🇷 **Brazil:** Selic at **{selic:.2f}%**. Next COPOM meeting on **{selic_next}**.",
     "briefing_markets":    "🌍 **Global close:** FTSE {ftse} · Ibovespa {ibov} · S&P 500 {sp} · NASDAQ {nasdaq}.",
@@ -1103,6 +1105,7 @@ _ES: dict = {
     "global_no_data":      "Indicadores no disponibles.",
     # ── Briefing de Cierre ────────────────────────────────────────────────────
     "briefing_title":      "🗞️ Briefing de Cierre · {date}",
+    "briefing_title_live": "🗞️ Briefing de Mercado · {date}",
     "briefing_usa":        "🇺🇸 **EE.UU. (locomotora):** Fed Funds en **{fed:.2f}%**. Próxima reunión FOMC el **{fed_next}**.",
     "briefing_br":         "🇧🇷 **Brasil:** Selic en **{selic:.2f}%**. Próxima reunión COPOM el **{selic_next}**.",
     "briefing_markets":    "🌍 **Cierre global:** FTSE {ftse} · Ibovespa {ibov} · S&P 500 {sp} · NASDAQ {nasdaq}.",

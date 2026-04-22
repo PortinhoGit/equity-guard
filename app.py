@@ -1514,13 +1514,19 @@ def _render_briefing(T: dict) -> None:
             f"<b style='color:#e6edf3;'>{val}</b> {chg_html}</span></div>"
         )
 
-    # Data de referencia do briefing: usa data_ref do market_status — pode ser
-    # D-1 util quando estamos antes das 10h (mercado ainda nao abriu), ou hoje
-    # quando o pregao ja fechou ou esta em ONLINE. Nunca exibe hoje as 8h.
+    # Titulo + data dependem do estado do mercado (fuso America/Sao_Paulo,
+    # feriados B3 tratados em market_status.py):
+    #   ONLINE  (dia util, 10h-20h)  -> "Briefing de Mercado · hoje" (intraday)
+    #   FECHAMENTO (antes das 10h)   -> "Briefing de Fechamento · D-1 util"
+    #   FECHAMENTO (apos 20h/fds/fer)-> "Briefing de Fechamento · ultima sessao"
+    # Evita mostrar "Fechamento 22/04" as 8h quando o pregao nem abriu.
     _mkt_hdr = get_status_mercado()
     today = pd.Timestamp.now(tz="America/Sao_Paulo").strftime("%d/%m/%Y")
     _briefing_date = _mkt_hdr["data_ref"].strftime("%d/%m/%Y")
-    with st.expander(T["briefing_title"].format(date=_briefing_date), expanded=True):
+    _is_live = _mkt_hdr["estado"] == "ONLINE"
+    _title_key = "briefing_title_live" if _is_live else "briefing_title"
+    _title = T.get(_title_key, T["briefing_title"]).format(date=_briefing_date)
+    with st.expander(_title, expanded=True):
 
         _bc1, _bc2 = st.columns(2)
 
