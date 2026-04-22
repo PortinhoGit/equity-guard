@@ -739,9 +739,19 @@ def _classify_ticker(ticker: str) -> str:
     return "Ação"
 
 
+# Bump _PROVENTOS_CACHE_V sempre que o shape ou rotulos de
+# get_proventos_summary mudarem — forca Streamlit a descartar entradas
+# antigas do cache (ir_label vira chave do hash).
+_PROVENTOS_CACHE_V = 3
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def _fetch_proventos_cached(ticker: str, window_months: int, discount_jcp: bool) -> dict:
-    """Cache 1h do summary de proventos por ticker."""
+def _fetch_proventos_cached(
+    ticker: str, window_months: int, discount_jcp: bool,
+    _cache_v: int = _PROVENTOS_CACHE_V,
+) -> dict:
+    """Cache 1h do summary de proventos por ticker.
+    _cache_v: parametro so pra invalidar cache antigo; nao usado internamente."""
     from data.provider import get_proventos_summary
     is_fii = _classify_ticker(ticker) == "FII"
     return get_proventos_summary(ticker, window_months, discount_jcp, is_fii)
@@ -938,7 +948,7 @@ def _render_passive_income_simulator(T: dict, embedded: bool = False) -> None:
         # ── Linha fixa do CDI ─────────────────────────────────────────────
         rows.append({
             "Ticker": "CDI (ref.)", "Tipo": "—", "Preço": None,
-            "Qtd": None, "Proventos 12m": None, "IR aplicado": "15%",
+            "Qtd": None, "Proventos 12m": None, "IR aplicado": "15% sobre rendimento",
             "Renda anual líq.": renda_anual_cdi,
             "Renda mensal equiv.": renda_mensal_cdi,
             "DY líq. a.a.": cdi_liquido, "% do CDI": 100.0,
@@ -1065,8 +1075,9 @@ def _render_passive_income_simulator(T: dict, embedded: bool = False) -> None:
         if _any_fallback:
             _notes.append(T.get(
                 "sim_note_fallback",
-                "⚠️ Ações marcadas usam yfinance (Status Invest indisponível); "
-                "IR aplicado como 15% sobre o total — estimativa conservadora."
+                "⚠️ Ações marcadas usam yfinance (Status Invest indisponível). "
+                "A proporção JCP/dividendo foi estimada pelo perfil do setor; "
+                "o IR de 15% incide apenas sobre a parcela de JCP."
             ))
         if _any_below:
             _notes.append(T.get(
