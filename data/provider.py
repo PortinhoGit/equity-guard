@@ -508,6 +508,175 @@ def get_ptax_bulletins(date_ref: Optional[str] = None) -> Dict[str, Any]:
     return out
 
 
+# ═══ Simulador de Renda Passiva — proventos por ticker ═══════════════════════
+# Regra v1: acoes via Status Invest (endpoint /acao/companytickerprovents,
+# JSON com separacao JCP/Dividendo/Rend. Tributado); FIIs via yfinance (sao
+# isentos de IR para PF, Lei 11.033/2004). Fallback yfinance para acoes se
+# Status Invest falhar — aplica 15% IR sobre o total como estimativa
+# conservadora (yfinance nao separa JCP).
+
+_STATUS_INVEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/122.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "pt-BR,pt;q=0.9",
+    "Referer": "https://statusinvest.com.br/",
+}
+
+
+def _parse_status_invest_records(data: dict) -> list:
+    """Converte assetEarningsModels do Status Invest em lista normalizada."""
+    out = []
+    for rec in (data or {}).get("assetEarningsModels", []) or []:
+        try:
+            _dt_str = rec.get("pd") or rec.get("ed") or ""
+            if not _dt_str:
+                continue
+            _dt = pd.to_datetime(_dt_str, format="%d/%m/%Y", errors="coerce")
+            if pd.isna(_dt):
+                continue
+            _tipo_raw = (rec.get("et") or rec.get("etd") or "").upper()
+            # Normaliza 3 buckets: DIVIDENDO, JCP, RENDIMENTO
+            if "DIVIDENDO" in _tipo_raw or _tipo_raw == "D":
+                _tipo = "DIVIDENDO"
+            elif "JCP" in _tipo_raw or "JUROS" in _tipo_raw:
+                _tipo = "JCP"
+            elif "TRIBUT" in _tipo_raw:
+                # "Rend. Tributado" no caso de FII — o usuario pediu para tratar
+                # como JCP (tem IR 15%). Para acoes comuns geralmente nao aparece.
+                _tipo = "JCP"
+            elif "RENDIMENTO" in _tipo_raw or "FII" in _tipo_raw:
+                _tipo = "RENDIMENTO"
+            else:
+                _tipo = "OUTRO"
+            out.append({
+                "data": _dt,
+                "tipo": _tipo,
+                "valor": float(rec.get("v", 0)),
+            })
+        except Exception:
+            continue
+    return out
+
+
+def _fetch_proventos_status_invest(ticker: str) -> list:
+    """Busca proventos de uma ACAO no Status Invest. Raise em falha."""
+    import requests as _req
+    t = ticker.upper().replace(".SA", "")
+    url = (
+        "https://statusinvest.com.br/acao/companytickerprovents"
+        f"?ticker={t}&chartProventsType=2"
+    )
+    r = _req.get(url, headers=_STATUS_INVEST_HEADERS, timeout=8)
+    r.raise_for_status()
+    ctype = r.headers.get("content-type", "")
+    if "json" not in ctype and not r.text.strip().startswith(("{", "[")):
+        raise ValueError(f"Status Invest devolveu {ctype} em vez de JSON")
+    return _parse_status_invest_records(r.json())
+
+
+def _fetch_proventos_yfinance(ticker: str) -> list:
+    """Fallback / fonte primaria FII: dividendos do yfinance.
+    Retorna lista com tipo='MISTO' (acoes) ou 'RENDIMENTO' (FII)."""
+    t = normalize_ticker(ticker)
+    try:
+        tk = yf.Ticker(t)
+        divs = tk.dividends
+    except Exception:
+        return []
+    if divs is None or len(divs) == 0:
+        return []
+    out = []
+    for idx, val in divs.items():
+        try:
+            _dt = pd.Timestamp(idx)
+            if _dt.tz is not None:
+                _dt = _dt.tz_localize(None)
+            out.append({"data": _dt, "tipo": "MISTO", "valor": float(val)})
+        except Exception:
+            continue
+    return out
+
+
+def get_proventos_summary(
+    ticker: str,
+    window_months: int,
+    discount_jcp: bool,
+    is_fii: bool,
+) -> Dict[str, Any]:
+    """
+    Resumo de proventos anualizado (normalizado para 12 meses).
+
+    Regra por cenario:
+      * FII -> yfinance (sem separacao, isento)
+      * Acao + Status Invest OK -> separa dividendos/JCP; aplica IR 15% em JCP
+        se discount_jcp=True.
+      * Acao + Status Invest falha -> fallback yfinance (misto). Se
+        discount_jcp=True, aplica 15% sobre o total como estimativa.
+
+    Retorna dict com:
+      ticker, source ('status_invest'|'yfinance'|'yfinance_fallback'),
+      ir_label (str), total_12m (bruto), liquido_12m (apos IR),
+      div_12m, jcp_12m, n_records, is_fii.
+    """
+    cutoff = pd.Timestamp.now().tz_localize(None) - pd.DateOffset(months=window_months)
+
+    if is_fii:
+        records = _fetch_proventos_yfinance(ticker)
+        source = "yfinance"
+    else:
+        try:
+            records = _fetch_proventos_status_invest(ticker)
+            source = "status_invest"
+            if not records:
+                raise ValueError("Status Invest sem registros")
+        except Exception as e:
+            logger.info(f"Status Invest fallback p/ {ticker}: {type(e).__name__} {e}")
+            records = _fetch_proventos_yfinance(ticker)
+            source = "yfinance_fallback"
+
+    records_win = [r for r in records if r["data"] >= cutoff]
+    soma_div = sum(r["valor"] for r in records_win if r["tipo"] == "DIVIDENDO")
+    soma_jcp = sum(r["valor"] for r in records_win if r["tipo"] == "JCP")
+    soma_rend = sum(r["valor"] for r in records_win if r["tipo"] == "RENDIMENTO")
+    soma_mist = sum(r["valor"] for r in records_win if r["tipo"] == "MISTO")
+    soma_total = soma_div + soma_jcp + soma_rend + soma_mist
+
+    if is_fii:
+        liquido = soma_total
+        ir_label = "Isento"
+    elif source == "status_invest":
+        if discount_jcp:
+            liquido = soma_div + (soma_jcp * 0.85)
+            ir_label = "15% sobre JCP"
+        else:
+            liquido = soma_total
+            ir_label = "Sem desconto"
+    else:
+        # yfinance fallback p/ acao — nao separa; aplica 15% sobre tudo se flag ON
+        if discount_jcp:
+            liquido = soma_total * 0.85
+            ir_label = "15% sobre total (estimativa)"
+        else:
+            liquido = soma_total
+            ir_label = "Sem desconto"
+
+    factor = 12.0 / max(window_months, 1)
+    return {
+        "ticker": ticker,
+        "source": source,
+        "ir_label": ir_label,
+        "total_12m": soma_total * factor,
+        "liquido_12m": liquido * factor,
+        "div_12m": (soma_div + soma_mist) * factor,  # misto conta como "div" visual
+        "jcp_12m": soma_jcp * factor,
+        "rendimento_12m": soma_rend * factor,
+        "n_records": len(records_win),
+        "is_fii": is_fii,
+    }
+
+
 def get_market_news(max_per_source: int = 3) -> list:
     """Busca manchetes de mercado do yfinance para Ibovespa e S&P 500."""
     results = []

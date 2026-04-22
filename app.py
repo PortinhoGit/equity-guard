@@ -723,6 +723,320 @@ def _fetch_ptax_bulletins(date_ref: Optional[str] = None) -> dict:
     return get_ptax_bulletins(date_ref)
 
 
+# ═══ Simulador de Renda Passiva Comparativa ══════════════════════════════════
+# Units listadas na B3 que TERMINAM em 11 mas sao acoes (nao FIIs).
+_UNITS_ACOES = {
+    "BPAC11", "TAEE11", "SANB11", "KLBN11", "SAPR11", "ALUP11", "CVCB11",
+    "ENGI11", "TRPL11", "CTSA11",
+}
+
+
+def _classify_ticker(ticker: str) -> str:
+    """FII se termina em 11 e NAO e unit conhecida; caso contrario, Ação."""
+    t = ticker.upper().replace(".SA", "")
+    if t.endswith("11") and t not in _UNITS_ACOES:
+        return "FII"
+    return "Ação"
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_proventos_cached(ticker: str, window_months: int, discount_jcp: bool) -> dict:
+    """Cache 1h do summary de proventos por ticker."""
+    from data.provider import get_proventos_summary
+    is_fii = _classify_ticker(ticker) == "FII"
+    return get_proventos_summary(ticker, window_months, discount_jcp, is_fii)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_cdi_cached() -> Optional[float]:
+    """Cache 1h do CDI anualizado (BCB serie 12)."""
+    from rates import get_cdi_12m_annualized
+    return get_cdi_12m_annualized()
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _fetch_price_cached(ticker: str) -> Optional[float]:
+    """Preco atual via yfinance (TTL 10min — ok para simulador)."""
+    import yfinance as yf
+    from data.provider import normalize_ticker
+    try:
+        tk = yf.Ticker(normalize_ticker(ticker))
+        fi = getattr(tk, "fast_info", None)
+        if fi is not None:
+            for _k in ("last_price", "lastPrice"):
+                _v = fi.get(_k) if hasattr(fi, "get") else getattr(fi, _k, None)
+                if _v:
+                    return float(_v)
+        hist = tk.history(period="5d", interval="1d", auto_adjust=True)
+        if hist is not None and not hist.empty:
+            return float(hist["Close"].dropna().iloc[-1])
+    except Exception:
+        pass
+    return None
+
+
+def _render_passive_income_simulator(T: dict) -> None:
+    """
+    Simulador de Renda Passiva Comparativa: o usuario informa quanto quer
+    investir + escolhe ate 5 ativos (acoes/FIIs) e o app compara a renda
+    anual liquida de cada um contra o CDI.
+    """
+    from data.tickers_b3 import ACOES, FIIS
+    import plotly.graph_objects as go
+
+    _sec_title = T.get("sim_title", "💰 Simulador de Renda Passiva Comparativa")
+    st.markdown(
+        f"<div style='margin:18px 0 8px;'>"
+        f"<span style='font-size:.82rem;font-weight:800;letter-spacing:1.5px;"
+        f"text-transform:uppercase;color:#d4af37;'>{_sec_title}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander(T.get("sim_expander", "Abrir simulador"), expanded=False):
+        _c1, _c2 = st.columns([1, 2])
+        with _c1:
+            valor_aporte = st.number_input(
+                T.get("sim_aporte_label", "Quanto voce quer investir?"),
+                min_value=100.0, value=100000.0, step=1000.0, format="%.2f",
+                key="sim_aporte",
+            )
+        with _c2:
+            _opts = sorted(set(ACOES + FIIS))
+            tickers = st.multiselect(
+                T.get("sim_tickers_label", "Selecione os ativos (2 a 5)"),
+                options=_opts, default=["BBAS3", "ITSA4"], max_selections=5,
+                key="sim_tickers",
+            )
+
+        _c3, _c4 = st.columns([2, 1])
+        with _c3:
+            janela_label = st.radio(
+                T.get("sim_window_label", "Janela de calculo dos proventos"),
+                options=["12m", "24m", "5a"],
+                format_func=lambda s: {
+                    "12m": T.get("sim_window_12m", "Últimos 12 meses"),
+                    "24m": T.get("sim_window_24m", "Últimos 24 meses"),
+                    "5a":  T.get("sim_window_5y",  "Média 5 anos"),
+                }[s],
+                index=0, horizontal=True, key="sim_window",
+            )
+        with _c4:
+            descontar_ir_jcp = st.toggle(
+                T.get("sim_ir_toggle", "Descontar 15% IR sobre JCP"),
+                value=True, key="sim_ir",
+            )
+
+        if len(tickers) < 2:
+            st.warning(T.get("sim_min_tickers",
+                             "Selecione pelo menos 2 ativos para comparar."))
+            return
+
+        _window_map = {"12m": 12, "24m": 24, "5a": 60}
+        window_months = _window_map[janela_label]
+
+        # ── Coleta dados por ticker ────────────────────────────────────────
+        cdi_aa = _fetch_cdi_cached()
+        if cdi_aa is None:
+            st.error(T.get("sim_cdi_err", "CDI indisponivel (BCB)."))
+            return
+        cdi_liquido = cdi_aa * 0.85
+        renda_anual_cdi = valor_aporte * cdi_liquido
+        renda_mensal_cdi = renda_anual_cdi / 12
+
+        rows = []
+        with st.spinner(T.get("sim_loading", "Calculando...")):
+            for t in tickers:
+                tipo = _classify_ticker(t)
+                prov = _fetch_proventos_cached(t, window_months, descontar_ir_jcp)
+                price = _fetch_price_cached(t)
+                if not price or price <= 0:
+                    rows.append({
+                        "Ticker": t, "Tipo": tipo, "Preço": None,
+                        "Qtd": None, "Proventos 12m": None, "IR aplicado": "—",
+                        "Renda anual líq.": None, "Renda mensal equiv.": None,
+                        "DY líq. a.a.": None, "% do CDI": None,
+                        "_source": prov.get("source", "?"),
+                        "_warn_fallback": prov.get("source") == "yfinance_fallback",
+                        "_below_cdi": False,
+                    })
+                    continue
+                qtd = valor_aporte / price
+                prov_por_acao_12m = prov["liquido_12m"]
+                renda_anual = prov_por_acao_12m * qtd
+                renda_mensal = renda_anual / 12
+                dy_liq = renda_anual / valor_aporte if valor_aporte else 0
+                pct_cdi = (renda_anual / renda_anual_cdi * 100) if renda_anual_cdi else 0
+                rows.append({
+                    "Ticker": t, "Tipo": tipo, "Preço": price,
+                    "Qtd": qtd, "Proventos 12m": prov_por_acao_12m,
+                    "IR aplicado": prov["ir_label"],
+                    "Renda anual líq.": renda_anual,
+                    "Renda mensal equiv.": renda_mensal,
+                    "DY líq. a.a.": dy_liq,
+                    "% do CDI": pct_cdi,
+                    "_source": prov.get("source", "?"),
+                    "_warn_fallback": prov.get("source") == "yfinance_fallback",
+                    "_below_cdi": renda_anual < renda_anual_cdi,
+                })
+
+        # ── Linha fixa do CDI ─────────────────────────────────────────────
+        rows.append({
+            "Ticker": "CDI (ref.)", "Tipo": "—", "Preço": None,
+            "Qtd": None, "Proventos 12m": None, "IR aplicado": "15%",
+            "Renda anual líq.": renda_anual_cdi,
+            "Renda mensal equiv.": renda_mensal_cdi,
+            "DY líq. a.a.": cdi_liquido, "% do CDI": 100.0,
+            "_source": "bcb_12", "_warn_fallback": False, "_below_cdi": False,
+        })
+
+        # ── Card destaque: melhor renda mensal ─────────────────────────────
+        valid_assets = [r for r in rows if r["Ticker"] != "CDI (ref.)" and r["Renda mensal equiv."] is not None]
+        if valid_assets:
+            best = max(valid_assets, key=lambda r: r["Renda mensal equiv."])
+            _best_pct = best.get("% do CDI") or 0
+            _txt = T.get(
+                "sim_highlight",
+                "Investindo {aporte} você receberia em média {mensal}/mês com "
+                "{ticker} ({tipo}), equivalente a {pct:.0f}% do CDI."
+            ).format(
+                aporte=_fmt_money(valor_aporte, "R$"),
+                mensal=_fmt_money(best["Renda mensal equiv."], "R$"),
+                ticker=best["Ticker"], tipo=best["Tipo"], pct=_best_pct,
+            )
+            st.markdown(
+                f"<div style='background:rgba(212,175,55,.10);border:1px solid #d4af37;"
+                f"border-radius:10px;padding:12px 18px;margin:10px 0 14px;"
+                f"color:#e6edf3;font-size:.92rem;line-height:1.45;'>"
+                f"💡 {_txt}</div>",
+                unsafe_allow_html=True,
+            )
+            st.caption(
+                T.get("sim_ref_caption",
+                      "Comparando {n} ativos com o CDI médio dos últimos 12 meses "
+                      "({bruto:.2f}% a.a., líquido de IR: {liq:.2f}%).")
+                .format(n=len(tickers), bruto=cdi_aa * 100, liq=cdi_liquido * 100)
+            )
+
+        # ── Tabela ─────────────────────────────────────────────────────────
+        def _fmt_brl(v):
+            return _fmt_money(v, "R$") if v is not None else "—"
+
+        def _fmt_pct(v):
+            return f"{v * 100:.2f}%" if v is not None else "—"
+
+        def _fmt_pct_raw(v):
+            return f"{v:.0f}%" if v is not None else "—"
+
+        def _fmt_qtd(v):
+            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if v is not None else "—"
+
+        def _fmt_prov(v):
+            return f"R$ {v:.4f}".replace(".", ",") if v is not None else "—"
+
+        disp = []
+        for r in rows:
+            _tk_label = r["Ticker"]
+            if r["_warn_fallback"]:
+                _tk_label += " ⚠️"
+            elif r["_below_cdi"]:
+                _tk_label += " ⚠️"
+            disp.append({
+                T.get("sim_col_ticker", "Ticker"): _tk_label,
+                T.get("sim_col_type", "Tipo"): r["Tipo"],
+                T.get("sim_col_price", "Preço"): _fmt_brl(r["Preço"]),
+                T.get("sim_col_qtd", "Qtd"): _fmt_qtd(r["Qtd"]),
+                T.get("sim_col_prov", "Proventos 12m"): _fmt_prov(r["Proventos 12m"]),
+                T.get("sim_col_ir", "IR aplicado"): r["IR aplicado"],
+                T.get("sim_col_renda_anual", "Renda anual líq."): _fmt_brl(r["Renda anual líq."]),
+                T.get("sim_col_renda_mensal", "Renda mensal equiv."): _fmt_brl(r["Renda mensal equiv."]),
+                T.get("sim_col_dy", "DY líq. a.a."): _fmt_pct(r["DY líq. a.a."]),
+                T.get("sim_col_pct_cdi", "% do CDI"): _fmt_pct_raw(r["% do CDI"]),
+            })
+        _df = pd.DataFrame(disp)
+        st.dataframe(_df, use_container_width=True, hide_index=True)
+
+        # ── Grafico barras horizontal ─────────────────────────────────────
+        _bar_tickers = [r["Ticker"] for r in rows]
+        _bar_values = [r["Renda mensal equiv."] or 0 for r in rows]
+        _bar_colors = []
+        for r in rows:
+            if r["Ticker"] == "CDI (ref.)":
+                _bar_colors.append("#8b949e")
+            elif r["Tipo"] == "FII":
+                _bar_colors.append("#58a6ff")
+            else:
+                _bar_colors.append("#3fb950")
+        _fig = go.Figure(go.Bar(
+            x=_bar_values, y=_bar_tickers, orientation="h",
+            marker_color=_bar_colors,
+            text=[_fmt_brl(v) for v in _bar_values],
+            textposition="outside",
+            hovertemplate="%{y}: R$ %{x:,.2f}/mês<extra></extra>",
+        ))
+        _fig.add_vline(
+            x=renda_mensal_cdi, line_dash="dash", line_color="#8b949e",
+            annotation_text="CDI (base)",
+            annotation_position="top right",
+            annotation_font=dict(size=10, color="#8b949e"),
+        )
+        _fig.update_layout(
+            height=max(220, 40 * len(_bar_tickers) + 80),
+            margin=dict(l=10, r=10, t=20, b=20),
+            paper_bgcolor="#0d1117", plot_bgcolor="#0d1117",
+            font=dict(color="#e6edf3", size=11),
+            showlegend=False,
+            xaxis=dict(showgrid=True, gridcolor="#21262d", tickprefix="R$ ", tickformat=",.0f"),
+            yaxis=dict(showgrid=False, autorange="reversed"),
+        )
+        st.plotly_chart(_fig, use_container_width=True, config={"displayModeBar": False})
+
+        # ── Download CSV ──────────────────────────────────────────────────
+        _csv = _df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            T.get("sim_download", "📥 Baixar tabela em CSV"),
+            data=_csv, file_name="simulacao_renda.csv", mime="text/csv",
+            key="sim_csv_dl",
+        )
+
+        # ── Rodape + avisos ───────────────────────────────────────────────
+        _any_fallback = any(r["_warn_fallback"] for r in rows)
+        _any_below = any(r["_below_cdi"] for r in rows)
+        _notes = []
+        if _any_fallback:
+            _notes.append(T.get(
+                "sim_note_fallback",
+                "⚠️ Ações marcadas usam yfinance (Status Invest indisponível); "
+                "IR aplicado como 15% sobre o total — estimativa conservadora."
+            ))
+        if _any_below:
+            _notes.append(T.get(
+                "sim_note_below",
+                "⚠️ Ativos com renda abaixo do CDI no período analisado."
+            ))
+        _notes.append(T.get(
+            "sim_note_disclaimer",
+            "Cálculo baseado em proventos históricos; rendimentos passados "
+            "não garantem rendimentos futuros."
+        ))
+        _notes.append(T.get(
+            "sim_note_fii",
+            "FIIs: isenção de IR para PF conforme Lei 11.033/2004."
+        ))
+        st.markdown(
+            "<div style='font-size:.7rem;color:#6e7681;margin-top:10px;line-height:1.55;'>"
+            + "<br>".join(_notes) +
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<div style='font-size:.62rem;color:#484f58;margin-top:4px;'>"
+            f"{T.get('sim_source_footer', 'Fonte: Status Invest (ações) · yfinance (FIIs, fallback, preços) · BCB série 12 (CDI) · IR 15% sobre JCP e CDI.')}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+
 def _render_share_buttons(T: dict) -> None:
     """Social share buttons with correct share URLs + email + copy."""
     import urllib.parse as _url
@@ -4369,6 +4683,9 @@ def main() -> None:
 
     # ── 📊 Mercado B3 (top altas, baixas, mais negociadas) ──────────────────
     _render_market_movers(T)
+
+    # ── Simulador de Renda Passiva Comparativa (multi-ativo vs CDI) ─────────
+    _render_passive_income_simulator(T)
 
     # ── Busca de ticker — apos o panorama do mercado, para o usuario ver
     # primeiro altas/baixas/negociadas e so depois escolher o ticker.
