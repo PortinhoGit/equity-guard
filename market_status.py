@@ -102,8 +102,15 @@ def get_status_mercado() -> Dict:
         }
     else:
         if is_dia_util(hoje) and hora_atual >= HORA_CORTE:
+            # Dia util apos o corte (pos-20h): fechamento e de hoje.
             data_ref = hoje
+        elif is_dia_util(hoje) and hora_atual < HORA_ABERTURA:
+            # Dia util antes da abertura (pre-10h): fechamento ainda e do
+            # ultimo dia util anterior. Sem isso, o app mostrava FECHAMENTO
+            # do dia corrente as 6h da manha.
+            data_ref = dia_util_anterior(hoje)
         else:
+            # Fim de semana, feriado, ou estado indefinido.
             data_ref = ultimo_dia_util(hoje)
         data_ant = dia_util_anterior(data_ref)
         return {
