@@ -715,6 +715,14 @@ def _fetch_fx_usdbrl() -> Optional[dict]:
     return get_fx_usdbrl()
 
 
+@st.cache_data(ttl=90, show_spinner=False)
+def _fetch_ptax_bulletins(date_ref: Optional[str] = None) -> dict:
+    """Cached wrapper para os boletins PTAX do dia (TTL 90s — os boletins
+    sao publicados em HH:04-HH:15, entao cache curto da 1-2 ticks por hora)."""
+    from data.provider import get_ptax_bulletins
+    return get_ptax_bulletins(date_ref)
+
+
 def _render_share_buttons(T: dict) -> None:
     """Social share buttons with correct share URLs + email + copy."""
     import urllib.parse as _url
@@ -2229,6 +2237,90 @@ def _render_macro_panel(T: dict) -> None:
     st.markdown(
         f"<div style='font-size:.55rem;color:#484f58;text-align:right;margin-top:2px;'>"
         f"{_t_src}</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Boletins PTAX · Banco Central (informacao complementar) ──────────────
+    # Yahoo Finance fica como cotacao principal do card acima; esta secao mostra
+    # os 4 boletins oficiais do dia (10h, 11h, 12h, 13h) + PTAX de fechamento
+    # (~13h15). Fonte: Olinda / BCB via get_ptax_bulletins().
+    _today_fmt_ptax = pd.Timestamp.now(tz="America/Sao_Paulo").strftime("%m-%d-%Y")
+    _ptax = _fetch_ptax_bulletins(_today_fmt_ptax)
+    _ptax_bul = (_ptax or {}).get("bulletins") or {}
+    _ptax_close = (_ptax or {}).get("closing")
+
+    # Se nao ha nenhum boletim e o mercado B3 esta fechado (fds/feriado),
+    # tenta pegar o PTAX de fechamento do ultimo dia util para referencia.
+    _fallback_date = None
+    if not _ptax_bul and _ptax_close is None:
+        try:
+            _prev_d = dia_util_anterior(pd.Timestamp.now(tz="America/Sao_Paulo").date())
+            _ptax_fb = _fetch_ptax_bulletins(_prev_d.strftime("%m-%d-%Y"))
+            if _ptax_fb and _ptax_fb.get("closing"):
+                _ptax_close = _ptax_fb["closing"]
+                _fallback_date = _prev_d
+        except Exception:
+            pass
+
+    _rows_html = ""
+    _wait_label = T.get("ptax_waiting", "aguardando")
+    for _h in (10, 11, 12, 13):
+        _b = _ptax_bul.get(_h)
+        if _b:
+            _rows_html += (
+                f"<tr>"
+                f"<td style='padding:2px 0;font-size:.72rem;color:#8b949e;'>{_h}h</td>"
+                f"<td style='padding:2px 0;font-size:.78rem;text-align:right;"
+                f"color:#e6edf3;font-weight:700;'>R$ {_b['ask']:.4f}".replace(".", ",") + "</td>"
+                f"<td style='padding:2px 0 2px 6px;font-size:.68rem;color:#3fb950;"
+                f"text-align:right;width:22px;'>✓</td>"
+                f"</tr>"
+            )
+        else:
+            _rows_html += (
+                f"<tr>"
+                f"<td style='padding:2px 0;font-size:.72rem;color:#8b949e;'>{_h}h</td>"
+                f"<td style='padding:2px 0;font-size:.78rem;text-align:right;"
+                f"color:#484f58;'>—</td>"
+                f"<td style='padding:2px 0 2px 6px;font-size:.62rem;color:#6e7681;"
+                f"text-align:right;'>{_wait_label}</td>"
+                f"</tr>"
+            )
+
+    _closing_html = ""
+    if _ptax_close:
+        _close_val = f"{_ptax_close['ask']:.4f}".replace(".", ",")
+        _close_line = T.get("ptax_closing", "★ PTAX Fechamento: R$ {val} ({ts})").format(
+            val=_close_val, ts=_ptax_close.get("ts", "13h15"),
+        )
+        _closing_html = (
+            f"<div style='margin-top:6px;padding-top:6px;border-top:1px dashed #30363d;"
+            f"font-size:.78rem;color:#d4af37;font-weight:700;text-align:center;'>"
+            f"{_close_line}</div>"
+        )
+
+    _ref_html = ""
+    if _fallback_date:
+        _ref = T.get("ptax_ref_date", "Ref. {date}").format(
+            date=_fallback_date.strftime("%d/%m/%Y")
+        )
+        _ref_html = (
+            f"<div style='font-size:.6rem;color:#6e7681;text-align:right;margin-top:4px;'>"
+            f"{_ref}</div>"
+        )
+
+    st.markdown(
+        f"<div style='background:#161b22;border:1px solid #21262d;"
+        f"border-radius:10px;padding:10px 12px;margin-top:8px;'>"
+        f"<div style='font-size:.68rem;font-weight:800;letter-spacing:.5px;"
+        f"text-transform:uppercase;color:#6e7681;margin-bottom:6px;'>"
+        f"{T.get('ptax_title', 'Boletins PTAX · Banco Central')}</div>"
+        f"<table style='width:100%;border-collapse:collapse;'>"
+        f"{_rows_html}"
+        f"</table>"
+        f"{_closing_html}"
+        f"{_ref_html}"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
