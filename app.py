@@ -2161,7 +2161,7 @@ def _render_macro_panel(T: dict) -> None:
         f"line-height:1.35;'>{_yf_src_line}</div>"
     )
 
-    _hdr = "color:#6e7681;font-size:.62rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;padding-bottom:4px;"
+    _hdr = "color:#ffffff;font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding-bottom:4px;"
     _cell = "padding:3px 0;font-size:.82rem;text-align:right;"
     _lbl = "padding:3px 0;font-size:.72rem;color:#8b949e;"
     _gold_cell = "padding:3px 0;font-size:.88rem;text-align:right;font-weight:800;color:#d4af37;"
