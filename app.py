@@ -775,25 +775,35 @@ def _fetch_price_cached(ticker: str) -> Optional[float]:
     return None
 
 
-def _render_passive_income_simulator(T: dict) -> None:
+def _render_passive_income_simulator(T: dict, embedded: bool = False) -> None:
     """
     Simulador de Renda Passiva Comparativa: o usuario informa quanto quer
     investir + escolhe ate 5 ativos (acoes/FIIs) e o app compara a renda
     anual liquida de cada um contra o CDI.
+
+    embedded=True: renderiza sem titulo/expander (uso dentro de st.tabs
+    do Planejador). embedded=False mantem o layout legado com expander.
     """
     from data.tickers_b3 import ACOES, FIIS
     import plotly.graph_objects as go
 
-    _sec_title = T.get("sim_title", "💰 Simulador de Renda Passiva Comparativa")
-    st.markdown(
-        f"<div style='margin:18px 0 8px;'>"
-        f"<span style='font-size:.82rem;font-weight:800;letter-spacing:1.5px;"
-        f"text-transform:uppercase;color:#d4af37;'>{_sec_title}</span>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
+    if not embedded:
+        _sec_title = T.get("sim_title", "💰 Simulador de Renda Passiva Comparativa")
+        st.markdown(
+            f"<div style='margin:18px 0 8px;'>"
+            f"<span style='font-size:.82rem;font-weight:800;letter-spacing:1.5px;"
+            f"text-transform:uppercase;color:#d4af37;'>{_sec_title}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
-    with st.expander(T.get("sim_expander", "Abrir simulador"), expanded=False):
+    # Context manager: expander quando standalone; nullcontext quando embutido.
+    import contextlib as _ctx
+    _wrapper = (
+        st.expander(T.get("sim_expander", "Abrir simulador"), expanded=False)
+        if not embedded else _ctx.nullcontext()
+    )
+    with _wrapper:
         # CSS: aporte em fonte "numerica" alinhada a direita (padrao financeiro).
         # Escopo global ok — o app so tem 1 st.number_input (este).
         st.markdown(
@@ -1053,6 +1063,235 @@ def _render_passive_income_simulator(T: dict) -> None:
             f"</div>",
             unsafe_allow_html=True,
         )
+
+
+def _render_meta_de_renda_card(T: dict, default_ticker: str = "BBAS3", cs: str = "R$") -> None:
+    """
+    Card "Minha meta de renda" (inverso do Simulador): o usuario informa
+    quanto quer receber, a frequencia e ate 5 ativos; o app calcula a
+    quantidade de acoes/cotas e o capital necessario de cada um pra
+    atingir a meta, comparando com o CDI.
+
+    Extraido do render_analysis para funcionar standalone dentro do
+    Planejador de Renda Passiva (aba 2).
+    """
+    from data.tickers_b3 import ALL_TICKERS_B3
+
+    _lang = st.session_state.get("lang", "pt")
+    _br_locale = _lang in ("pt", "es")
+
+    def _parse_money(s: str, default: float = 1000.0) -> float:
+        if not s:
+            return default
+        s = str(s).strip()
+        for p in ("R$", "US$", "U$S", "€", "£", "$", " "):
+            s = s.replace(p, "")
+        if "," in s and "." in s:
+            if s.rfind(",") > s.rfind("."):
+                s = s.replace(".", "").replace(",", ".")
+            else:
+                s = s.replace(",", "")
+        elif "," in s and s.count(",") == 1:
+            s = s.replace(",", ".")
+        try:
+            return max(0.0, float(s))
+        except ValueError:
+            return default
+
+    _default_str = f"{cs} 1.000" if _br_locale else f"{cs} 1,000"
+
+    _g1, _g2, _g3 = st.columns([2, 2, 3])
+    with _g1:
+        _goal_str = st.text_input(
+            T["goal_input_label"],
+            value=st.session_state.get("goal_target_str", _default_str),
+            key="goal_target_str",
+            placeholder=_default_str,
+        )
+        _goal_target = _parse_money(_goal_str, default=1000.0)
+    with _g2:
+        _freq_opts = T["goal_freq_options"]
+        _freq_idx = st.selectbox(
+            T["goal_freq_label"],
+            options=list(range(len(_freq_opts))),
+            format_func=lambda i: _freq_opts[i],
+            index=0, key="goal_freq",
+        )
+    with _g3:
+        _goal_tickers = st.multiselect(
+            T.get("goal_tickers_label", "Ativos para calcular (até 5)"),
+            options=sorted(set(ALL_TICKERS_B3)),
+            default=[(default_ticker or "BBAS3").upper()],
+            max_selections=5,
+            key="goal_tickers_ms",
+            help=T.get("goal_tickers_help",
+                       "Até 5 ativos (ações e/ou FIIs) para comparar com o CDI."),
+        )
+
+    _fat_full = {0: 12, 1: 4, 2: 2, 3: 1}
+    _annual_need = _goal_target * _fat_full.get(_freq_idx, 1)
+
+    if not _goal_tickers:
+        st.warning(T.get("goal_min_ticker", "Selecione ao menos 1 ativo."))
+        return
+
+    rows = []
+    for t in _goal_tickers:
+        _tipo = _classify_ticker(t)
+        _prov = _fetch_proventos_cached(t, 12, True)
+        _px = _fetch_price_cached(t)
+        _prov_12m = _prov.get("liquido_12m") or 0
+        if not _px or _px <= 0 or _prov_12m <= 0:
+            rows.append({
+                "Ativo": t, "Tipo": _tipo, "Cotação": _px,
+                "Qtd": None, "Capital": None,
+                "_fallback": _prov.get("source") == "yfinance_fallback",
+                "_most_eff": False,
+            })
+            continue
+        _qtd = int(math.ceil(_annual_need / _prov_12m))
+        _capital = _qtd * _px
+        rows.append({
+            "Ativo": t, "Tipo": _tipo, "Cotação": _px,
+            "Qtd": _qtd, "Capital": _capital,
+            "_fallback": _prov.get("source") == "yfinance_fallback",
+            "_most_eff": False,
+        })
+
+    _cdi_aa = _fetch_cdi_cached() or 0
+    _cdi_liq = _cdi_aa * 0.85
+    _cdi_capital = (_annual_need / _cdi_liq) if _cdi_liq else None
+    rows.append({
+        "Ativo": "CDI (ref.)", "Tipo": "—", "Cotação": None,
+        "Qtd": None, "Capital": _cdi_capital,
+        "_fallback": False, "_most_eff": False,
+    })
+
+    _valid = [r for r in rows
+              if r["Ativo"] != "CDI (ref.)" and r["Capital"] is not None]
+    if _valid:
+        _best = min(_valid, key=lambda r: r["Capital"])
+        _best["_most_eff"] = True
+
+    _freq_lower = _freq_opts[_freq_idx].lower()
+    _header_tpl = T.get(
+        "goal_table_header",
+        "🎯 Para receber <b>{valor}</b> {freq} líquidos:"
+    )
+    st.markdown(
+        f"<div style='margin:12px 0 6px;color:#e6edf3;font-size:.92rem;'>"
+        + _header_tpl.format(
+            valor=_fmt_money(_goal_target, cs), freq=_freq_lower,
+        ) +
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    def _fmt_brl_or_dash(v):
+        return _fmt_money(v, cs) if v is not None else "—"
+
+    def _fmt_qtd_goal(v):
+        return f"{v:,}".replace(",", ".") if v is not None else "—"
+
+    def _label(r):
+        lbl = r["Ativo"]
+        if r["_fallback"]:
+            lbl += " ⚠️"
+        if r["_most_eff"]:
+            lbl += " ⬇"
+        return lbl
+
+    _disp = [
+        {
+            T.get("goal_col_ativo", "Ativo"): _label(r),
+            T.get("goal_col_tipo", "Tipo"): r["Tipo"],
+            T.get("goal_col_cotacao", "Cotação"): _fmt_brl_or_dash(r["Cotação"]),
+            T.get("goal_col_qtd", "Qtd necessária"): _fmt_qtd_goal(r["Qtd"]),
+            T.get("goal_col_capital", "Capital necessário"): _fmt_brl_or_dash(r["Capital"]),
+        }
+        for r in rows
+    ]
+    st.dataframe(pd.DataFrame(_disp), use_container_width=True, hide_index=True)
+
+    if _valid and _cdi_capital:
+        _b = min(_valid, key=lambda r: r["Capital"])
+        _economia = _cdi_capital - _b["Capital"]
+        if _economia > 0:
+            _hl = T.get(
+                "goal_most_efficient",
+                "💡 Opção mais eficiente: <b>{ticker}</b> com <b>{capital}</b> "
+                "(economia de {economia} vs CDI)."
+            ).format(
+                ticker=_b["Ativo"],
+                capital=_fmt_money(_b["Capital"], cs),
+                economia=_fmt_money(_economia, cs),
+            )
+            st.markdown(
+                f"<div style='background:rgba(63,185,80,.10);border:1px solid "
+                f"rgba(63,185,80,.35);border-radius:10px;padding:10px 16px;"
+                f"margin-top:8px;color:#e6edf3;font-size:.88rem;'>{_hl}</div>",
+                unsafe_allow_html=True,
+            )
+
+    st.markdown(
+        f"<div style='font-size:.62rem;color:#484f58;margin-top:8px;'>"
+        f"{T.get('goal_source_footer', 'Fonte: Status Invest (ações) · yfinance (FIIs, fallback) · BCB série 12 (CDI) · IR 15% sobre JCP e CDI.')}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_planejador_renda_passiva(T: dict) -> None:
+    """
+    Planejador de Renda Passiva: wrapper com header + abas agrupando o
+    Simulador (quanto X rende) e a Meta de Renda (quanto investir para
+    receber Y). Exibe so uma aba por vez, cada uma dentro de um card
+    dourado sutil pra demarcar visualmente.
+    """
+    # CSS do card (dourado sutil consistente com demais cards do app).
+    # Aplicado uma vez; escopo evita colidir com outros expanders/tabs.
+    st.markdown(
+        """
+        <style>
+        .eg-planner-card {
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            border-radius: 12px;
+            padding: 18px 20px;
+            background: rgba(255, 255, 255, 0.015);
+            margin-top: 6px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Header + caption como "guarda-chuva" da feature
+    st.markdown(
+        f"<div style='margin:20px 0 4px;'>"
+        f"<span style='font-size:.92rem;font-weight:800;letter-spacing:1.2px;"
+        f"text-transform:uppercase;color:#d4af37;'>"
+        f"{T.get('planner_header', '📊 Planejador de Renda Passiva')}</span>"
+        f"</div>"
+        f"<div style='font-size:.76rem;color:#8b949e;margin-bottom:8px;'>"
+        f"{T.get('planner_subtitle', 'Simule quanto seu aporte renderia ou quanto precisa investir para atingir sua meta.')}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    _tab_sim, _tab_meta = st.tabs([
+        T.get("planner_tab_simulator", "💰 Simulador de Renda Passiva"),
+        T.get("planner_tab_goal",      "🎯 Minha Meta de Renda"),
+    ])
+
+    with _tab_sim:
+        st.markdown('<div class="eg-planner-card">', unsafe_allow_html=True)
+        _render_passive_income_simulator(T, embedded=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with _tab_meta:
+        st.markdown('<div class="eg-planner-card">', unsafe_allow_html=True)
+        _render_meta_de_renda_card(T)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def _render_share_buttons(T: dict) -> None:
@@ -3688,193 +3927,9 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         else:
             st.info(T["no_month_pattern"])
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 🎯 INCOME GOAL CALCULATOR
-    # ══════════════════════════════════════════════════════════════════════════
-    st.markdown('<div class="eg-nav-anchor" id="sec-dividendos"></div>', unsafe_allow_html=True)
-    st.markdown(_chip_header(T["goal_title"]), unsafe_allow_html=True)
-    if avg_div > 0 and price and price > 0:
-        _lang = st.session_state.get("lang", "pt")
-        _br_locale = _lang in ("pt", "es")
-
-        def _parse_money(s: str, default: float = 1000.0) -> float:
-            """Aceita 'R$ 1.000,00', 'US$ 1,000.00', '1000', etc."""
-            if not s:
-                return default
-            s = str(s).strip()
-            for p in ("R$", "US$", "U$S", "€", "£", "$", " "):
-                s = s.replace(p, "")
-            if "," in s and "." in s:
-                if s.rfind(",") > s.rfind("."):
-                    s = s.replace(".", "").replace(",", ".")
-                else:
-                    s = s.replace(",", "")
-            elif "," in s and s.count(",") == 1:
-                s = s.replace(",", ".")
-            try:
-                return max(0.0, float(s))
-            except ValueError:
-                return default
-
-        # Default sem decimais (estetica financeira): "R$ 1.000" / "US$ 1,000".
-        if _br_locale:
-            _default_str = f"{cs} 1.000"
-        else:
-            _default_str = f"{cs} 1,000"
-
-        from data.tickers_b3 import ALL_TICKERS_B3
-        _g1, _g2, _g3 = st.columns([2, 2, 3])
-        with _g1:
-            _goal_str = st.text_input(
-                T["goal_input_label"],
-                value=st.session_state.get("goal_target_str", _default_str),
-                key="goal_target_str",
-                placeholder=_default_str,
-            )
-            _goal_target = _parse_money(_goal_str, default=1000.0)
-        with _g2:
-            _freq_opts = T["goal_freq_options"]
-            _freq_idx  = st.selectbox(
-                T["goal_freq_label"],
-                options=list(range(len(_freq_opts))),
-                format_func=lambda i: _freq_opts[i],
-                index=0, key="goal_freq",
-            )
-        with _g3:
-            _default_tickers = [ticker.upper()] if ticker else ["BBAS3"]
-            _goal_tickers = st.multiselect(
-                T.get("goal_tickers_label", "Ativos para calcular (até 5)"),
-                options=sorted(set(ALL_TICKERS_B3)),
-                default=_default_tickers,
-                max_selections=5,
-                key="goal_tickers_ms",
-                help=T.get("goal_tickers_help",
-                           "Até 5 ativos (ações e/ou FIIs) para comparar com o CDI."),
-            )
-
-        # Frequencia -> fator anual. Mapeia Por mes/trim/sem/ano (se o i18n
-        # listar menos opcoes, o mapa abaixo se adapta).
-        _fat_full = {0: 12, 1: 4, 2: 2, 3: 1}
-        _annual_need = _goal_target * _fat_full.get(_freq_idx, 1)
-
-        if not _goal_tickers:
-            st.warning(T.get("goal_min_ticker", "Selecione ao menos 1 ativo."))
-        else:
-            # ── Monta a tabela: N ativos + linha fixa CDI ──────────────────
-            rows = []
-            for t in _goal_tickers:
-                _tipo = _classify_ticker(t)
-                _prov = _fetch_proventos_cached(t, 12, True)
-                _px = _fetch_price_cached(t)
-                _prov_12m = _prov.get("liquido_12m") or 0
-                if not _px or _px <= 0 or _prov_12m <= 0:
-                    rows.append({
-                        "Ativo": t, "Tipo": _tipo, "Cotação": _px,
-                        "Qtd": None, "Capital": None,
-                        "_fallback": _prov.get("source") == "yfinance_fallback",
-                        "_most_eff": False,
-                    })
-                    continue
-                _qtd = int(math.ceil(_annual_need / _prov_12m))
-                _capital = _qtd * _px
-                rows.append({
-                    "Ativo": t, "Tipo": _tipo, "Cotação": _px,
-                    "Qtd": _qtd, "Capital": _capital,
-                    "_fallback": _prov.get("source") == "yfinance_fallback",
-                    "_most_eff": False,
-                })
-
-            _cdi_aa = _fetch_cdi_cached() or 0
-            _cdi_liq = _cdi_aa * 0.85
-            _cdi_capital = (_annual_need / _cdi_liq) if _cdi_liq else None
-            rows.append({
-                "Ativo": "CDI (ref.)", "Tipo": "—", "Cotação": None,
-                "Qtd": None, "Capital": _cdi_capital,
-                "_fallback": False, "_most_eff": False,
-            })
-
-            # Marca o ativo mais eficiente (menor capital, excluindo CDI)
-            _valid = [r for r in rows
-                      if r["Ativo"] != "CDI (ref.)" and r["Capital"] is not None]
-            if _valid:
-                _best = min(_valid, key=lambda r: r["Capital"])
-                _best["_most_eff"] = True
-
-            # Header dourado com a meta
-            _freq_lower = _freq_opts[_freq_idx].lower()
-            _header_tpl = T.get(
-                "goal_table_header",
-                "🎯 Para receber <b>{valor}</b> {freq} líquidos:"
-            )
-            st.markdown(
-                f"<div style='margin:12px 0 6px;color:#e6edf3;font-size:.92rem;'>"
-                + _header_tpl.format(
-                    valor=_fmt_money(_goal_target, cs), freq=_freq_lower,
-                ) +
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-            def _fmt_brl_or_dash(v):
-                return _fmt_money(v, cs) if v is not None else "—"
-
-            def _fmt_qtd(v):
-                return f"{v:,}".replace(",", ".") if v is not None else "—"
-
-            # Label do ativo com badges
-            def _label(r):
-                lbl = r["Ativo"]
-                if r["_fallback"]:
-                    lbl += " ⚠️"
-                if r["_most_eff"]:
-                    lbl += " ⬇"
-                return lbl
-
-            _disp = [
-                {
-                    T.get("goal_col_ativo", "Ativo"): _label(r),
-                    T.get("goal_col_tipo", "Tipo"): r["Tipo"],
-                    T.get("goal_col_cotacao", "Cotação"): _fmt_brl_or_dash(r["Cotação"]),
-                    T.get("goal_col_qtd", "Qtd necessária"): _fmt_qtd(r["Qtd"]),
-                    T.get("goal_col_capital", "Capital necessário"): _fmt_brl_or_dash(r["Capital"]),
-                }
-                for r in rows
-            ]
-            import pandas as _pd
-            st.dataframe(_pd.DataFrame(_disp), use_container_width=True, hide_index=True)
-
-            # Linha destaque: opcao mais eficiente vs CDI
-            if _valid and _cdi_capital:
-                _b = min(_valid, key=lambda r: r["Capital"])
-                _economia = _cdi_capital - _b["Capital"]
-                if _economia > 0:
-                    _hl = T.get(
-                        "goal_most_efficient",
-                        "💡 Opção mais eficiente: <b>{ticker}</b> com <b>{capital}</b> "
-                        "(economia de {economia} vs CDI)."
-                    ).format(
-                        ticker=_b["Ativo"],
-                        capital=_fmt_money(_b["Capital"], cs),
-                        economia=_fmt_money(_economia, cs),
-                    )
-                    st.markdown(
-                        f"<div style='background:rgba(63,185,80,.10);border:1px solid "
-                        f"rgba(63,185,80,.35);border-radius:10px;padding:10px 16px;"
-                        f"margin-top:8px;color:#e6edf3;font-size:.88rem;'>{_hl}</div>",
-                        unsafe_allow_html=True,
-                    )
-
-            # Rodape com fonte
-            st.markdown(
-                f"<div style='font-size:.62rem;color:#484f58;margin-top:8px;'>"
-                f"{T.get('goal_source_footer', 'Fonte: Status Invest (ações) · yfinance (FIIs, fallback) · BCB série 12 (CDI) · IR 15% sobre JCP e CDI.')}"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-    else:
-        st.info(T["goal_no_data"])
-
-    st.divider()
+    # ── Meta de Renda movida para o Planejador de Renda Passiva no topo ─────
+    # da pagina (aba 🎯 Minha Meta de Renda). Anchor sec-dividendos removido
+    # do menu de navegacao nesta versao.
 
     # ── Key metrics ───────────────────────────────────────────────────────────
     st.markdown('<div class="eg-nav-anchor" id="sec-metricas"></div>', unsafe_allow_html=True)
@@ -4757,7 +4812,7 @@ def main() -> None:
     _nav_items = [
         (T["nav_cotacao"], "sec-cotacao"),
         (T["nav_projecao"], "sec-projecao"),
-        (T["nav_dividendos"], "sec-dividendos"),
+        # nav_dividendos removido: Meta de Renda migrou para o Planejador no topo.
         (T["nav_metricas"], "sec-metricas"),
         (T["nav_saude"], "sec-saude"),
         (T["nav_tecnico"], "sec-tecnico"),
@@ -4820,8 +4875,8 @@ def main() -> None:
     # ── 📊 Mercado B3 (top altas, baixas, mais negociadas) ──────────────────
     _render_market_movers(T)
 
-    # ── Simulador de Renda Passiva Comparativa (multi-ativo vs CDI) ─────────
-    _render_passive_income_simulator(T)
+    # ── Planejador de Renda Passiva (tabs: Simulador + Meta de Renda) ──────
+    _render_planejador_renda_passiva(T)
 
     # ── Busca de ticker — apos o panorama do mercado, para o usuario ver
     # primeiro altas/baixas/negociadas e so depois escolher o ticker.
