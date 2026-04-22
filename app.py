@@ -794,12 +794,26 @@ def _render_passive_income_simulator(T: dict) -> None:
     )
 
     with st.expander(T.get("sim_expander", "Abrir simulador"), expanded=False):
+        # CSS: aporte em fonte "numerica" alinhada a direita (padrao financeiro).
+        # Escopo global ok — o app so tem 1 st.number_input (este).
+        st.markdown(
+            "<style>"
+            "div[data-testid='stNumberInput'] input "
+            "{ text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }"
+            "</style>",
+            unsafe_allow_html=True,
+        )
         _c1, _c2 = st.columns([1, 2])
         with _c1:
             valor_aporte = st.number_input(
                 T.get("sim_aporte_label", "Quanto voce quer investir?"),
-                min_value=100.0, value=100000.0, step=1000.0, format="%.2f",
+                min_value=100, value=100000, step=1000, format="%d",
                 key="sim_aporte",
+            )
+            # Preview BRL formatado (ponto como separador de milhar).
+            _aporte_brl = f"R$ {valor_aporte:,.0f}".replace(",", ".")
+            st.caption(
+                T.get("sim_aporte_preview", "Investindo: **{val}**").format(val=_aporte_brl)
             )
         with _c2:
             _opts = sorted(set(ACOES + FIIS))
@@ -929,7 +943,11 @@ def _render_passive_income_simulator(T: dict) -> None:
             return f"{v:.0f}%" if v is not None else "—"
 
         def _fmt_qtd(v):
-            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if v is not None else "—"
+            # Exibe quantidade como inteiro (floor) com separador de milhar.
+            # Calculo interno da renda continua usando o valor fracionario.
+            if v is None:
+                return "—"
+            return f"{math.floor(v):,}".replace(",", ".")
 
         def _fmt_prov(v):
             return f"R$ {v:.4f}".replace(".", ",") if v is not None else "—"
@@ -3698,10 +3716,11 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             except ValueError:
                 return default
 
+        # Default sem decimais (estetica financeira): "R$ 1.000" / "US$ 1,000".
         if _br_locale:
-            _default_str = f"{cs} 1.000,00"
+            _default_str = f"{cs} 1.000"
         else:
-            _default_str = f"{cs} 1,000.00"
+            _default_str = f"{cs} 1,000"
 
         from data.tickers_b3 import ALL_TICKERS_B3
         _g1, _g2, _g3 = st.columns([2, 2, 3])
