@@ -1059,7 +1059,7 @@ def _render_passive_income_simulator(T: dict, embedded: bool = False) -> None:
         )
         st.markdown(
             f"<div style='font-size:.62rem;color:#484f58;margin-top:4px;'>"
-            f"{T.get('sim_source_footer', 'Fonte: Status Invest (ações) · yfinance (FIIs, fallback, preços) · BCB série 12 (CDI) · IR 15% sobre JCP e CDI.')}"
+            f"{T.get('sim_source_footer', 'Fonte: Status Invest (ações) · yfinance (FIIs, fallback, preços) · BCB série 12 (CDI). IR de 15% incide apenas sobre JCP (ações) e rendimentos do CDI. Dividendos e rendimentos de FII são isentos para PF.')}"
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -1235,7 +1235,7 @@ def _render_meta_de_renda_card(T: dict, default_ticker: str = "BBAS3", cs: str =
 
     st.markdown(
         f"<div style='font-size:.62rem;color:#484f58;margin-top:8px;'>"
-        f"{T.get('goal_source_footer', 'Fonte: Status Invest (ações) · yfinance (FIIs, fallback) · BCB série 12 (CDI) · IR 15% sobre JCP e CDI.')}"
+        f"{T.get('goal_source_footer', 'Fonte: Status Invest (ações) · yfinance (FIIs, fallback) · BCB série 12 (CDI). IR de 15% incide apenas sobre JCP (ações) e rendimentos do CDI. Dividendos e rendimentos de FII são isentos para PF.')}"
         f"</div>",
         unsafe_allow_html=True,
     )

@@ -521,7 +521,22 @@ _STATUS_INVEST_HEADERS = {
                   "Chrome/122.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "pt-BR,pt;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
     "Referer": "https://statusinvest.com.br/",
+    "X-Requested-With": "XMLHttpRequest",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
+}
+
+# Tickers de bancos/holdings com perfil de pagamento majoritariamente em JCP
+# — usados na heuristica setorial do fallback yfinance quando Status Invest
+# cai. Para esses, ~90% dos proventos sao JCP (IR 15%). Para os demais,
+# assumimos 50/50 dividendo-JCP.
+_JCP_HEAVY_TICKERS = {
+    "BBAS3", "ITUB4", "ITUB3", "BBDC4", "BBDC3", "SANB11", "SANB3", "SANB4",
+    "BPAC11", "BPAC3", "BPAC5", "ITSA3", "ITSA4", "BRSR6", "BMGB4", "ABCB4",
+    "BNBR3",
 }
 
 
@@ -561,19 +576,52 @@ def _parse_status_invest_records(data: dict) -> list:
 
 
 def _fetch_proventos_status_invest(ticker: str) -> list:
-    """Busca proventos de uma ACAO no Status Invest. Raise em falha."""
+    """Busca proventos de uma ACAO no Status Invest com retry + backoff.
+    Raise em falha definitiva.
+
+    Estrategia: 3 tentativas com timeouts crescentes (5s, 8s, 12s) e
+    backoff (1s, 3s). Usa session com cookies acumulados (algumas
+    requisicoes do Status Invest so retornam JSON depois que a cookie
+    de anti-bot e setada). Referer explicito por ticker.
+    """
     import requests as _req
+    import time as _time
     t = ticker.upper().replace(".SA", "")
     url = (
         "https://statusinvest.com.br/acao/companytickerprovents"
         f"?ticker={t}&chartProventsType=2"
     )
-    r = _req.get(url, headers=_STATUS_INVEST_HEADERS, timeout=8)
-    r.raise_for_status()
-    ctype = r.headers.get("content-type", "")
-    if "json" not in ctype and not r.text.strip().startswith(("{", "[")):
-        raise ValueError(f"Status Invest devolveu {ctype} em vez de JSON")
-    return _parse_status_invest_records(r.json())
+    headers = dict(_STATUS_INVEST_HEADERS)
+    # Referer especifico ajuda a passar por checks basicos de anti-bot
+    headers["Referer"] = f"https://statusinvest.com.br/acoes/{t.lower()}"
+
+    sess = _req.Session()
+    sess.headers.update(headers)
+
+    last_err: Optional[Exception] = None
+    timeouts = (5, 8, 12)
+    backoffs = (0, 1, 3)
+    for attempt, (tmo, back) in enumerate(zip(timeouts, backoffs), start=1):
+        if back:
+            _time.sleep(back)
+        try:
+            r = sess.get(url, timeout=tmo)
+            r.raise_for_status()
+            ctype = r.headers.get("content-type", "")
+            body = r.text.strip()
+            if "json" not in ctype and not body.startswith(("{", "[")):
+                raise ValueError(f"content-type={ctype!r} body_head={body[:80]!r}")
+            data = r.json()
+            records = _parse_status_invest_records(data)
+            if not records:
+                raise ValueError("assetEarningsModels vazio ou sem registros validos")
+            return records
+        except Exception as e:
+            last_err = e
+            logger.info(f"Status Invest tentativa {attempt}/3 falhou p/ {ticker}: "
+                        f"{type(e).__name__} {e}")
+            continue
+    raise last_err or RuntimeError(f"Status Invest indisponivel p/ {ticker}")
 
 
 def _fetch_proventos_yfinance(ticker: str) -> list:
@@ -643,24 +691,40 @@ def get_proventos_summary(
     soma_mist = sum(r["valor"] for r in records_win if r["tipo"] == "MISTO")
     soma_total = soma_div + soma_jcp + soma_rend + soma_mist
 
+    # ── Regra de IR por cenario ──────────────────────────────────────────────
+    # Dividendos e proventos de FII sao ISENTOS de IR para PF (Lei 11.033/2004).
+    # IR de 15% incide APENAS sobre JCP e Rendimento Tributado (que na
+    # pratica tem a mesma aliquota).
     if is_fii:
         liquido = soma_total
         ir_label = "Isento"
     elif source == "status_invest":
         if discount_jcp:
+            # Isenta dividendo; aplica 15% so no JCP.
             liquido = soma_div + (soma_jcp * 0.85)
-            ir_label = "15% sobre JCP"
+            if soma_jcp <= 0 and soma_div > 0:
+                ir_label = "Isento (só dividendos)"
+            else:
+                ir_label = "15% sobre JCP"
         else:
             liquido = soma_total
-            ir_label = "Sem desconto"
+            ir_label = "Bruto (sem IR)"
     else:
-        # yfinance fallback p/ acao — nao separa; aplica 15% sobre tudo se flag ON
+        # Fallback yfinance: nao ha separacao JCP/Dividendo. Em vez de aplicar
+        # 15% cego sobre o total (errado — o rotulo antigo "15% sobre total"
+        # ensinava conceito tributario incorreto), usa heuristica setorial:
+        #   * bancos/holdings (_JCP_HEAVY_TICKERS): ~90% JCP -> fator 0.865
+        #     (0.10 dividendo isento + 0.90 × 0.85 JCP liquido)
+        #   * demais acoes: assume 50% JCP / 50% dividendo -> fator 0.925
+        _t_up = ticker.upper().replace(".SA", "")
+        _heavy = _t_up in _JCP_HEAVY_TICKERS
         if discount_jcp:
-            liquido = soma_total * 0.85
-            ir_label = "15% sobre total (estimativa)"
+            factor_jcp = 0.865 if _heavy else 0.925
+            liquido = soma_total * factor_jcp
+            ir_label = "15% sobre JCP estimado"
         else:
             liquido = soma_total
-            ir_label = "Sem desconto"
+            ir_label = "Bruto (sem IR)"
 
     factor = 12.0 / max(window_months, 1)
     return {
