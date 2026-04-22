@@ -166,6 +166,7 @@ _PT: dict = {
     # ── Performance ───────────────────────────────────────────────────────────
     "perf_title":      "📊 Relatório de Performance",
     "perf_1d":         "Ontem",
+    "perf_1d_fmt":     "Fech. {date}",
     "perf_7d":         "7 Dias",
     "perf_30d":        "30 Dias",
     "perf_52w_min":    "Mín 52 Sem.",
@@ -565,6 +566,7 @@ _EN: dict = {
     # ── Performance ───────────────────────────────────────────────────────────
     "perf_title":      "📊 Performance Report",
     "perf_1d":         "Yesterday",
+    "perf_1d_fmt":     "Close {date}",
     "perf_7d":         "7 Days",
     "perf_30d":        "30 Days",
     "perf_52w_min":    "52W Low",
@@ -963,6 +965,7 @@ _ES: dict = {
     # ── Performance ───────────────────────────────────────────────────────────
     "perf_title":      "📊 Informe de Performance",
     "perf_1d":         "Ayer",
+    "perf_1d_fmt":     "Cierre {date}",
     "perf_7d":         "7 Días",
     "perf_30d":        "30 Días",
     "perf_52w_min":    "Mín 52 Sem.",

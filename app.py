@@ -3988,8 +3988,18 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.markdown(_chip_header(T["perf_title"]), unsafe_allow_html=True)
     _perf = get_price_performance(df)
     if _perf:
+        # Rotulo dinamico para o fechamento anterior: usa a data real do
+        # penultimo indice do df (que e a base do calculo de _perf['yesterday']).
+        # Evita o erro "Ontem" apontar pra data do ultimo dia util quando o
+        # dia anterior foi feriado/fim de semana (ex.: 22/04/2026 apos Tiradentes
+        # -> yesterday = 20/04, nao 21/04).
+        try:
+            _prev_close_date = df.index[-2].strftime("%d/%m")
+            _lbl_1d = T.get("perf_1d_fmt", "Fech. {date}").format(date=_prev_close_date)
+        except Exception:
+            _lbl_1d = T["perf_1d"]
         _perf_data = [
-            (T["perf_1d"],      _perf.get("yesterday"),  _perf.get("chg_1d")),
+            (_lbl_1d,           _perf.get("yesterday"),  _perf.get("chg_1d")),
             (T["perf_7d"],      _perf.get("price_7d"),   _perf.get("chg_7d")),
             (T["perf_30d"],     _perf.get("price_30d"),  _perf.get("chg_30d")),
             (T["perf_52w_min"], _perf.get("w52_min"),    None),
