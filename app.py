@@ -1616,8 +1616,6 @@ def _render_briefing(T: dict) -> None:
     _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
     _hora_online = _now_brt.strftime("%H:%M:%S")
     _data_ref = _mkt["data_ref"].strftime("%d/%m/%Y")
-    _data_ant = _mkt["data_anterior"].strftime("%d/%m/%Y")
-    _is_online = _mkt["estado"] == "ONLINE"
 
     _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
     _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
@@ -1686,72 +1684,42 @@ def _render_briefing(T: dict) -> None:
         + _body_block
     )
 
-    # ── Fechamento anterior (data_anterior) ──────────────────────────────
-    _ant_msg = (
-        "*Briefing Equity Guard*\\n"
-        + "*Fechamento " + _data_ant + ", " + _hora_corte + ".*\\n\\n"
-        + _body_block
-    )
-
-    # ── Online (só quando mercado aberto) ────────────────────────────────
+    # ── Online (snapshot atual — funciona em qualquer estado do mercado)
     _online_msg = (
         "*Briefing Equity Guard*\\n"
         + "*Online " + today + " " + _hora_online + " (Brasilia)*\\n\\n"
         + _body_block
     )
 
-    if _is_online:
-        # Mercado aberto: vermelho (fechamento anterior) + verde (online)
-        _wa_comp.html("""
-        <div style="display:flex;flex-direction:column;gap:6px;">
-        <button onclick="
-            var msg = '""" + _ant_msg + """';
-            """ + _emoji_js + """
-            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-        " style="
-            display:block;width:100%;background:#c0392b;color:#fff;
-            padding:10px 8px;border-radius:8px;font-size:.78rem;
-            font-weight:700;border:none;cursor:pointer;
-            font-family:Inter,system-ui,sans-serif;
-        ">Fechamento """ + _data_ant + """</button>
-        <button onclick="
-            var msg = '""" + _online_msg + """';
-            """ + _emoji_js + """
-            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-        " style="
-            display:block;width:100%;background:#25d366;color:#fff;
-            padding:10px 8px;border-radius:8px;font-size:.78rem;
-            font-weight:700;border:none;cursor:pointer;
-            font-family:Inter,system-ui,sans-serif;
-        ">Online """ + _hora_online + """ (Brasilia)</button>
-        </div>
-        """, height=90)
-    else:
-        # Mercado fechado: vermelho (fechamento de hoje) + cinza (anterior)
-        _wa_comp.html("""
-        <div style="display:flex;flex-direction:column;gap:6px;">
-        <button onclick="
-            var msg = '""" + _close_msg + """';
-            """ + _emoji_js + """
-            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-        " style="
-            display:block;width:100%;background:#c0392b;color:#fff;
-            padding:10px 8px;border-radius:8px;font-size:.78rem;
-            font-weight:700;border:none;cursor:pointer;
-            font-family:Inter,system-ui,sans-serif;
-        ">Fechamento """ + _data_ref + """ (""" + _hora_corte + """)</button>
-        <button onclick="
-            var msg = '""" + _ant_msg + """';
-            """ + _emoji_js + """
-            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-        " style="
-            display:block;width:100%;background:#484f58;color:#e6edf3;
-            padding:10px 8px;border-radius:8px;font-size:.78rem;
-            font-weight:700;border:none;cursor:pointer;
-            font-family:Inter,system-ui,sans-serif;
-        ">Fechamento anterior """ + _data_ant + """</button>
-        </div>
-        """, height=90)
+    # Sempre dois botoes: Fechamento (ultima sessao encerrada) + Online
+    # (snapshot intradia / pos-pregao atual). Elimina a assimetria anterior
+    # em que o botao "Online" sumia fora do horario de pregao.
+    _close_label = "Fechamento " + _data_ref + " (" + _hora_corte + ")"
+    _online_label = "Online " + _hora_online + " (Brasilia)"
+    _wa_comp.html("""
+    <div style="display:flex;flex-direction:column;gap:6px;">
+    <button onclick="
+        var msg = '""" + _close_msg + """';
+        """ + _emoji_js + """
+        window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+    " style="
+        display:block;width:100%;background:#c0392b;color:#fff;
+        padding:10px 8px;border-radius:8px;font-size:.78rem;
+        font-weight:700;border:none;cursor:pointer;
+        font-family:Inter,system-ui,sans-serif;
+    ">""" + _close_label + """</button>
+    <button onclick="
+        var msg = '""" + _online_msg + """';
+        """ + _emoji_js + """
+        window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+    " style="
+        display:block;width:100%;background:#25d366;color:#fff;
+        padding:10px 8px;border-radius:8px;font-size:.78rem;
+        font-weight:700;border:none;cursor:pointer;
+        font-family:Inter,system-ui,sans-serif;
+    ">""" + _online_label + """</button>
+    </div>
+    """, height=90)
     st.markdown(
         f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
         f"{T['briefing_source_footer']}</div>",
