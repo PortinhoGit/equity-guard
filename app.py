@@ -2140,14 +2140,57 @@ def _render_macro_panel(T: dict) -> None:
 
 
 @st.fragment
-def _render_interactive_quote(ticker: str, df: pd.DataFrame, T: dict, cs: str) -> None:
+def _render_projection_fragment(
+    avg_div: float,
+    target_yield: float,
+    yield_pct: float,
+    price: float,
+    cs: str,
+    T: dict,
+) -> None:
+    """
+    Projecao de dividendos com slider de crescimento anual. Wrapped em
+    @st.fragment: mexer na regua rerenderiza SOMENTE este bloco, sem
+    mandar a pagina inteira pro topo/fundo. Mantém o scroll do usuario.
+    """
+    growth = st.slider(
+        T["projection_growth"], 0.0, 20.0, 5.0, .5, key="div_growth"
+    ) / 100
+    proj = project_dividends(avg_div, years=5, growth_rate=growth)
+    rows = [
+        {
+            T["year_col"]: f"+{yr}",
+            T["div_projected"]: f"{cs} {dv:.2f}",
+            T["ceiling_projected"].format(pct=yield_pct): f"{cs} {dv/target_yield:.2f}",
+            T["yield_on_price"]: f"{dv/price*100:.2f}%",
+            T["potential_gain"]: f"{(dv/target_yield - price)/price*100:+.1f}%",
+        }
+        for yr, dv in proj.items()
+    ]
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+@st.fragment
+def _render_interactive_quote(ticker: str, df: pd.DataFrame, T: dict, cs: str,
+                              company_name: str = "") -> None:
     """
     Interactive Quote block (period selector + area chart + OHLC cards).
     Wrapped in @st.fragment so clicking a period button only reruns THIS block,
     not the entire page — keeps scroll position and other state stable.
     """
+    # Cabecalho no padrao unificado: ticker chip + titulo agrupados a ESQUERDA,
+    # com gap moderado entre eles (nao nas extremidades opostas).
+    _sym = normalize_ticker(ticker)
     st.markdown(
-        f'<div class="eg-section-header">{T["chart_quick_title"]}</div>',
+        f"<div style='display:flex;justify-content:flex-start;"
+        f"align-items:center;gap:16px;margin:16px 0 8px;flex-wrap:wrap;'>"
+        f"<div class='eg-ticker-chip' style='margin:0;'>"
+        f"{company_name}"
+        f"<span class='eg-ticker-chip-sym'>{_sym}</span>"
+        f"</div>"
+        f"<span class='eg-section-header' style='margin:0;'>"
+        f"{T['chart_quick_title']}</span>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
@@ -2914,16 +2957,23 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ── Currency symbol (USD/GBP/EUR/BRL…) ────────────────────────────────────
     cs = _currency_symbol(fundamentals.get("currency", "BRL"))
 
-    # ── Ticker chip HTML — repetido antes de cada secao para que prints
-    #    da pagina sempre mostrem qual acao esta sendo analisada.
+    # ── Cabecalho de cada secao: ticker chip a ESQUERDA, titulo da secao
+    #    logo ao lado. Repete o chip em toda secao para que prints parciais
+    #    da pagina sempre identifiquem a acao analisada.
     _chip_name = fundamentals.get("name", ticker)
     _chip_sym = normalize_ticker(ticker)
-    _ticker_chip_html = (
-        f'<div class="eg-ticker-chip">'
-        f'{_chip_name}'
-        f'<span class="eg-ticker-chip-sym">{_chip_sym}</span>'
-        f'</div>'
-    )
+
+    def _chip_header(title: str) -> str:
+        return (
+            f"<div style='display:flex;justify-content:flex-start;"
+            f"align-items:center;gap:16px;margin:16px 0 8px;flex-wrap:wrap;'>"
+            f"<div class='eg-ticker-chip' style='margin:0;'>"
+            f"{_chip_name}"
+            f"<span class='eg-ticker-chip-sym'>{_chip_sym}</span>"
+            f"</div>"
+            f"<span class='eg-section-header' style='margin:0;'>{title}</span>"
+            f"</div>"
+        )
 
     # ── Calculations ──────────────────────────────────────────────────────────
     avg_div = calculate_avg_dividends(dividends) if dividends is not None else 0.0
@@ -2944,92 +2994,31 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     desc_text   = T["signal_descs"][sk].format(rsi=rsi_now)
     yield_pct   = target_yield * 100
 
-    # ── Company header ────────────────────────────────────────────────────────
-    c_title, c_sig = st.columns([3, 1])
-    with c_title:
-        name = fundamentals.get("name", ticker)
-        best_badge = (
-            f'<span class="eg-best-badge">⭐ {T["best_badge"]}</span>'
-            if is_best else ""
-        )
-        dev_badge = (
-            f'<span class="eg-dev-badge">{T["dev_badge"]}</span>'
-            if user.get("is_admin") else ""
-        )
-
-        # Favorite toggle — star button next to the company name
-        _is_anon    = user.get("is_anonymous", False)
-        _ticker_key = ticker.upper().strip()
-        _is_fav     = (
-            _ticker_key in get_favorites(user.get("email", ""))
-            if not _is_anon else False
-        )
-        _name_col, _star_col = st.columns([9, 1])
-        with _name_col:
-            st.markdown(
-                f"<h3 style='margin:4px 0 2px;display:flex;align-items:center;"
-                f"gap:6px;flex-wrap:wrap;font-size:1.25rem;font-weight:800;"
-                f"line-height:1.2;'>"
-                f"<span>{name}</span>"
-                f"<span class='eg-ticker-chip-sym'>{normalize_ticker(ticker)}</span>"
-                f"{best_badge}{dev_badge}"
-                f"</h3>"
-                f"<div style='color:#8b949e;font-size:.78rem;margin:0 0 2px;"
-                f"line-height:1.25;'>"
-                f"{fundamentals.get('sector','—')} › {fundamentals.get('industry','—')}"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-        with _star_col:
-            _star_icon = "⭐" if _is_fav else "☆"
-            _star_help = T["fav_remove_help"] if _is_fav else T["fav_add_help"]
-            if st.button(_star_icon, key="eg_fav_toggle", help=_star_help):
-                if _is_anon:
-                    st.toast(T["fav_anon_toast"])
-                elif _is_fav:
-                    remove_favorite(user["email"], _ticker_key)
-                    st.toast(T["fav_removed_toast"].format(ticker=_ticker_key))
-                    st.rerun()
-                else:
-                    add_favorite(user["email"], _ticker_key)
-                    st.toast(T["fav_added_toast"].format(ticker=_ticker_key))
-                    st.rerun()
-    with c_sig:
-        # Linha extra: comparacao MA20 x MA200 em linguagem direta.
-        _ma20 = trend.get("ma20")
-        _ma200 = trend.get("ma200")
-        _ma_line = ""
-        if _ma20 and _ma200:
-            _spread = ((_ma20 - _ma200) / _ma200) * 100
-            _above = _spread >= 0
-            _direction = "acima" if _above else "abaixo"
-            _color = "#3fb950" if _above else "#dc2626"
-            _lead = (
-                "compradores dominam no curto e longo prazo"
-                if _above else
-                "vendedores pressionam o curto e longo prazo"
-            )
-            # Termo "Média Móvel" por extenso para o leitor deduzir "MM20/MM200"
-            # que aparece no bloco de Golden/Death Cross mais abaixo.
-            _ma_line = (
-                f"<div style='font-size:.72rem;color:#8b949e;text-align:center;"
-                f"margin-top:6px;line-height:1.4;'>"
-                f"A <b style='color:#c9d1d9;'>Média Móvel</b> de 20 dias "
-                f"({cs} {_ma20:.2f}) está "
-                f"<b style='color:{_color};'>{_spread:+.1f}%</b> "
-                f"{_direction} da <b style='color:#c9d1d9;'>Média Móvel</b> de "
-                f"200 dias ({cs} {_ma200:.2f}) — "
-                f"<span style='color:#c9d1d9;'>{_lead}</span>."
-                f"</div>"
-            )
-        st.markdown(
-            f"<div class='eg-signal' style='background:{signal['bg_color']};color:{signal['color']};'>"
-            f"{signal['emoji']} {action_text}</div>"
-            f"<div style='font-size:.76rem;color:#8b949e;text-align:center;margin-top:5px;'>"
-            f"{desc_text}</div>"
-            f"{_ma_line}",
-            unsafe_allow_html=True,
-        )
+    # ── Botao de favorito (estrela) a direita — sem o header duplicado
+    #    "Banco do Brasil S.A. / Financial Services > Banks - Regional"
+    #    ja que o nome + setor aparecem em cada _chip_header abaixo.
+    name = fundamentals.get("name", ticker)
+    _is_anon    = user.get("is_anonymous", False)
+    _ticker_key = ticker.upper().strip()
+    _is_fav     = (
+        _ticker_key in get_favorites(user.get("email", ""))
+        if not _is_anon else False
+    )
+    _sp_col, _star_col = st.columns([15, 1])
+    with _star_col:
+        _star_icon = "⭐" if _is_fav else "☆"
+        _star_help = T["fav_remove_help"] if _is_fav else T["fav_add_help"]
+        if st.button(_star_icon, key="eg_fav_toggle", help=_star_help):
+            if _is_anon:
+                st.toast(T["fav_anon_toast"])
+            elif _is_fav:
+                remove_favorite(user["email"], _ticker_key)
+                st.toast(T["fav_removed_toast"].format(ticker=_ticker_key))
+                st.rerun()
+            else:
+                add_favorite(user["email"], _ticker_key)
+                st.toast(T["fav_added_toast"].format(ticker=_ticker_key))
+                st.rerun()
 
     # ── Sticky ticker bar (mobile) ───────────────────────────────────────────
     _ticker_display = normalize_ticker(ticker)
@@ -3067,41 +3056,26 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # Sem ticker chip aqui: o cabecalho da empresa acima ja identifica a acao.
     st.markdown('<div class="eg-nav-anchor" id="sec-cotacao"></div>', unsafe_allow_html=True)
-    _render_interactive_quote(ticker, df, T, cs)
+    _render_interactive_quote(ticker, df, T, cs, company_name=name)
 
     st.divider()
 
     # ══════════════════════════════════════════════════════════════════════════
     # 🔮 FUTURE-FOCUS BLOCK — projection + monthly map at the top of the page
     # ══════════════════════════════════════════════════════════════════════════
-    st.markdown('<div class="eg-nav-anchor" id="sec-projecao"></div>' + _ticker_chip_html, unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-projecao"></div>', unsafe_allow_html=True)
     _fut_left, _fut_right = st.columns([3, 2])
 
     with _fut_left:
-        st.markdown(
-            f'<div class="eg-section-header">🔮 {T["projection_title"]}</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(_chip_header(f'🔮 {T["projection_title"]}'), unsafe_allow_html=True)
         if avg_div > 0:
-            growth = st.slider(T["projection_growth"], 0.0, 20.0, 5.0, .5, key="div_growth") / 100
-            proj   = project_dividends(avg_div, years=5, growth_rate=growth)
-            rows   = [
-                {
-                    T["year_col"]:           f"+{yr}",
-                    T["div_projected"]:      f"{cs} {dv:.2f}",
-                    T["ceiling_projected"].format(pct=yield_pct): f"{cs} {dv/target_yield:.2f}",
-                    T["yield_on_price"]:     f"{dv/price*100:.2f}%",
-                    T["potential_gain"]:     f"{(dv/target_yield - price)/price*100:+.1f}%",
-                }
-                for yr, dv in proj.items()
-            ]
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            _render_projection_fragment(avg_div, target_yield, yield_pct, price, cs, T)
         else:
             st.info(T["no_projection"])
 
     with _fut_right:
         st.markdown(
-            _ticker_chip_html + f'<div class="eg-section-header">{T["month_map_title"]}</div>',
+            _chip_header(T["month_map_title"]),
             unsafe_allow_html=True,
         )
 
@@ -3164,11 +3138,8 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # 🎯 INCOME GOAL CALCULATOR
     # ══════════════════════════════════════════════════════════════════════════
-    st.markdown('<div class="eg-nav-anchor" id="sec-dividendos"></div>' + _ticker_chip_html, unsafe_allow_html=True)
-    st.markdown(
-        f'<div class="eg-section-header">{T["goal_title"]}</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div class="eg-nav-anchor" id="sec-dividendos"></div>', unsafe_allow_html=True)
+    st.markdown(_chip_header(T["goal_title"]), unsafe_allow_html=True)
     if avg_div > 0 and price and price > 0:
         _lang = st.session_state.get("lang", "pt")
         _br_locale = _lang in ("pt", "es")
@@ -3235,8 +3206,8 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Key metrics ───────────────────────────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-metricas"></div>' + _ticker_chip_html, unsafe_allow_html=True)
-    st.markdown(f'<div class="eg-section-header">{T["current_price"][:2]} {T["nav_metricas"]}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-metricas"></div>', unsafe_allow_html=True)
+    st.markdown(_chip_header(f'{T["current_price"][:2]} {T["nav_metricas"]}'), unsafe_allow_html=True)
     dy = fundamentals.get("dividend_yield")
     _dy_s = f"{dy*100:.2f}%" if dy else T["na"]
     _teto_s = f"{cs} {teto:.2f}" if teto > 0 else T["na"]
@@ -3288,7 +3259,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Performance Report ────────────────────────────────────────────────────
-    st.markdown(_ticker_chip_html + f'<div class="eg-section-header">{T["perf_title"]}</div>', unsafe_allow_html=True)
+    st.markdown(_chip_header(T["perf_title"]), unsafe_allow_html=True)
     _perf = get_price_performance(df)
     if _perf:
         _perf_data = [
@@ -3341,7 +3312,6 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         _curr    = _perf.get("current")
         if _w52_min and _w52_max and _curr and _w52_max > _w52_min:
             _pos_pct = max(0.0, min(100.0, (_curr - _w52_min) / (_w52_max - _w52_min) * 100))
-            st.markdown(_ticker_chip_html, unsafe_allow_html=True)
             st.markdown(
                 f"<div style='margin-top:4px;background:#161b22;border:1px solid #21262d;"
                 f"border-radius:10px;padding:14px 20px;'>"
@@ -3374,11 +3344,11 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Financial health + Trend ──────────────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-saude"></div>' + _ticker_chip_html, unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-saude"></div>', unsafe_allow_html=True)
     col_h, col_t = st.columns(2)
 
     with col_h:
-        st.markdown(f'<div class="eg-section-header">{T["health_title"]}</div>', unsafe_allow_html=True)
+        st.markdown(_chip_header(T["health_title"]), unsafe_allow_html=True)
 
         pv = health["payout_value"]
         dv = health["debt_ebitda_value"]
@@ -3420,8 +3390,24 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         if _is_bank_no_ebitda:
             st.caption(T["bank_ebitda_note"])
 
+        # Sinal de COMPRA/VENDA — posicionado aqui, logo apos a nota
+        # "bancos nao utilizam EBITDA", preenchendo o espaco vazio do
+        # lado esquerdo que antes ficava abaixo dos cards de saude.
+        st.markdown(
+            f"<div style='display:flex;align-items:center;gap:12px;"
+            f"margin-top:14px;flex-wrap:wrap;'>"
+            f"<div class='eg-signal' style='background:{signal['bg_color']};"
+            f"color:{signal['color']};margin:0;flex:0 0 auto;'>"
+            f"{signal['emoji']} {action_text}</div>"
+            f"<div style='font-size:.78rem;color:#8b949e;flex:1;"
+            f"line-height:1.45;min-width:180px;'>"
+            f"{desc_text}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
     with col_t:
-        st.markdown(f'<div class="eg-section-header">{T["trend_title"]}</div>', unsafe_allow_html=True)
+        st.markdown(_chip_header(T["trend_title"]), unsafe_allow_html=True)
         ov = trend["overall"]
         trend_map = {
             "TENDÊNCIA DE ALTA FORTE":  (T["trend_bull_strong"], "rgba(63,185,80,.12)",   "#58a6ff"),
@@ -3464,8 +3450,48 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             _ma_html += "</div>"
             st.markdown(_ma_html, unsafe_allow_html=True)
 
-        # ── Veredito consolidado: apenas cruz (MM20/MM200 ja aparecem no
-        # cabecalho, logo abaixo do sinal de COMPRA/VENDA — duplicacao removida).
+        # ── Veredito consolidado: cruz + explicacao "porque" ──────────────────
+        # Termo "Média Móvel" por extenso — o leitor deduz a sigla MM20/MM200
+        # usada no cabecalho da cruz.
+        _why = None
+        if _ma20 and _ma200:
+            _spread = ((_ma20 - _ma200) / _ma200) * 100
+            if ov == "TENDÊNCIA DE ALTA FORTE":
+                _why = (
+                    f"A <b>Média Móvel</b> de 20 dias ({cs} {_ma20:.2f}) está "
+                    f"<b>{_spread:+.1f}%</b> acima da <b>Média Móvel</b> de "
+                    f"200 dias ({cs} {_ma200:.2f}) — compradores dominam no "
+                    f"curto e longo prazo."
+                )
+            elif ov == "TENDÊNCIA DE ALTA":
+                _why = (
+                    f"<b>Média Móvel</b> de 20 dias ({cs} {_ma20:.2f}) "
+                    f"ligeiramente acima da <b>Média Móvel</b> de 200 dias "
+                    f"({cs} {_ma200:.2f}), diferença de <b>{_spread:+.1f}%</b> "
+                    f"— momentum positivo, mas ainda moderado."
+                )
+            elif ov == "TENDÊNCIA DE BAIXA FORTE":
+                _why = (
+                    f"A <b>Média Móvel</b> de 20 dias ({cs} {_ma20:.2f}) está "
+                    f"<b>{_spread:+.1f}%</b> abaixo da <b>Média Móvel</b> de "
+                    f"200 dias ({cs} {_ma200:.2f}) — vendedores pressionando "
+                    f"tanto o curto quanto o longo prazo."
+                )
+            elif ov == "TENDÊNCIA DE BAIXA":
+                _why = (
+                    f"<b>Média Móvel</b> de 20 dias ({cs} {_ma20:.2f}) "
+                    f"ligeiramente abaixo da <b>Média Móvel</b> de 200 dias "
+                    f"({cs} {_ma200:.2f}), diferença de <b>{_spread:+.1f}%</b> "
+                    f"— pressão vendedora moderada."
+                )
+            else:
+                _why = (
+                    f"<b>Média Móvel</b> de 20 dias ({cs} {_ma20:.2f}) e "
+                    f"<b>Média Móvel</b> de 200 dias ({cs} {_ma200:.2f}) "
+                    f"praticamente coladas (<b>{_spread:+.1f}%</b>) — "
+                    f"mercado sem direção clara no momento."
+                )
+
         _cross_lbl = None
         _cross_bg = None
         _cross_border = None
@@ -3478,12 +3504,15 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             _cross_bg = "rgba(248,81,73,.10)"
             _cross_border = "#f85149"
 
-        if _cross_lbl:
+        if _cross_lbl or _why:
             _header = (
-                f"<div style='font-size:.86rem;font-weight:800;color:#e6edf3;'>"
-                f"{_cross_lbl}</div>"
+                f"<div style='font-size:.86rem;font-weight:800;color:#e6edf3;margin-bottom:6px;'>"
+                f"{_cross_lbl}</div>" if _cross_lbl else ""
             )
-            _body = ""
+            _body = (
+                f"<div style='font-size:.78rem;color:#c9d1d9;line-height:1.5;'>{_why}</div>"
+                if _why else ""
+            )
             _bg = _cross_bg or "#161b22"
             _border = _cross_border or t_color
             st.markdown(
@@ -3510,8 +3539,8 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Main chart ────────────────────────────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-tecnico"></div>' + _ticker_chip_html, unsafe_allow_html=True)
-    st.markdown(f'<div class="eg-section-header">{T["chart_title"]}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-tecnico"></div>', unsafe_allow_html=True)
+    st.markdown(_chip_header(T["chart_title"]), unsafe_allow_html=True)
     with st.expander(f"📘 {T['chart_help_title']}", expanded=True):
         st.markdown(
             f"<div style='font-size:.84rem;line-height:1.55;color:#c9d1d9;'>"
@@ -3581,11 +3610,8 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     # ══════════════════════════════════════════════════════════════════════════
     # 🧠 ANÁLISE ESTRUTURADA — unified narrative (trend + technicals + valuation)
     # ══════════════════════════════════════════════════════════════════════════
-    st.markdown('<div class="eg-nav-anchor" id="sec-inteligencia"></div>' + _ticker_chip_html, unsafe_allow_html=True)
-    st.markdown(
-        f'<div class="eg-section-header" style="margin-top:12px;">{T["narrative_title"]}</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div class="eg-nav-anchor" id="sec-inteligencia"></div>', unsafe_allow_html=True)
+    st.markdown(_chip_header(T["narrative_title"]), unsafe_allow_html=True)
     _narr_lines: list = []
     _price_str = f"{cs}{price:,.2f}"
     if cs == "R$":
@@ -3679,8 +3705,8 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Dividends (historical bar chart) ──────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-proventos"></div>' + _ticker_chip_html, unsafe_allow_html=True)
-    st.markdown(f'<div class="eg-section-header">{T["dividends_title"]}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-proventos"></div>', unsafe_allow_html=True)
+    st.markdown(_chip_header(T["dividends_title"]), unsafe_allow_html=True)
     if dividends is not None and not dividends.empty:
         st.plotly_chart(
             _dividend_chart(dividends, ticker, T, cs=cs),
@@ -3701,7 +3727,7 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     st.divider()
 
     # ── Dividend Calendar ─────────────────────────────────────────────────────
-    st.markdown(_ticker_chip_html + f'<div class="eg-section-header">{T["cal_title"]}</div>', unsafe_allow_html=True)
+    st.markdown(_chip_header(T["cal_title"]), unsafe_allow_html=True)
     _cal = get_dividend_calendar(ticker)
     if _cal.empty and dividends is not None and not dividends.empty:
         _today = pd.Timestamp.now().normalize()
@@ -3747,7 +3773,8 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         st.info(T["cal_no_data"])
 
     # ── Glossary expander ─────────────────────────────────────────────────────
-    st.markdown('<div class="eg-nav-anchor" id="sec-indicadores"></div>' + _ticker_chip_html, unsafe_allow_html=True)
+    st.markdown('<div class="eg-nav-anchor" id="sec-indicadores"></div>', unsafe_allow_html=True)
+    st.markdown(_chip_header(T["glossary_title"]), unsafe_allow_html=True)
     with st.expander(T["glossary_title"], expanded=True):
         _g1, _g2 = st.columns(2)
         _gitems = T["glossary_items"]
