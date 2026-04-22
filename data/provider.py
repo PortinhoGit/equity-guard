@@ -312,36 +312,48 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
     import requests as _req
 
     bid = ask = None
-    # ── BCB PTAX (comercial) ─────────────────────────────────────────────────
-    try:
-        _today = pd.Timestamp.now().strftime("%m-%d-%Y")
-        _url = (
-            "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
-            f"CotacaoDolarDia(dataCotacao=@d)?@d='{_today}'"
-            "&$top=1&$orderby=dataHoraCotacao%20desc&$format=json"
-        )
-        r = _req.get(_url, timeout=5)
-        if r.ok:
-            data = r.json().get("value", [])
-            if data:
-                bid = float(data[0]["cotacaoCompra"])
-                ask = float(data[0]["cotacaoVenda"])
-    except Exception as e:
-        logger.warning(f"BCB PTAX falhou: {e}")
-
-    # ── yfinance (comercial) + sparkline ─────────────────────────────────────
+    # ── yfinance (comercial) — fonte primaria live durante o pregao ─────────
+    # fast_info.last_price e uma leitura intradiaria; history(1d) da o close
+    # mais recente como backup. BCB PTAX e fallback apenas se yfinance falhar.
     try:
         tk = yf.Ticker("USDBRL=X")
+        fi = getattr(tk, "fast_info", None)
+        if fi is not None:
+            for _k in ("last_price", "lastPrice"):
+                try:
+                    _v = fi.get(_k) if hasattr(fi, "get") else getattr(fi, _k, None)
+                    if _v:
+                        ask = float(_v)
+                        break
+                except Exception:
+                    continue
         hist = tk.history(period="13mo", interval="1d", auto_adjust=True)
         if hist is None or hist.empty:
-            if bid is None:
+            if ask is None:
+                # Ainda sem cotacao — tenta BCB PTAX ultimo boletim como fallback
+                try:
+                    _today = pd.Timestamp.now().strftime("%m-%d-%Y")
+                    _url = (
+                        "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+                        f"CotacaoDolarDia(dataCotacao=@d)?@d='{_today}'"
+                        "&$top=1&$orderby=dataHoraCotacao%20desc&$format=json"
+                    )
+                    r = _req.get(_url, timeout=5)
+                    if r.ok:
+                        data = r.json().get("value", [])
+                        if data:
+                            bid = float(data[0]["cotacaoCompra"])
+                            ask = float(data[0]["cotacaoVenda"])
+                except Exception as e:
+                    logger.warning(f"BCB PTAX fallback falhou: {e}")
+            if ask is None:
                 return None
             hist_ok = False
         else:
             hist_ok = True
     except Exception as e:
         logger.error(f"Erro ao buscar USDBRL=X: {e}")
-        if bid is None:
+        if ask is None:
             return None
         hist_ok = False
 
@@ -354,8 +366,8 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
             series = closes.tail(7)
             if ask is None:
                 ask = float(series.iloc[-1])
-            if bid is None:
-                bid = round(ask * 0.995, 4)
+    if bid is None:
+        bid = round(ask * 0.995, 4)
 
     if ask is None:
         return None
@@ -396,6 +408,78 @@ def get_fx_usdbrl() -> Optional[Dict[str, Any]]:
         "last": ask, "prev": prev,
         "fetched_at": pd.Timestamp.now(tz="America/Sao_Paulo").tz_localize(None),
     }
+
+
+def get_ptax_bulletins(date_ref: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Busca os boletins PTAX do BCB para uma data. Retorna:
+      {
+        "date": "YYYY-MM-DD",
+        "bulletins": {
+            10: {"bid": float, "ask": float, "ts": "HH:MM"},  # Intermediario 10h
+            11: {...}, 12: {...}, 13: {...},
+        },
+        "closing": {"bid": float, "ask": float, "ts": "HH:MM"} | None,
+        "source": "BCB Olinda PTAX",
+      }
+    `bulletins[h]` pode vir ausente quando a BC ainda nao publicou.
+    date_ref: "MM-DD-YYYY" (formato BCB). None = hoje.
+    """
+    import requests as _req
+
+    if date_ref is None:
+        date_ref = pd.Timestamp.now(tz="America/Sao_Paulo").strftime("%m-%d-%Y")
+
+    out: Dict[str, Any] = {
+        "date": date_ref, "bulletins": {}, "closing": None,
+        "source": "BCB Olinda PTAX",
+    }
+
+    try:
+        # CotacaoMoedaDia expoe TODOS os boletins do dia (Abertura + 3
+        # Intermediarios + Fechamento PTAX). CotacaoDolarDia so traz o
+        # fechamento — nao serve pra esta secao.
+        url = (
+            "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+            "CotacaoMoedaDia(moeda=@m,dataCotacao=@d)"
+            f"?@m='USD'&@d='{date_ref}'"
+            "&$orderby=dataHoraCotacao%20asc&$format=json"
+        )
+        r = _req.get(url, timeout=6)
+        if not r.ok:
+            return out
+        rows = r.json().get("value", []) or []
+    except Exception as e:
+        logger.warning(f"PTAX bulletins falhou: {e}")
+        return out
+
+    for row in rows:
+        tipo = (row.get("tipoBoletim") or "").strip().lower()
+        ts = row.get("dataHoraCotacao") or ""
+        try:
+            hh_mm = ts[11:16]     # "YYYY-MM-DD HH:MM:SS.sss"
+            hour = int(ts[11:13])
+        except (ValueError, IndexError):
+            continue
+        try:
+            bid = float(row["cotacaoCompra"])
+            ask = float(row["cotacaoVenda"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        payload = {"bid": bid, "ask": ask, "ts": hh_mm}
+        if "fechamento" in tipo:
+            out["closing"] = payload
+        elif "intermediário" in tipo or "intermediario" in tipo:
+            # BC publica boletins em HH:04-HH:05 para o slot HH. Usamos o hour
+            # do timestamp como slot.
+            if hour in (10, 11, 12, 13) and hour not in out["bulletins"]:
+                out["bulletins"][hour] = payload
+        elif "abertura" in tipo:
+            # "Abertura" e equivalente ao slot 10h quando nao houver Intermediario.
+            if 10 not in out["bulletins"]:
+                out["bulletins"][10] = payload
+
+    return out
 
 
 def get_market_news(max_per_source: int = 3) -> list:
