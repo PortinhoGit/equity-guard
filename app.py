@@ -1514,8 +1514,13 @@ def _render_briefing(T: dict) -> None:
             f"<b style='color:#e6edf3;'>{val}</b> {chg_html}</span></div>"
         )
 
+    # Data de referencia do briefing: usa data_ref do market_status — pode ser
+    # D-1 util quando estamos antes das 10h (mercado ainda nao abriu), ou hoje
+    # quando o pregao ja fechou ou esta em ONLINE. Nunca exibe hoje as 8h.
+    _mkt_hdr = get_status_mercado()
     today = pd.Timestamp.now(tz="America/Sao_Paulo").strftime("%d/%m/%Y")
-    with st.expander(T["briefing_title"].format(date=today), expanded=False):
+    _briefing_date = _mkt_hdr["data_ref"].strftime("%d/%m/%Y")
+    with st.expander(T["briefing_title"].format(date=_briefing_date), expanded=True):
 
         _bc1, _bc2 = st.columns(2)
 
@@ -1574,298 +1579,305 @@ def _render_briefing(T: dict) -> None:
                 unsafe_allow_html=True,
             )
 
-        # ── WhatsApp share — botões conforme status do mercado ────────────────
-        _mkt = get_status_mercado()
-        _fx_wa = _fetch_fx_usdbrl()
-        _pd = _fetch_prevdow_live()
-        # NitroPrev (IFM) suspenso no briefing — conteudo de portal privado.
-        import streamlit.components.v1 as _wa_comp
+    # ── WhatsApp share — fora do expander Briefing, sempre visivel ───────
+    st.markdown(
+        "<div style='margin:14px 0 6px;'>"
+        "<span style='font-size:.82rem;font-weight:800;letter-spacing:1.5px;"
+        "text-transform:uppercase;color:#d4af37;'>📲 Compartilhar Briefing</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    _mkt = get_status_mercado()
+    _fx_wa = _fetch_fx_usdbrl()
+    _pd = _fetch_prevdow_live()
+    # NitroPrev (IFM) suspenso no briefing — conteudo de portal privado.
+    import streamlit.components.v1 as _wa_comp
 
-        def _fx_fmt_wa(v):
-            return f"R${v:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".") if v else "---"
+    def _fx_fmt_wa(v):
+        return f"R${v:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".") if v else "---"
 
-        def _wa_chg(name):
-            ind = by_name.get(name)
-            if not ind or ind.get("change") is None:
-                return ""
-            c = ind["change"]
-            arrow = "+" if c > 0 else ""
-            return f"{arrow}{c:.1f}%"
+    def _wa_chg(name):
+        ind = by_name.get(name)
+        if not ind or ind.get("change") is None:
+            return ""
+        c = ind["change"]
+        arrow = "+" if c > 0 else ""
+        return f"{arrow}{c:.1f}%"
 
-        def _wa_val(name, loc="us"):
-            return _fmt_val(name, loc)
+    def _wa_val(name, loc="us"):
+        return _fmt_val(name, loc)
 
-        _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
-        _hora_online = _now_brt.strftime("%H:%M:%S")
-        _data_ref = _mkt["data_ref"].strftime("%d/%m/%Y")
-        _data_ant = _mkt["data_anterior"].strftime("%d/%m/%Y")
-        _is_online = _mkt["estado"] == "ONLINE"
+    _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
+    _hora_online = _now_brt.strftime("%H:%M:%S")
+    _data_ref = _mkt["data_ref"].strftime("%d/%m/%Y")
+    _data_ant = _mkt["data_anterior"].strftime("%d/%m/%Y")
+    _is_online = _mkt["estado"] == "ONLINE"
 
-        _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
-        _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
-        _fx_chg_val = (_fx_wa or {}).get("change", 0)
-        _fx_arrow = "+" if _fx_chg_val > 0 else ""
-        _hora_corte = _mkt["hora_corte"].strftime("%Hh%M")
+    _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
+    _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
+    _fx_chg_val = (_fx_wa or {}).get("change", 0)
+    _fx_arrow = "+" if _fx_chg_val > 0 else ""
+    _hora_corte = _mkt["hora_corte"].strftime("%Hh%M")
 
-        def _pad(name, width=10):
-            return name + " " * max(1, width - len(name))
+    def _pad(name, width=10):
+        return name + " " * max(1, width - len(name))
 
-        def _rpad(val, width=12):
-            return " " * max(1, width - len(val)) + val
+    def _rpad(val, width=12):
+        return " " * max(1, width - len(val)) + val
 
-        _emoji_js = """
-            msg = msg.replace('*Juros*', String.fromCodePoint(0x1F3E6)+' *Juros*');
-            msg = msg.replace('US Fed:', String.fromCodePoint(0x1F1FA,0x1F1F8)+' Fed:');
-            msg = msg.replace('BR Selic:', String.fromCodePoint(0x1F1E7,0x1F1F7)+' Selic:');
-            msg = msg.replace('*Commodities*', String.fromCodePoint(0x1F6E2)+' *Commodities*');
-            msg = msg.replace('*Dolar Comercial*', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
-            msg = msg.replace('*Bolsas*', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
-            msg = msg.replace('*Prevdow', String.fromCodePoint(0x1F3E6)+' *Prevdow');
-            msg = msg.replace('*NitroPrev', String.fromCodePoint(0x1F3E6)+' *NitroPrev');
-            msg = msg.replace('*Briefing', String.fromCodePoint(0x1F4CA)+' *Briefing');
-            msg = msg.replace('*Equity Guard*', String.fromCodePoint(0x1F449)+' *Equity Guard*');
-        """
+    _emoji_js = """
+        msg = msg.replace('*Juros*', String.fromCodePoint(0x1F3E6)+' *Juros*');
+        msg = msg.replace('US Fed:', String.fromCodePoint(0x1F1FA,0x1F1F8)+' Fed:');
+        msg = msg.replace('BR Selic:', String.fromCodePoint(0x1F1E7,0x1F1F7)+' Selic:');
+        msg = msg.replace('*Commodities*', String.fromCodePoint(0x1F6E2)+' *Commodities*');
+        msg = msg.replace('*Dolar Comercial*', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
+        msg = msg.replace('*Bolsas*', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
+        msg = msg.replace('*Prevdow', String.fromCodePoint(0x1F3E6)+' *Prevdow');
+        msg = msg.replace('*NitroPrev', String.fromCodePoint(0x1F3E6)+' *NitroPrev');
+        msg = msg.replace('*Briefing', String.fromCodePoint(0x1F4CA)+' *Briefing');
+        msg = msg.replace('*Equity Guard*', String.fromCodePoint(0x1F449)+' *Equity Guard*');
+    """
 
-        # Formato: nome: valor variacao (sem tentativa de alinhar colunas — WhatsApp usa fonte proporcional)
-        _juros_block = (
-            "*Juros*\\n"
-            + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (proxima reuniao FOMC " + _fmt_date_br(_fomc_next_iso()) + ")\\n"
-            + "BR Selic: " + f"{_selic_now():.2f}%" + " (proxima reuniao COPOM " + _fmt_date_br(_copom_next_iso()) + ")"
-        )
-        def _fmt_pct(v):
-            return f"{v:+.2f}%" if v is not None else "N/D"
-        _prev_di = _fmt_pct(_pd.get('cdi_month'))
-        _prev_bal = _fmt_pct(_pd.get('balanced_month'))
-        _prev_di_y = _fmt_pct(_pd.get('cdi_year'))
-        _prev_bal_y = _fmt_pct(_pd.get('balanced_year'))
-        _prev_block = (
-            "*Prevdow " + _pd['data_base'] + "*\\n"
-            + "DI: " + _prev_di + " mes | " + _prev_di_y + " ano\\n"
-            + "Balanceada: " + _prev_bal + " mes | " + _prev_bal_y + " ano"
-        )
-        _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
+    # Formato: nome: valor variacao (sem tentativa de alinhar colunas — WhatsApp usa fonte proporcional)
+    _juros_block = (
+        "*Juros*\\n"
+        + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (proxima reuniao FOMC " + _fmt_date_br(_fomc_next_iso()) + ")\\n"
+        + "BR Selic: " + f"{_selic_now():.2f}%" + " (proxima reuniao COPOM " + _fmt_date_br(_copom_next_iso()) + ")"
+    )
+    def _fmt_pct(v):
+        return f"{v:+.2f}%" if v is not None else "N/D"
+    _prev_di = _fmt_pct(_pd.get('cdi_month'))
+    _prev_bal = _fmt_pct(_pd.get('balanced_month'))
+    _prev_di_y = _fmt_pct(_pd.get('cdi_year'))
+    _prev_bal_y = _fmt_pct(_pd.get('balanced_year'))
+    _prev_block = (
+        "*Prevdow " + _pd['data_base'] + "*\\n"
+        + "DI: " + _prev_di + " mes | " + _prev_di_y + " ano\\n"
+        + "Balanceada: " + _prev_bal + " mes | " + _prev_bal_y + " ano"
+    )
+    _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
-        _body_block = (
-            _juros_block + "\\n\\n"
-            + "*Commodities*\\n"
-            + "Brent: US$ " + _wa_val('Brent') + "  " + _wa_chg('Brent') + "\\n"
-            + "WTI: US$ " + _wa_val('WTI') + "  " + _wa_chg('WTI') + "\\n\\n"
-            + "*Dolar Comercial*\\n"
-            + "Venda: " + _fx_com + "  " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
-            + "*Bolsas*\\n"
-            + "Ibovespa: " + _wa_val('IBOV', 'br') + "  " + _wa_chg('IBOV') + "\\n"
-            + "S&P 500: " + _wa_val('S&P 500') + "  " + _wa_chg('S&P 500') + "\\n"
-            + "NASDAQ: " + _wa_val('NASDAQ') + "  " + _wa_chg('NASDAQ') + "\\n"
-            + "FTSE: " + _wa_val('FTSE') + "  " + _wa_chg('FTSE') + "\\n\\n"
-            + _prev_block + "\\n\\n"
-            + _footer
-        )
+    _body_block = (
+        _juros_block + "\\n\\n"
+        + "*Commodities*\\n"
+        + "Brent: US$ " + _wa_val('Brent') + "  " + _wa_chg('Brent') + "\\n"
+        + "WTI: US$ " + _wa_val('WTI') + "  " + _wa_chg('WTI') + "\\n\\n"
+        + "*Dolar Comercial*\\n"
+        + "Venda: " + _fx_com + "  " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
+        + "*Bolsas*\\n"
+        + "Ibovespa: " + _wa_val('IBOV', 'br') + "  " + _wa_chg('IBOV') + "\\n"
+        + "S&P 500: " + _wa_val('S&P 500') + "  " + _wa_chg('S&P 500') + "\\n"
+        + "NASDAQ: " + _wa_val('NASDAQ') + "  " + _wa_chg('NASDAQ') + "\\n"
+        + "FTSE: " + _wa_val('FTSE') + "  " + _wa_chg('FTSE') + "\\n\\n"
+        + _prev_block + "\\n\\n"
+        + _footer
+    )
 
-        # ── Fechamento do último pregão (data_ref) ───────────────────────────
-        _close_msg = (
-            "*Briefing Equity Guard*\\n"
-            + "*Fechamento " + _data_ref + ", " + _hora_corte + ".*\\n\\n"
-            + _body_block
-        )
+    # ── Fechamento do último pregão (data_ref) ───────────────────────────
+    _close_msg = (
+        "*Briefing Equity Guard*\\n"
+        + "*Fechamento " + _data_ref + ", " + _hora_corte + ".*\\n\\n"
+        + _body_block
+    )
 
-        # ── Fechamento anterior (data_anterior) ──────────────────────────────
-        _ant_msg = (
-            "*Briefing Equity Guard*\\n"
-            + "*Fechamento " + _data_ant + ", " + _hora_corte + ".*\\n\\n"
-            + _body_block
-        )
+    # ── Fechamento anterior (data_anterior) ──────────────────────────────
+    _ant_msg = (
+        "*Briefing Equity Guard*\\n"
+        + "*Fechamento " + _data_ant + ", " + _hora_corte + ".*\\n\\n"
+        + _body_block
+    )
 
-        # ── Online (só quando mercado aberto) ────────────────────────────────
-        _online_msg = (
-            "*Briefing Equity Guard*\\n"
-            + "*Online " + today + " " + _hora_online + " (Brasilia)*\\n\\n"
-            + _body_block
-        )
+    # ── Online (só quando mercado aberto) ────────────────────────────────
+    _online_msg = (
+        "*Briefing Equity Guard*\\n"
+        + "*Online " + today + " " + _hora_online + " (Brasilia)*\\n\\n"
+        + _body_block
+    )
 
-        if _is_online:
-            # Mercado aberto: vermelho (fechamento anterior) + verde (online)
-            _wa_comp.html("""
-            <div style="display:flex;flex-direction:column;gap:6px;">
-            <button onclick="
-                var msg = '""" + _ant_msg + """';
-                """ + _emoji_js + """
-                window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-            " style="
-                display:block;width:100%;background:#c0392b;color:#fff;
-                padding:10px 8px;border-radius:8px;font-size:.78rem;
-                font-weight:700;border:none;cursor:pointer;
-                font-family:Inter,system-ui,sans-serif;
-            ">Fechamento """ + _data_ant + """</button>
-            <button onclick="
-                var msg = '""" + _online_msg + """';
-                """ + _emoji_js + """
-                window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-            " style="
-                display:block;width:100%;background:#25d366;color:#fff;
-                padding:10px 8px;border-radius:8px;font-size:.78rem;
-                font-weight:700;border:none;cursor:pointer;
-                font-family:Inter,system-ui,sans-serif;
-            ">Online """ + _hora_online + """ (Brasilia)</button>
-            </div>
-            """, height=90)
-        else:
-            # Mercado fechado: vermelho (fechamento de hoje) + cinza (anterior)
-            _wa_comp.html("""
-            <div style="display:flex;flex-direction:column;gap:6px;">
-            <button onclick="
-                var msg = '""" + _close_msg + """';
-                """ + _emoji_js + """
-                window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-            " style="
-                display:block;width:100%;background:#c0392b;color:#fff;
-                padding:10px 8px;border-radius:8px;font-size:.78rem;
-                font-weight:700;border:none;cursor:pointer;
-                font-family:Inter,system-ui,sans-serif;
-            ">Fechamento """ + _data_ref + """ (""" + _hora_corte + """)</button>
-            <button onclick="
-                var msg = '""" + _ant_msg + """';
-                """ + _emoji_js + """
-                window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-            " style="
-                display:block;width:100%;background:#484f58;color:#e6edf3;
-                padding:10px 8px;border-radius:8px;font-size:.78rem;
-                font-weight:700;border:none;cursor:pointer;
-                font-family:Inter,system-ui,sans-serif;
-            ">Fechamento anterior """ + _data_ant + """</button>
-            </div>
-            """, height=90)
-        st.markdown(
-            f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
-            f"{T['briefing_source_footer']}</div>",
-            unsafe_allow_html=True,
-        )
-
-        # ── Enviar para meu WhatsApp ─────────────────────────────────────────
-        st.markdown(
-            "<div style='margin-top:12px;border-top:1px solid #21262d;padding-top:10px;'>"
-            "<div style='font-size:.72rem;color:#d4af37;font-weight:700;"
-            "text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;'>"
-            "📲 Enviar briefing para meu WhatsApp</div></div>",
-            unsafe_allow_html=True,
-        )
-        # Formulario HTML/JS puro — nao depende de rerender Streamlit,
-        # nao sofre popup blocker (window.open vem do click direto do usuario),
-        # e permite type="tel"/autocomplete="off" (Streamlit nao expoe).
-        import json as _json
-        _plain_msg = (
-            _online_msg
-            .replace("\\n", "\n")
-            .replace("\\u00e2", "â").replace("\\u00e1", "á")
-            .replace("\\u00e9", "é").replace("\\u00e7", "ç")
-            .replace("\\u00e3", "ã").replace("\\u00ea", "ê")
-            .replace("\\u00ed", "í").replace("\\u00f3", "ó")
-            .replace("\\u00f4", "ô").replace("\\u00f5", "õ")
-            .replace("\\u00fa", "ú").replace("\\u00fc", "ü")
-        )
-        # Emojis sao injetados no JS via String.fromCodePoint — isso sobrevive
-        # melhor ao forward do WhatsApp Desktop do que emojis nativos em Python
-        # (que podem virar "?" apos re-encoding do cliente desktop).
-        _msg_js = _json.dumps(_plain_msg)
-        _wa_comp.html(f"""
-        <style>
-        .eg-wa-wrap {{ display:flex; gap:10px; font-family:Inter,system-ui,sans-serif; }}
-        .eg-wa-phone {{
-            flex:3; padding:9px 14px; border-radius:8px;
-            background:#0d1117; color:#e6edf3; font-size:.88rem;
-            border:1px solid #30363d; outline:none;
+    if _is_online:
+        # Mercado aberto: vermelho (fechamento anterior) + verde (online)
+        _wa_comp.html("""
+        <div style="display:flex;flex-direction:column;gap:6px;">
+        <button onclick="
+            var msg = '""" + _ant_msg + """';
+            """ + _emoji_js + """
+            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+        " style="
+            display:block;width:100%;background:#c0392b;color:#fff;
+            padding:10px 8px;border-radius:8px;font-size:.78rem;
+            font-weight:700;border:none;cursor:pointer;
             font-family:Inter,system-ui,sans-serif;
-        }}
-        .eg-wa-phone:focus {{ border-color:#d4af37; box-shadow:0 0 0 2px rgba(212,175,55,.15); }}
-        .eg-wa-btn {{
-            flex:2; padding:9px 14px; border-radius:8px;
-            font-size:.82rem; font-weight:700; letter-spacing:.3px;
-            cursor:pointer; transition:all .15s;
-            display:flex; align-items:center; justify-content:center; gap:6px;
+        ">Fechamento """ + _data_ant + """</button>
+        <button onclick="
+            var msg = '""" + _online_msg + """';
+            """ + _emoji_js + """
+            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+        " style="
+            display:block;width:100%;background:#25d366;color:#fff;
+            padding:10px 8px;border-radius:8px;font-size:.78rem;
+            font-weight:700;border:none;cursor:pointer;
             font-family:Inter,system-ui,sans-serif;
-        }}
-        .eg-wa-btn.eg-wa-ready {{
-            background:#25d366; color:#0d1117; border:1px solid #1cbf5a;
-        }}
-        .eg-wa-btn.eg-wa-ready:hover {{ filter:brightness(1.08); transform:translateY(-1px); }}
-        .eg-wa-btn.eg-wa-off {{
-            background:#161b22; color:#6e7681; border:1px solid #30363d;
-            cursor:not-allowed;
-        }}
-        .eg-wa-err {{ color:#f85149; font-size:.72rem; margin-top:6px; min-height:16px; }}
-        </style>
-        <div class="eg-wa-wrap">
-            <input type="tel" inputmode="tel" autocomplete="off"
-                   name="eg-wa-phone-anon" id="eg-wa-phone"
-                   class="eg-wa-phone" placeholder="Ex.: 11 99999-9999 (BR) ou +1 415 555 2671">
-            <button id="eg-wa-send" class="eg-wa-btn eg-wa-off" disabled>Digite seu numero</button>
+        ">Online """ + _hora_online + """ (Brasilia)</button>
         </div>
-        <div id="eg-wa-err" class="eg-wa-err"></div>
-        <script>
-        (function() {{
-            var msg = {_msg_js};
-            var inp = document.getElementById('eg-wa-phone');
-            var btn = document.getElementById('eg-wa-send');
-            var err = document.getElementById('eg-wa-err');
+        """, height=90)
+    else:
+        # Mercado fechado: vermelho (fechamento de hoje) + cinza (anterior)
+        _wa_comp.html("""
+        <div style="display:flex;flex-direction:column;gap:6px;">
+        <button onclick="
+            var msg = '""" + _close_msg + """';
+            """ + _emoji_js + """
+            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+        " style="
+            display:block;width:100%;background:#c0392b;color:#fff;
+            padding:10px 8px;border-radius:8px;font-size:.78rem;
+            font-weight:700;border:none;cursor:pointer;
+            font-family:Inter,system-ui,sans-serif;
+        ">Fechamento """ + _data_ref + """ (""" + _hora_corte + """)</button>
+        <button onclick="
+            var msg = '""" + _ant_msg + """';
+            """ + _emoji_js + """
+            window.parent.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+        " style="
+            display:block;width:100%;background:#484f58;color:#e6edf3;
+            padding:10px 8px;border-radius:8px;font-size:.78rem;
+            font-weight:700;border:none;cursor:pointer;
+            font-family:Inter,system-ui,sans-serif;
+        ">Fechamento anterior """ + _data_ant + """</button>
+        </div>
+        """, height=90)
+    st.markdown(
+        f"<div style='font-size:.58rem;color:#484f58;text-align:right;margin-top:4px;'>"
+        f"{T['briefing_source_footer']}</div>",
+        unsafe_allow_html=True,
+    )
 
-            function cleanDigits(v) {{ return (v || '').replace(/\\D/g, ''); }}
-            function hasPlus(v) {{ return /^\\s*\\+/.test(v || ''); }}
-            // 8 a 15 digitos cobrem todos os paises (ITU-T E.164).
-            function isValid(d) {{ return d.length >= 8 && d.length <= 15; }}
+    # ── Enviar para meu WhatsApp ─────────────────────────────────────────
+    st.markdown(
+        "<div style='margin-top:12px;border-top:1px solid #21262d;padding-top:10px;'>"
+        "<div style='font-size:.72rem;color:#d4af37;font-weight:700;"
+        "text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;'>"
+        "📲 Enviar briefing para meu WhatsApp</div></div>",
+        unsafe_allow_html=True,
+    )
+    # Formulario HTML/JS puro — nao depende de rerender Streamlit,
+    # nao sofre popup blocker (window.open vem do click direto do usuario),
+    # e permite type="tel"/autocomplete="off" (Streamlit nao expoe).
+    import json as _json
+    _plain_msg = (
+        _online_msg
+        .replace("\\n", "\n")
+        .replace("\\u00e2", "â").replace("\\u00e1", "á")
+        .replace("\\u00e9", "é").replace("\\u00e7", "ç")
+        .replace("\\u00e3", "ã").replace("\\u00ea", "ê")
+        .replace("\\u00ed", "í").replace("\\u00f3", "ó")
+        .replace("\\u00f4", "ô").replace("\\u00f5", "õ")
+        .replace("\\u00fa", "ú").replace("\\u00fc", "ü")
+    )
+    # Emojis sao injetados no JS via String.fromCodePoint — isso sobrevive
+    # melhor ao forward do WhatsApp Desktop do que emojis nativos em Python
+    # (que podem virar "?" apos re-encoding do cliente desktop).
+    _msg_js = _json.dumps(_plain_msg)
+    _wa_comp.html(f"""
+    <style>
+    .eg-wa-wrap {{ display:flex; gap:10px; font-family:Inter,system-ui,sans-serif; }}
+    .eg-wa-phone {{
+        flex:3; padding:9px 14px; border-radius:8px;
+        background:#0d1117; color:#e6edf3; font-size:.88rem;
+        border:1px solid #30363d; outline:none;
+        font-family:Inter,system-ui,sans-serif;
+    }}
+    .eg-wa-phone:focus {{ border-color:#d4af37; box-shadow:0 0 0 2px rgba(212,175,55,.15); }}
+    .eg-wa-btn {{
+        flex:2; padding:9px 14px; border-radius:8px;
+        font-size:.82rem; font-weight:700; letter-spacing:.3px;
+        cursor:pointer; transition:all .15s;
+        display:flex; align-items:center; justify-content:center; gap:6px;
+        font-family:Inter,system-ui,sans-serif;
+    }}
+    .eg-wa-btn.eg-wa-ready {{
+        background:#25d366; color:#0d1117; border:1px solid #1cbf5a;
+    }}
+    .eg-wa-btn.eg-wa-ready:hover {{ filter:brightness(1.08); transform:translateY(-1px); }}
+    .eg-wa-btn.eg-wa-off {{
+        background:#161b22; color:#6e7681; border:1px solid #30363d;
+        cursor:not-allowed;
+    }}
+    .eg-wa-err {{ color:#f85149; font-size:.72rem; margin-top:6px; min-height:16px; }}
+    </style>
+    <div class="eg-wa-wrap">
+        <input type="tel" inputmode="tel" autocomplete="off"
+               name="eg-wa-phone-anon" id="eg-wa-phone"
+               class="eg-wa-phone" placeholder="Ex.: 11 99999-9999 (BR) ou +1 415 555 2671">
+        <button id="eg-wa-send" class="eg-wa-btn eg-wa-off" disabled>Digite seu numero</button>
+    </div>
+    <div id="eg-wa-err" class="eg-wa-err"></div>
+    <script>
+    (function() {{
+        var msg = {_msg_js};
+        var inp = document.getElementById('eg-wa-phone');
+        var btn = document.getElementById('eg-wa-send');
+        var err = document.getElementById('eg-wa-err');
 
-            function normalize(raw) {{
-                var d = cleanDigits(raw);
-                if (hasPlus(raw)) return d;          // usuario informou DDI
-                if (d.length >= 12) return d;         // provavel DDI ja incluso
-                return '55' + d;                      // default Brasil
+        function cleanDigits(v) {{ return (v || '').replace(/\\D/g, ''); }}
+        function hasPlus(v) {{ return /^\\s*\\+/.test(v || ''); }}
+        // 8 a 15 digitos cobrem todos os paises (ITU-T E.164).
+        function isValid(d) {{ return d.length >= 8 && d.length <= 15; }}
+
+        function normalize(raw) {{
+            var d = cleanDigits(raw);
+            if (hasPlus(raw)) return d;          // usuario informou DDI
+            if (d.length >= 12) return d;         // provavel DDI ja incluso
+            return '55' + d;                      // default Brasil
+        }}
+
+        function update() {{
+            var d = cleanDigits(inp.value);
+            if (isValid(d)) {{
+                btn.disabled = false;
+                btn.className = 'eg-wa-btn eg-wa-ready';
+                btn.textContent = 'Enviar para mim →';
+                err.textContent = '';
+            }} else {{
+                btn.disabled = true;
+                btn.className = 'eg-wa-btn eg-wa-off';
+                btn.textContent = 'Digite seu numero';
             }}
-
-            function update() {{
-                var d = cleanDigits(inp.value);
-                if (isValid(d)) {{
-                    btn.disabled = false;
-                    btn.className = 'eg-wa-btn eg-wa-ready';
-                    btn.textContent = 'Enviar para mim →';
-                    err.textContent = '';
-                }} else {{
-                    btn.disabled = true;
-                    btn.className = 'eg-wa-btn eg-wa-off';
-                    btn.textContent = 'Digite seu numero';
-                }}
+        }}
+        inp.addEventListener('input', update);
+        btn.addEventListener('click', function() {{
+            var d = cleanDigits(inp.value);
+            if (!isValid(d)) {{
+                err.textContent = 'Numero invalido. Digite DDD + numero ou +DDI numero.';
+                return;
             }}
-            inp.addEventListener('input', update);
-            btn.addEventListener('click', function() {{
-                var d = cleanDigits(inp.value);
-                if (!isValid(d)) {{
-                    err.textContent = 'Numero invalido. Digite DDD + numero ou +DDI numero.';
-                    return;
-                }}
-                d = normalize(inp.value);
-                // Detecta mobile. Em computador (Desktop/Windows/Mac), WhatsApp
-                // costuma corromper emojis 4-byte no forward, entao enviamos sem.
-                var ua = (navigator.userAgent || '') + ' ' + (navigator.platform || '');
-                var isMobile = /iPhone|iPad|iPod|Android|Mobile|IEMobile|Opera Mini/i.test(ua);
-                var m = msg;
-                if (isMobile) {{
-                    // Injeta emojis via String.fromCodePoint — preserva UTF-8 correto na URL.
-                    m = m.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA) + ' *Briefing Equity Guard*');
-                    m = m.replace('*Juros*', String.fromCodePoint(0x1F3E6) + ' *Juros*');
-                    m = m.replace('US Fed:', String.fromCodePoint(0x1F1FA, 0x1F1F8) + ' Fed:');
-                    m = m.replace('BR Selic:', String.fromCodePoint(0x1F1E7, 0x1F1F7) + ' Selic:');
-                    m = m.replace('*Commodities*', String.fromCodePoint(0x1F6E2) + ' *Commodities*');
-                    m = m.replace('*Dolar Comercial*', String.fromCodePoint(0x1F4B5) + ' *Dolar Comercial*');
-                    m = m.replace('*Bolsas*', String.fromCodePoint(0x1F4C8) + ' *Bolsas*');
-                    m = m.replace('*Prevdow', String.fromCodePoint(0x1F3E6) + ' *Prevdow');
-                    m = m.replace('*Equity Guard*', String.fromCodePoint(0x1F449) + ' *Equity Guard*');
-                }}
-                // Em desktop nao substituimos: mensagem fica com markdown puro
-                // (WhatsApp ainda renderiza *negrito* normalmente).
-                var url = 'https://wa.me/' + d + '?text=' + encodeURIComponent(m);
-                window.open(url, '_blank', 'noopener');
-            }});
-            update();
-        }})();
-        </script>
-        """, height=100)
+            d = normalize(inp.value);
+            // Detecta mobile. Em computador (Desktop/Windows/Mac), WhatsApp
+            // costuma corromper emojis 4-byte no forward, entao enviamos sem.
+            var ua = (navigator.userAgent || '') + ' ' + (navigator.platform || '');
+            var isMobile = /iPhone|iPad|iPod|Android|Mobile|IEMobile|Opera Mini/i.test(ua);
+            var m = msg;
+            if (isMobile) {{
+                // Injeta emojis via String.fromCodePoint — preserva UTF-8 correto na URL.
+                m = m.replace('*Briefing Equity Guard*', String.fromCodePoint(0x1F4CA) + ' *Briefing Equity Guard*');
+                m = m.replace('*Juros*', String.fromCodePoint(0x1F3E6) + ' *Juros*');
+                m = m.replace('US Fed:', String.fromCodePoint(0x1F1FA, 0x1F1F8) + ' Fed:');
+                m = m.replace('BR Selic:', String.fromCodePoint(0x1F1E7, 0x1F1F7) + ' Selic:');
+                m = m.replace('*Commodities*', String.fromCodePoint(0x1F6E2) + ' *Commodities*');
+                m = m.replace('*Dolar Comercial*', String.fromCodePoint(0x1F4B5) + ' *Dolar Comercial*');
+                m = m.replace('*Bolsas*', String.fromCodePoint(0x1F4C8) + ' *Bolsas*');
+                m = m.replace('*Prevdow', String.fromCodePoint(0x1F3E6) + ' *Prevdow');
+                m = m.replace('*Equity Guard*', String.fromCodePoint(0x1F449) + ' *Equity Guard*');
+            }}
+            // Em desktop nao substituimos: mensagem fica com markdown puro
+            // (WhatsApp ainda renderiza *negrito* normalmente).
+            var url = 'https://wa.me/' + d + '?text=' + encodeURIComponent(m);
+            window.open(url, '_blank', 'noopener');
+        }});
+        update();
+    }})();
+    </script>
+    """, height=100)
 
 
 def _render_global_bar(T: dict) -> None:
@@ -4194,14 +4206,15 @@ def main() -> None:
     # macro antes do usuario escolher o ticker.
     _render_economy_overview(T)
 
-    # ── Busca de ticker (prioridade mobile — sidebar fica escondido) ────────
-    _render_quick_ticker_search(T)
-
     # ── 🗞️ Briefing de Fechamento (juros, commodities, dolar, bolsas) ──────
     _render_briefing(T)
 
     # ── 📊 Mercado B3 (top altas, baixas, mais negociadas) ──────────────────
     _render_market_movers(T)
+
+    # ── Busca de ticker — apos o panorama do mercado, para o usuario ver
+    # primeiro altas/baixas/negociadas e so depois escolher o ticker.
+    _render_quick_ticker_search(T)
 
     # ── Sidebar + analysis ───────────────────────────────────────────────────
     ticker, period, target_yield, clicked = render_sidebar(user, T)
