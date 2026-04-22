@@ -695,33 +695,35 @@ def get_proventos_summary(
     # Dividendos e proventos de FII sao ISENTOS de IR para PF (Lei 11.033/2004).
     # IR de 15% incide APENAS sobre JCP e Rendimento Tributado (que na
     # pratica tem a mesma aliquota).
+    # Regra inegociavel: IR de 15% incide APENAS sobre JCP e rendimentos
+    # tributados. Dividendos (acoes) e proventos de FII sao ISENTOS.
+    # Expressao "15% sobre total" foi banida do app (ensina conceito errado).
     if is_fii:
         liquido = soma_total
         ir_label = "Isento"
     elif source == "status_invest":
         if discount_jcp:
-            # Isenta dividendo; aplica 15% so no JCP.
             liquido = soma_div + (soma_jcp * 0.85)
-            if soma_jcp <= 0 and soma_div > 0:
-                ir_label = "Isento (só dividendos)"
+            # Se NAO tem JCP, nao ha IR a descontar — "Isento" e o rotulo correto.
+            if soma_jcp <= 0:
+                ir_label = "Isento"
             else:
                 ir_label = "15% sobre JCP"
         else:
             liquido = soma_total
             ir_label = "Bruto (sem IR)"
     else:
-        # Fallback yfinance: nao ha separacao JCP/Dividendo. Em vez de aplicar
-        # 15% cego sobre o total (errado — o rotulo antigo "15% sobre total"
-        # ensinava conceito tributario incorreto), usa heuristica setorial:
-        #   * bancos/holdings (_JCP_HEAVY_TICKERS): ~90% JCP -> fator 0.865
-        #     (0.10 dividendo isento + 0.90 × 0.85 JCP liquido)
-        #   * demais acoes: assume 50% JCP / 50% dividendo -> fator 0.925
+        # Fallback yfinance: sem separacao JCP/Dividendo. Heuristica setorial:
+        #   * grandes pagadoras de JCP (_JCP_HEAVY_TICKERS): 90% JCP, 10% div
+        #     -> fator = 0.10 + 0.90 × 0.85 = 0.865
+        #   * demais: 50% JCP, 50% div -> fator = 0.50 + 0.50 × 0.85 = 0.925
+        # Nunca aplica 15% sobre o total (isso tributaria dividendo, proibido).
         _t_up = ticker.upper().replace(".SA", "")
         _heavy = _t_up in _JCP_HEAVY_TICKERS
         if discount_jcp:
             factor_jcp = 0.865 if _heavy else 0.925
             liquido = soma_total * factor_jcp
-            ir_label = "15% sobre JCP estimado"
+            ir_label = "15% sobre JCP (estimado)"
         else:
             liquido = soma_total
             ir_label = "Bruto (sem IR)"
