@@ -1061,32 +1061,55 @@ def _maybe_pension_alert(T: dict) -> None:
 
 def _render_quick_ticker_search(T: dict) -> None:
     """
-    Barra compacta no topo da area principal para trocar ticker rapidamente.
-    Critico no mobile — iPhone colapsa o sidebar e o seletor ficava inacessivel.
-    Reaproveita session_state 'eg_ticker_input' para sincronizar com o sidebar.
+    Seletor de ticker com autocomplete por nome popular ou setor.
+    Sincroniza com session_state['eg_ticker_input'] (usado pelo sidebar e pelo
+    router de ?t=XXXX vindo dos cards de mercado).
     """
+    from data.tickers_b3 import ALL_TICKERS_B3, popular_name, sector
+
+    # Opcoes com rotulo amigavel: "PETR4 — Petrobras · Petróleo"
+    _options: list = []
+    for _tk in sorted(ALL_TICKERS_B3):
+        _name = popular_name(_tk)
+        _sec = sector(_tk)
+        if _name and _sec:
+            _options.append(f"{_tk} — {_name} · {_sec}")
+        elif _name:
+            _options.append(f"{_tk} — {_name}")
+        elif _sec:
+            _options.append(f"{_tk} — {_sec}")
+        else:
+            _options.append(_tk)
+
+    _cur = st.session_state.get("eg_ticker_input", "BBAS3").upper().strip()
+    _cur_label = next(
+        (o for o in _options if o.startswith(f"{_cur} —") or o == _cur),
+        None,
+    )
+    if _cur_label is None:
+        # Ticker custom (nao esta na lista) — insere no topo como opcao extra.
+        _cur_label = _cur
+        _options = [_cur_label] + _options
+    _cur_idx = _options.index(_cur_label)
+
     st.markdown(
         "<style>"
-        ".eg-quick-search { margin: 0 0 10px; }"
-        ".eg-quick-search input { background:#0d1117 !important; color:#e6edf3 !important; "
+        "div[data-testid='stSelectbox'] > div > div { background:#0d1117 !important; "
         "border:1px solid #30363d !important; }"
         "</style>",
         unsafe_allow_html=True,
     )
-    _sc1, _sc2 = st.columns([5, 1])
-    with _sc1:
-        _cur = st.session_state.get("eg_ticker_input", "BBAS3")
-        _q = st.text_input(
-            T.get("quick_search_label", "Buscar ticker"),
-            value="",
-            key="eg_quick_search_input",
-            placeholder=f"Digite o ticker (atual: {_cur}) — ex: VALE3, PETR4, AAPL",
-            label_visibility="collapsed",
-        )
-    with _sc2:
-        _go = st.button("🔍", key="eg_quick_search_btn", use_container_width=True)
-    if _go and _q.strip():
-        _t = _q.strip().upper().replace(".SA", "")
+    _sel = st.selectbox(
+        label="Escolha o ticker para análise",
+        options=_options,
+        index=_cur_idx,
+        key="eg_quick_search_select",
+        placeholder="Escolha o ticker — digite código (PETR4) ou nome (klabin, vale)",
+        label_visibility="collapsed",
+    )
+    # Extrai ticker do rotulo "TICKER — ..." (ou o proprio rotulo se nao tem " — ")
+    _t = _sel.split(" — ")[0].strip().upper() if _sel else ""
+    if _t and _t != _cur:
         st.session_state["eg_ticker_input"] = _t
         st.session_state["eg_custom_ticker"] = _t
         st.session_state["_eg_auto_analyze"] = True
@@ -1323,51 +1346,49 @@ def _render_market_movers(T: dict) -> None:
         _color = "#3fb950" if r["chg"] >= 0 else "#dc2626"
         _chg = f"{r['chg']:+.2f}%"
         _price = f"R$ {r['last']:.2f}"
-        _popular = popular_name(r["ticker"])
-        _sector = sector(r["ticker"])
-        _name_line = (
-            f"<div style='color:#8b949e;font-size:.66rem;line-height:1.1;"
-            f"margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-            f"max-width:130px;'>{_popular}</div>"
-            if _popular else ""
-        )
-        _sector_line = (
-            f"<div style='color:#6e7681;font-size:.6rem;line-height:1.1;"
-            f"margin-top:1px;text-transform:uppercase;letter-spacing:.3px;'>{_sector}</div>"
-            if _sector else ""
-        )
+        _sector = sector(r["ticker"]) or "—"
         return (
             f"<a href='?t={r['ticker']}' target='_self' style='text-decoration:none;'>"
-            f"<div style='display:flex;justify-content:space-between;align-items:center;"
-            f"padding:7px 10px;background:#161b22;border:1px solid #21262d;border-radius:6px;"
-            f"margin-bottom:4px;font-size:.82rem;transition:border-color .15s;gap:8px;'>"
-            f"<div style='min-width:0;flex:1;'>"
-            f"<div style='font-weight:800;color:#e6edf3;letter-spacing:.3px;line-height:1.15;'>{r['ticker']}</div>"
-            f"{_name_line}"
-            f"{_sector_line}"
+            f"<div style='padding:6px 7px;background:#161b22;border:1px solid #21262d;"
+            f"border-radius:6px;margin-bottom:4px;transition:border-color .15s;'>"
+            # Linha 1: ticker (esq) + variacao % (dir)
+            f"<div style='display:flex;justify-content:space-between;align-items:baseline;gap:4px;'>"
+            f"<span style='font-weight:800;color:#e6edf3;font-size:.78rem;line-height:1.1;"
+            f"letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{r['ticker']}</span>"
+            f"<span style='color:{_color};font-weight:800;font-size:.74rem;'>{_chg}</span>"
             f"</div>"
-            f"<div style='display:flex;flex-direction:column;align-items:flex-end;gap:1px;'>"
-            f"<span style='color:{_color};font-weight:800;font-size:.82rem;'>{_chg}</span>"
-            f"<span style='color:#6e7681;font-size:.66rem;'>{_price}</span>"
+            # Linha 2: setor (esq) + preco (dir)
+            f"<div style='display:flex;justify-content:space-between;align-items:baseline;"
+            f"gap:4px;margin-top:3px;'>"
+            f"<span style='color:#a8b0ba;font-size:.56rem;text-transform:uppercase;"
+            f"letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{_sector}</span>"
+            f"<span style='color:#a8b0ba;font-size:.62rem;'>{_price}</span>"
             f"</div></div></a>"
         )
 
     def _render_col(title: str, items: list) -> str:
         rows = "".join(_render_row(r) for r in items) if items else \
-               "<div style='color:#6e7681;font-size:.78rem;padding:10px;'>Sem dados.</div>"
+               "<div style='color:#6e7681;font-size:.72rem;padding:10px;'>Sem dados.</div>"
         return (
-            f"<div style='font-size:.78rem;font-weight:800;color:#c9d1d9;"
-            f"margin:0 0 8px;letter-spacing:.3px;'>{title}</div>"
+            f"<div>"
+            f"<div style='font-size:.72rem;font-weight:800;color:#c9d1d9;"
+            f"margin:0 0 6px;letter-spacing:.2px;line-height:1.15;"
+            f"overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{title}</div>"
             f"{rows}"
+            f"</div>"
         )
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(_render_col("📈 Maiores Altas", _data["gainers"]), unsafe_allow_html=True)
-    with c2:
-        st.markdown(_render_col("📉 Maiores Baixas", _data["losers"]), unsafe_allow_html=True)
-    with c3:
-        st.markdown(_render_col("🔥 Mais Negociadas", _data["actives"]), unsafe_allow_html=True)
+    # Grid CSS nativo — forca 3 colunas lado a lado mesmo em iPhone.
+    # st.columns(3) no Streamlit quebra em linha unica em telas estreitas.
+    _grid_html = (
+        "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"
+        "margin-top:4px;'>"
+        f"{_render_col('📈 Altas', _data['gainers'])}"
+        f"{_render_col('📉 Baixas', _data['losers'])}"
+        f"{_render_col('🔥 Negociadas', _data['actives'])}"
+        "</div>"
+    )
+    st.markdown(_grid_html, unsafe_allow_html=True)
 
 
 def _render_briefing(T: dict) -> None:
