@@ -530,6 +530,23 @@ def _fetch_full_data(ticker: str, period: str):
     return get_full_data(ticker, period=period)
 
 
+@st.cache_data(ttl=86400, show_spinner=False)
+def _fetch_fundamentals_24h(ticker: str) -> dict:
+    """
+    Cache 24h dedicado pros fundamentos (ROE, payout, debt, pe, pb).
+    Fundamentos mudam trimestralmente — TTL longo reduz dependencia do
+    rate-limit do Yahoo Finance. Se a chamada retornar vazio (provavel
+    rate-limit), raise RuntimeError para o Streamlit nao cachear o vazio.
+    """
+    from data.provider import get_fundamentals
+    funds = get_fundamentals(ticker)
+    if (funds.get("roe") is None
+        and funds.get("payout_ratio") is None
+        and funds.get("pe_ratio") is None):
+        raise RuntimeError("fundamentals_empty_skip_cache")
+    return funds
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_prevdow_live() -> dict:
     """
@@ -1100,12 +1117,12 @@ def _render_quick_ticker_search(T: dict) -> None:
         unsafe_allow_html=True,
     )
     _sel = st.selectbox(
-        label="Escolha o ticker para análise",
+        label="🔎 Escolha o ticker para análise — digite código (PETR4) ou nome (klabin, vale)",
         options=_options,
         index=_cur_idx,
         key="eg_quick_search_select",
-        placeholder="Escolha o ticker — digite código (PETR4) ou nome (klabin, vale)",
-        label_visibility="collapsed",
+        placeholder="Digite código ou nome da empresa",
+        label_visibility="visible",
     )
     # Extrai ticker do rotulo "TICKER — ..." (ou o proprio rotulo se nao tem " — ")
     _t = _sel.split(" — ")[0].strip().upper() if _sel else ""
@@ -2854,6 +2871,21 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             st.error(T["not_found"].format(t=ticker))
             return
 
+        # Fallback 24h: se Yahoo retornou ROE/payout/PE todos vazios agora
+        # (rate-limit provavel), tenta resgatar do cache de 24h alimentado
+        # em hits anteriores bem-sucedidos.
+        if (fundamentals.get("roe") is None
+            and fundamentals.get("payout_ratio") is None
+            and fundamentals.get("pe_ratio") is None):
+            try:
+                _cached_funds = _fetch_fundamentals_24h(ticker)
+                fundamentals = {
+                    **fundamentals,
+                    **{k: v for k, v in _cached_funds.items() if v is not None},
+                }
+            except RuntimeError:
+                pass  # cache tambem vazio — mantem N/D
+
         # Consume credit — skip for the free demo load
         if not _is_demo_free:
             if not user.get("is_admin") and not user.get("is_anonymous"):
@@ -2935,13 +2967,15 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
         _name_col, _star_col = st.columns([9, 1])
         with _name_col:
             st.markdown(
-                f"<h3 style='margin:0 0 4px;display:flex;align-items:center;"
-                f"gap:6px;flex-wrap:wrap;font-size:1.25rem;font-weight:800;'>"
+                f"<h3 style='margin:4px 0 2px;display:flex;align-items:center;"
+                f"gap:6px;flex-wrap:wrap;font-size:1.25rem;font-weight:800;"
+                f"line-height:1.2;'>"
                 f"<span>{name}</span>"
                 f"<span class='eg-ticker-chip-sym'>{normalize_ticker(ticker)}</span>"
                 f"{best_badge}{dev_badge}"
                 f"</h3>"
-                f"<div style='color:#8b949e;font-size:.8rem;margin-bottom:6px;'>"
+                f"<div style='color:#8b949e;font-size:.78rem;margin:0 0 2px;"
+                f"line-height:1.25;'>"
                 f"{fundamentals.get('sector','—')} › {fundamentals.get('industry','—')}"
                 f"</div>",
                 unsafe_allow_html=True,
@@ -2961,11 +2995,39 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
                     st.toast(T["fav_added_toast"].format(ticker=_ticker_key))
                     st.rerun()
     with c_sig:
+        # Linha extra: comparacao MA20 x MA200 em linguagem direta.
+        _ma20 = trend.get("ma20")
+        _ma200 = trend.get("ma200")
+        _ma_line = ""
+        if _ma20 and _ma200:
+            _spread = ((_ma20 - _ma200) / _ma200) * 100
+            _above = _spread >= 0
+            _direction = "acima" if _above else "abaixo"
+            _color = "#3fb950" if _above else "#dc2626"
+            _lead = (
+                "compradores dominam no curto e longo prazo"
+                if _above else
+                "vendedores pressionam o curto e longo prazo"
+            )
+            # Termo "Média Móvel" por extenso para o leitor deduzir "MM20/MM200"
+            # que aparece no bloco de Golden/Death Cross mais abaixo.
+            _ma_line = (
+                f"<div style='font-size:.72rem;color:#8b949e;text-align:center;"
+                f"margin-top:6px;line-height:1.4;'>"
+                f"A <b style='color:#c9d1d9;'>Média Móvel</b> de 20 dias "
+                f"({cs} {_ma20:.2f}) está "
+                f"<b style='color:{_color};'>{_spread:+.1f}%</b> "
+                f"{_direction} da <b style='color:#c9d1d9;'>Média Móvel</b> de "
+                f"200 dias ({cs} {_ma200:.2f}) — "
+                f"<span style='color:#c9d1d9;'>{_lead}</span>."
+                f"</div>"
+            )
         st.markdown(
             f"<div class='eg-signal' style='background:{signal['bg_color']};color:{signal['color']};'>"
             f"{signal['emoji']} {action_text}</div>"
             f"<div style='font-size:.76rem;color:#8b949e;text-align:center;margin-top:5px;'>"
-            f"{desc_text}</div>",
+            f"{desc_text}</div>"
+            f"{_ma_line}",
             unsafe_allow_html=True,
         )
 
@@ -2993,7 +3055,12 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
     </script>
     """, height=0)
 
-    st.divider()
+    # Espacador compacto (em vez de st.divider que abre gap grande entre o
+    # cabecalho da empresa e o grafico).
+    st.markdown(
+        "<div style='border-top:1px solid #21262d;margin:10px 0 6px;'></div>",
+        unsafe_allow_html=True,
+    )
 
     # ══════════════════════════════════════════════════════════════════════════
     # 📈 INTERACTIVE QUOTE — right below the signal (primary scroll experience)
@@ -3397,38 +3464,8 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             _ma_html += "</div>"
             st.markdown(_ma_html, unsafe_allow_html=True)
 
-        # ── Veredito consolidado: cruz + explicacao "porque" ──────────────────
-        _why = None
-        if _ma20 and _ma200:
-            _spread = ((_ma20 - _ma200) / _ma200) * 100
-            if ov == "TENDÊNCIA DE ALTA FORTE":
-                _why = (
-                    f"A média dos últimos <b>20 dias</b> ({cs} {_ma20:.2f}) está <b>{_spread:+.1f}%</b> "
-                    f"acima da média dos últimos <b>200 dias</b> ({cs} {_ma200:.2f}) — "
-                    f"compradores dominam no curto e longo prazo."
-                )
-            elif ov == "TENDÊNCIA DE ALTA":
-                _why = (
-                    f"MA20 ({cs} {_ma20:.2f}) ligeiramente acima da MA200 ({cs} {_ma200:.2f}), "
-                    f"diferença de <b>{_spread:+.1f}%</b> — momentum positivo, mas ainda moderado."
-                )
-            elif ov == "TENDÊNCIA DE BAIXA FORTE":
-                _why = (
-                    f"A média dos últimos <b>20 dias</b> ({cs} {_ma20:.2f}) está <b>{_spread:+.1f}%</b> "
-                    f"abaixo da média dos últimos <b>200 dias</b> ({cs} {_ma200:.2f}) — "
-                    f"vendedores pressionando tanto o curto quanto o longo prazo."
-                )
-            elif ov == "TENDÊNCIA DE BAIXA":
-                _why = (
-                    f"MA20 ({cs} {_ma20:.2f}) ligeiramente abaixo da MA200 ({cs} {_ma200:.2f}), "
-                    f"diferença de <b>{_spread:+.1f}%</b> — pressão vendedora moderada."
-                )
-            else:
-                _why = (
-                    f"MA20 ({cs} {_ma20:.2f}) e MA200 ({cs} {_ma200:.2f}) praticamente coladas "
-                    f"(<b>{_spread:+.1f}%</b>) — mercado sem direção clara no momento."
-                )
-
+        # ── Veredito consolidado: apenas cruz (MM20/MM200 ja aparecem no
+        # cabecalho, logo abaixo do sinal de COMPRA/VENDA — duplicacao removida).
         _cross_lbl = None
         _cross_bg = None
         _cross_border = None
@@ -3441,15 +3478,12 @@ def render_analysis(user: dict, ticker: str, period: str, target_yield: float,
             _cross_bg = "rgba(248,81,73,.10)"
             _cross_border = "#f85149"
 
-        if _cross_lbl or _why:
+        if _cross_lbl:
             _header = (
-                f"<div style='font-size:.86rem;font-weight:800;color:#e6edf3;margin-bottom:6px;'>"
-                f"{_cross_lbl}</div>" if _cross_lbl else ""
+                f"<div style='font-size:.86rem;font-weight:800;color:#e6edf3;'>"
+                f"{_cross_lbl}</div>"
             )
-            _body = (
-                f"<div style='font-size:.78rem;color:#c9d1d9;line-height:1.5;'>{_why}</div>"
-                if _why else ""
-            )
+            _body = ""
             _bg = _cross_bg or "#161b22"
             _border = _cross_border or t_color
             st.markdown(
