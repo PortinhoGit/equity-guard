@@ -804,10 +804,40 @@ def _render_passive_income_simulator(T: dict, embedded: bool = False) -> None:
         if not embedded else _ctx.nullcontext()
     )
     with _wrapper:
-        # CSS: aporte em fonte "numerica" alinhada a direita (padrao financeiro).
-        # Escopo global ok — o app so tem 1 st.number_input (este).
+        # Mascara BRL: campo vira text_input pra exibir "R$ 100.000" com
+        # cifrao, ponto de milhar e sem decimais. Aceita qualquer formato
+        # colado (100000, 100.000, R$ 100.000, r$ 100000) — o parse_brl
+        # normaliza; ao perder foco o callback re-formata.
+        import re as _re
+
+        def _parse_brl_int(s: str) -> int:
+            if not s:
+                return 0
+            digits = _re.sub(r"[^\d]", "", str(s))
+            return int(digits) if digits else 0
+
+        def _format_brl_int(v: int) -> str:
+            return f"R$ {v:,}".replace(",", ".")
+
+        if "sim_aporte_str" not in st.session_state:
+            st.session_state.sim_aporte_str = _format_brl_int(100000)
+
+        def _reformat_aporte():
+            _v = _parse_brl_int(st.session_state.sim_aporte_str)
+            if _v < 100:
+                _v = 100
+            st.session_state.sim_aporte_str = _format_brl_int(_v)
+
+        # CSS: aporte em fonte numerica alinhada a direita (padrao financeiro).
+        # Escopado por aria-label (Streamlit usa o texto do label) — acerta o
+        # campo de aporte do Simulador e o 'Quanto voce quer receber?' da Meta
+        # sem afetar outros text_inputs (ticker search, whatsapp phone, etc).
         st.markdown(
             "<style>"
+            "input[aria-label*='investir'],"
+            "input[aria-label*='receber'],"
+            "input[aria-label*='invest'],"
+            "input[aria-label*='receive'],"
             "div[data-testid='stNumberInput'] input "
             "{ text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }"
             "</style>",
@@ -815,16 +845,17 @@ def _render_passive_income_simulator(T: dict, embedded: bool = False) -> None:
         )
         _c1, _c2 = st.columns([1, 2])
         with _c1:
-            valor_aporte = st.number_input(
+            st.text_input(
                 T.get("sim_aporte_label", "Quanto voce quer investir?"),
-                min_value=100, value=100000, step=1000, format="%d",
-                key="sim_aporte",
+                key="sim_aporte_str",
+                on_change=_reformat_aporte,
+                help=T.get("sim_aporte_help",
+                           "Digite o valor em reais. Ex.: R$ 100.000 ou R$ 1.000.000."),
             )
-            # Preview BRL formatado (ponto como separador de milhar).
-            _aporte_brl = f"R$ {valor_aporte:,.0f}".replace(",", ".")
-            st.caption(
-                T.get("sim_aporte_preview", "Investindo: **{val}**").format(val=_aporte_brl)
-            )
+            valor_aporte = _parse_brl_int(st.session_state.sim_aporte_str)
+            if valor_aporte < 100:
+                st.warning(T.get("sim_aporte_min", "Valor mínimo: R$ 100."))
+                return
         with _c2:
             _opts = sorted(set(ACOES + FIIS))
             tickers = st.multiselect(
@@ -1100,15 +1131,28 @@ def _render_meta_de_renda_card(T: dict, default_ticker: str = "BBAS3", cs: str =
 
     _default_str = f"{cs} 1.000" if _br_locale else f"{cs} 1,000"
 
+    # Auto-reformat BRL ao perder foco: usuario pode digitar "5000" ou
+    # "R$ 5000" e o campo vira "R$ 5.000" automaticamente.
+    def _reformat_goal_target():
+        _v = _parse_money(st.session_state.goal_target_str, default=1000.0)
+        _int = int(round(_v))
+        if _br_locale:
+            st.session_state.goal_target_str = f"{cs} {_int:,}".replace(",", ".")
+        else:
+            st.session_state.goal_target_str = f"{cs} {_int:,}"
+
+    if "goal_target_str" not in st.session_state:
+        st.session_state.goal_target_str = _default_str
+
     _g1, _g2, _g3 = st.columns([2, 2, 3])
     with _g1:
-        _goal_str = st.text_input(
+        st.text_input(
             T["goal_input_label"],
-            value=st.session_state.get("goal_target_str", _default_str),
             key="goal_target_str",
+            on_change=_reformat_goal_target,
             placeholder=_default_str,
         )
-        _goal_target = _parse_money(_goal_str, default=1000.0)
+        _goal_target = _parse_money(st.session_state.goal_target_str, default=1000.0)
     with _g2:
         _freq_opts = T["goal_freq_options"]
         _freq_idx = st.selectbox(
