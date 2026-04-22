@@ -175,6 +175,34 @@ def get_ipca_12m_history(n: int = 15) -> list:
     return _fetch_bcb_series(13522, n)
 
 
+def get_cdi_12m_annualized() -> Optional[float]:
+    """
+    CDI anualizado com base na media geometrica dos ultimos 20 dias uteis
+    (~1 mes; serie SGS 12, CDI diario em % a.d.). O CDI segue a Selic meta
+    de perto, entao 20 dias ja entrega uma taxa representativa sem bater
+    no rate-limit do BCB (que derruba requests grandes na SGS 12).
+
+    Retorna decimal (ex.: 0.1475 = 14.75% a.a.) ou None.
+    Formula: (∏(1 + d/100))^(252/n) - 1.
+    Cache 24h (herdado do _fetch_bcb_series).
+    """
+    rows = _fetch_bcb_series(12, 20)
+    if not rows:
+        return None
+    try:
+        daily_rates = [r["valor"] for r in rows if isinstance(r.get("valor"), (int, float))]
+        if len(daily_rates) < 5:
+            return None
+        prod = 1.0
+        for d in daily_rates:
+            prod *= (1 + d / 100.0)
+        n = len(daily_rates)
+        annualized = prod ** (252.0 / n) - 1.0
+        return float(annualized)
+    except Exception:
+        return None
+
+
 def get_selic_history_range(days: int = 400) -> list:
     """
     Meta Selic (SGS 432) nos ultimos N dias, via range de datas.
