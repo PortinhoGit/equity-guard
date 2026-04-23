@@ -2294,7 +2294,7 @@ def _render_briefing(T: dict) -> None:
     _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
     _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
     _fx_chg_val = (_fx_wa or {}).get("change", 0)
-    _fx_arrow = "+" if _fx_chg_val > 0 else ""
+    _fx_pct = f"{_fx_chg_val:+.1f}%"
     _hora_corte = _mkt["hora_corte"].strftime("%Hh%M")
 
     def _pad(name, width=10):
@@ -2335,19 +2335,29 @@ def _render_briefing(T: dict) -> None:
     )
     _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
-    # Quando um mercado esta "atrasado" pelo calendario (ex.: IBOV em 20/04
-    # enquanto NYSE/LSE em 21/04 por causa do Tiradentes), a linha ganha um
-    # sufixo "(fech. DD/MM — motivo)" para explicar a assimetria no share.
+    # Linhas de Bolsas com padding fixo para renderizacao monospace (```)
+    # em WhatsApp. label 10 chars esquerda, valor 12 chars direita.
+    # Quando ha assimetria de calendario (ex.: B3 fechado no Tiradentes enquanto
+    # NYSE/LSE operaram), o sufixo aparece apos o change na mesma linha.
     def _wa_asset_line(label: str, yf_name: str, locale: str, market: str) -> str:
-        base = label + ": " + _wa_val(yf_name, locale) + "  " + _wa_chg(yf_name)
+        val = _wa_val(yf_name, locale)
+        chg = _wa_chg(yf_name) or "N/D"
+        line = f"{label:<10}{val:>12}  {chg}"
         info = _market_info.get(market)
         if info and info["asym"]:
             _d, _nome = info["asym"]
-            base += (
-                f" (fech. {info['last'].strftime('%d/%m')} — {_nome} em "
-                f"{_d.strftime('%d/%m')})"
-            )
-        return base
+            line += f" (f.{info['last'].strftime('%d/%m')}—{_nome} {_d.strftime('%d/%m')})"
+        return line
+
+    _bolsas_block = (
+        "*Bolsas*\\n"
+        "```\\n"
+        + _wa_asset_line('Ibovespa', 'IBOV', 'br', 'B3') + "\\n"
+        + _wa_asset_line('S&P 500', 'S&P 500', 'us', 'NYSE') + "\\n"
+        + _wa_asset_line('NASDAQ', 'NASDAQ', 'us', 'NYSE') + "\\n"
+        + _wa_asset_line('FTSE', 'FTSE', 'us', 'LSE') + "\\n"
+        + "```"
+    )
 
     _body_block = (
         _juros_block + "\\n\\n"
@@ -2355,12 +2365,8 @@ def _render_briefing(T: dict) -> None:
         + "Brent: US$ " + _wa_val('Brent') + "  " + _wa_chg('Brent') + "\\n"
         + "WTI: US$ " + _wa_val('WTI') + "  " + _wa_chg('WTI') + "\\n\\n"
         + "*Dolar Comercial*\\n"
-        + "Venda: " + _fx_com + "  " + _fx_arrow + f"{_fx_chg_val:+.1f}%" + "\\n\\n"
-        + "*Bolsas*\\n"
-        + _wa_asset_line('Ibovespa', 'IBOV', 'br', 'B3') + "\\n"
-        + _wa_asset_line('S&P 500', 'S&P 500', 'us', 'NYSE') + "\\n"
-        + _wa_asset_line('NASDAQ', 'NASDAQ', 'us', 'NYSE') + "\\n"
-        + _wa_asset_line('FTSE', 'FTSE', 'us', 'LSE') + "\\n\\n"
+        + "Venda: " + _fx_com + "  " + _fx_pct + "\\n\\n"
+        + _bolsas_block + "\\n\\n"
         + _prev_block + "\\n\\n"
         + _footer
     )
