@@ -2335,14 +2335,14 @@ def _render_briefing(T: dict) -> None:
     )
     _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
-    # Linhas de Bolsas com padding fixo para renderizacao monospace (```)
-    # em WhatsApp. label 10 chars esquerda, valor 12 chars direita.
-    # Quando ha assimetria de calendario (ex.: B3 fechado no Tiradentes enquanto
-    # NYSE/LSE operaram), o sufixo aparece apos o change na mesma linha.
+    # Linhas de Bolsas: percentual em *bold* para destaque visual.
+    # Triple-backtick nao renderiza como monospace via wa.me URL (limitacao
+    # do WhatsApp com mensagens pre-preenchidas por link), por isso usamos
+    # bold no percentual que funciona de forma confiavel em todos os clientes.
     def _wa_asset_line(label: str, yf_name: str, locale: str, market: str) -> str:
         val = _wa_val(yf_name, locale)
         chg = _wa_chg(yf_name) or "N/D"
-        line = f"{label:<10}{val:>12}  {chg}"
+        line = f"{label}: {val}  *{chg}*"
         info = _market_info.get(market)
         if info and info["asym"]:
             _d, _nome = info["asym"]
@@ -2351,12 +2351,10 @@ def _render_briefing(T: dict) -> None:
 
     _bolsas_block = (
         "*Bolsas*\\n"
-        "```\\n"
         + _wa_asset_line('Ibovespa', 'IBOV', 'br', 'B3') + "\\n"
         + _wa_asset_line('S&P 500', 'S&P 500', 'us', 'NYSE') + "\\n"
         + _wa_asset_line('NASDAQ', 'NASDAQ', 'us', 'NYSE') + "\\n"
-        + _wa_asset_line('FTSE', 'FTSE', 'us', 'LSE') + "\\n"
-        + "```"
+        + _wa_asset_line('FTSE', 'FTSE', 'us', 'LSE')
     )
 
     _body_block = (
@@ -2381,18 +2379,24 @@ def _render_briefing(T: dict) -> None:
         + _body_block
     )
 
-    # ── Online (snapshot atual — funciona em qualquer estado do mercado)
+    # ── Online (snapshot atual — cabecalho reflete estado real do mercado)
+    # Se mercados fechados (fora do pregao), o header indica "Fechamento" para
+    # nao induzir o usuario a pensar que os dados sao do dia corrente.
+    if _is_live:
+        _online_header = "*Online " + today + " " + _hora_online + " (Brasilia)*"
+        _online_label = "Online " + _hora_online + " (Brasilia)"
+    else:
+        _online_header = "*Fechamento " + _briefing_date + " · snap " + _hora_online + "*"
+        _online_label = "Fechamento " + _briefing_date + " (snap " + _hora_online + ")"
+
     _online_msg = (
         "*Briefing Equity Guard*\\n"
-        + "*Online " + today + " " + _hora_online + " (Brasilia)*\\n\\n"
+        + _online_header + "\\n\\n"
         + _body_block
     )
 
-    # Sempre dois botoes: Fechamento (ultima sessao encerrada) + Online
-    # (snapshot intradia / pos-pregao atual). Elimina a assimetria anterior
-    # em que o botao "Online" sumia fora do horario de pregao.
+    # Sempre dois botoes: Fechamento (ultima sessao encerrada) + Online/Snap
     _close_label = "Fechamento " + _close_global_date + " (" + _hora_corte + ")"
-    _online_label = "Online " + _hora_online + " (Brasilia)"
     _wa_comp.html("""
     <div style="display:flex;flex-direction:column;gap:6px;">
     <button onclick="
