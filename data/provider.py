@@ -508,6 +508,41 @@ def get_ptax_bulletins(date_ref: Optional[str] = None) -> Dict[str, Any]:
     return out
 
 
+def get_ptax_closing(max_days_back: int = 8) -> Optional[Dict[str, Any]]:
+    """
+    Retorna o fechamento PTAX oficial do BCB para o ultimo dia util disponivel.
+    CotacaoDolarDia retorna apenas o boletim de fechamento (~13h15 BRT).
+    Itera ate max_days_back dias para cobrir feriados e fins de semana.
+    """
+    import requests as _req
+
+    today = pd.Timestamp.now(tz="America/Sao_Paulo").normalize()
+    for i in range(max_days_back):
+        dia = today - pd.Timedelta(days=i)
+        data_str = dia.strftime("%m-%d-%Y")
+        url = (
+            "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+            "CotacaoDolarDia(dataCotacao=@dataCotacao)"
+            f"?@dataCotacao='{data_str}'"
+            "&$top=1&$format=json"
+            "&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao"
+        )
+        try:
+            r = _req.get(url, timeout=10)
+            r.raise_for_status()
+            rows = r.json().get("value", [])
+            if rows:
+                return {
+                    "compra": float(rows[0]["cotacaoCompra"]),
+                    "venda": float(rows[0]["cotacaoVenda"]),
+                    "data": dia.strftime("%d/%m/%y"),
+                }
+        except Exception as e:
+            logger.warning(f"PTAX closing falhou para {data_str}: {e}")
+            continue
+    return None
+
+
 # ═══ Simulador de Renda Passiva — proventos por ticker ═══════════════════════
 # Regra v1: acoes via Status Invest (endpoint /acao/companytickerprovents,
 # JSON com separacao JCP/Dividendo/Rend. Tributado); FIIs via yfinance (sao

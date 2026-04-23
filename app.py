@@ -723,6 +723,14 @@ def _fetch_ptax_bulletins(date_ref: Optional[str] = None) -> dict:
     return get_ptax_bulletins(date_ref)
 
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _fetch_ptax_closing() -> Optional[dict]:
+    """Cached wrapper para o fechamento PTAX oficial do BCB (TTL 1800s).
+    PTAX de fechamento e publicado pelo BCB por volta das 13h15 BRT."""
+    from data.provider import get_ptax_closing
+    return get_ptax_closing()
+
+
 # ═══ Simulador de Renda Passiva Comparativa ══════════════════════════════════
 # Units listadas na B3 que TERMINAM em 11 mas sao acoes (nao FIIs).
 _UNITS_ACOES = {
@@ -2307,11 +2315,8 @@ def _render_briefing(T: dict) -> None:
         dots_n = max(3, _LINE_W - len(rotulo) - 1 - len(valor) - len(suffix) - emoji_pen)
         return f"{rotulo} {'.' * dots_n}{valor}{suffix}"
 
-    def _prev_line(rotulo, pct_mes, pct_ano):
-        right = f"{_chg_emoji(pct_mes)} {pct_mes:+.2f}% | {_chg_emoji(pct_ano)} {pct_ano:+.2f}%"
-        # Coluna fixa 21: ambos os rotulos comecam a parte direita na mesma coluna
-        dots_n = max(2, 21 - len(rotulo) - 1)
-        return f"{rotulo} {'.' * dots_n}{right}"
+    def _prev_right(pct_mes, pct_ano, extra=""):
+        return f"{extra}{_chg_emoji(pct_mes)} {pct_mes:+.2f}% | {_chg_emoji(pct_ano)} {pct_ano:+.2f}%"
 
     _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
     _hora_online = _now_brt.strftime("%H:%M:%S")
@@ -2333,6 +2338,7 @@ def _render_briefing(T: dict) -> None:
         msg = msg.replace('BR Selic:', String.fromCodePoint(0x1F1E7,0x1F1F7)+' Selic:');
         msg = msg.replace('*Commodities*', String.fromCodePoint(0x1F6E2)+' *Commodities*');
         msg = msg.replace('*Dolar Comercial*', String.fromCodePoint(0x1F4B5)+' *Dolar Comercial*');
+        msg = msg.replace('*Dolar PTAX', String.fromCodePoint(0x1F4B5)+' *Dolar PTAX');
         msg = msg.replace('*Bolsas*', String.fromCodePoint(0x1F4C8)+' *Bolsas*');
         msg = msg.replace('*Prevdow', String.fromCodePoint(0x1F3E6)+' *Prevdow');
         msg = msg.replace('*NitroPrev', String.fromCodePoint(0x1F3E6)+' *NitroPrev');
@@ -2345,9 +2351,9 @@ def _render_briefing(T: dict) -> None:
     _juros_block = (
         "*Juros*\\n"
         + _dots_line("US Fed:", f"{FED_FUNDS_RATE:.2f}%") + "\\n"
-        + "    (proxima reuniao FOMC " + _fomc_date_short + ")\\n"
+        + "    (próxima reunião FOMC " + _fomc_date_short + ")\\n"
         + _dots_line("BR Selic:", f"{_selic_now():.2f}%") + "\\n"
-        + "    (proxima reuniao COPOM " + _copom_date_short + ")"
+        + "    (próxima reunião COPOM " + _copom_date_short + ")"
     )
     def _fmt_pct(v):
         return f"{v:+.2f}%" if v is not None else "N/D"
@@ -2356,10 +2362,24 @@ def _render_briefing(T: dict) -> None:
     _pd_cy = _pd.get('cdi_year')
     _pd_by = _pd.get('balanced_year')
     _prev_block = (
-        "*Prevdow " + _pd['data_base'] + "* (mes | ano)\\n"
-        + _prev_line("Carteira DI:", _pd_cm, _pd_cy) + "\\n"
-        + _prev_line("Cart. Balanceada:", _pd_bm, _pd_by)
+        "*Prevdow " + _pd['data_base'] + "* (mês | ano)\\n"
+        + "Carteira DI:  " + _prev_right(_pd_cm, _pd_cy, "...") + "\\n"
+        + "Balanceada:   " + _prev_right(_pd_bm, _pd_by)
     )
+    _ptax = _fetch_ptax_closing()
+    if _ptax:
+        _ptax_compra = f"R$ {_ptax['compra']:.4f}".replace(".", ",")
+        _ptax_venda = f"R$ {_ptax['venda']:.4f}".replace(".", ",")
+        _dolar_ptax_block = (
+            "*Dolar PTAX " + _ptax['data'] + "*\\n"
+            + "Compra: ......" + _ptax_compra + "\\n"
+            + "Venda: ......." + _ptax_venda
+        )
+    else:
+        _dolar_ptax_block = (
+            "*Dolar Comercial*\\n"
+            + _dots_line("Venda:", _fx_com, _fx_chg_val)
+        )
     _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
     # Linhas de Bolsas: percentual em *bold* para destaque visual.
@@ -2392,8 +2412,7 @@ def _render_briefing(T: dict) -> None:
         + "*Commodities*\\n"
         + _comm_brent_line + "\\n"
         + _comm_wti_line + "\\n\\n"
-        + "*Dolar Comercial*\\n"
-        + _dots_line("Venda:", _fx_com, _fx_chg_val) + "\\n\\n"
+        + _dolar_ptax_block + "\\n\\n"
         + _bolsas_block + "\\n\\n"
         + _prev_block + "\\n\\n"
         + _footer
@@ -2570,6 +2589,7 @@ def _render_briefing(T: dict) -> None:
                 m = m.replace('BR Selic:', String.fromCodePoint(0x1F1E7, 0x1F1F7) + ' Selic:');
                 m = m.replace('*Commodities*', String.fromCodePoint(0x1F6E2) + ' *Commodities*');
                 m = m.replace('*Dolar Comercial*', String.fromCodePoint(0x1F4B5) + ' *Dolar Comercial*');
+                m = m.replace('*Dolar PTAX', String.fromCodePoint(0x1F4B5) + ' *Dolar PTAX');
                 m = m.replace('*Bolsas*', String.fromCodePoint(0x1F4C8) + ' *Bolsas*');
                 m = m.replace('*Prevdow', String.fromCodePoint(0x1F3E6) + ' *Prevdow');
                 m = m.replace('*Equity Guard*', String.fromCodePoint(0x1F449) + ' *Equity Guard*');
