@@ -2288,13 +2288,29 @@ def _render_briefing(T: dict) -> None:
     def _wa_val(name, loc="us"):
         return _fmt_val(name, loc)
 
+    def _wa_chg_float(name):
+        ind = by_name.get(name)
+        if not ind or ind.get("change") is None:
+            return None
+        return float(ind["change"])
+
+    def _chg_emoji(pct):
+        if pct is None: return "⚪"
+        return "🟢" if pct > 0 else "🔻" if pct < 0 else "⚪"
+
+    _DOTS_W = 46
+
+    def _dots_line(rotulo, valor, pct=None):
+        dots_n = max(3, _DOTS_W - len(rotulo) - 1 - len(valor))
+        suffix = f",  {_chg_emoji(pct)} {pct:+.1f}%" if pct is not None else ""
+        return f"{rotulo} {'.' * dots_n}{valor}{suffix}"
+
     _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
     _hora_online = _now_brt.strftime("%H:%M:%S")
 
     _fx_com = _fx_fmt_wa(_fx_wa.get("com_ask")) if _fx_wa else "---"
     _fx_prev = _fx_fmt_wa(_fx_wa.get("com_prev")) if _fx_wa else "---"
     _fx_chg_val = (_fx_wa or {}).get("change", 0)
-    _fx_pct = f"{_fx_chg_val:+.1f}%"
     _hora_corte = _mkt["hora_corte"].strftime("%Hh%M")
 
     def _pad(name, width=10):
@@ -2316,22 +2332,25 @@ def _render_briefing(T: dict) -> None:
         msg = msg.replace('*Equity Guard*', String.fromCodePoint(0x1F449)+' *Equity Guard*');
     """
 
-    # Formato: nome: valor variacao (sem tentativa de alinhar colunas — WhatsApp usa fonte proporcional)
+    _fomc_date_short = pd.Timestamp(_fomc_next_iso()).strftime("%d/%m")
+    _copom_date_short = pd.Timestamp(_copom_next_iso()).strftime("%d/%m")
     _juros_block = (
         "*Juros*\\n"
-        + "US Fed: " + f"{FED_FUNDS_RATE:.2f}%" + " (proxima reuniao FOMC " + _fmt_date_br(_fomc_next_iso()) + ")\\n"
-        + "BR Selic: " + f"{_selic_now():.2f}%" + " (proxima reuniao COPOM " + _fmt_date_br(_copom_next_iso()) + ")"
+        + _dots_line("US Fed:", f"{FED_FUNDS_RATE:.2f}%") + "\\n"
+        + "    (proxima reuniao FOMC " + _fomc_date_short + ")\\n"
+        + _dots_line("BR Selic:", f"{_selic_now():.2f}%") + "\\n"
+        + "    (proxima reuniao COPOM " + _copom_date_short + ")"
     )
     def _fmt_pct(v):
         return f"{v:+.2f}%" if v is not None else "N/D"
-    _prev_di = _fmt_pct(_pd.get('cdi_month'))
-    _prev_bal = _fmt_pct(_pd.get('balanced_month'))
-    _prev_di_y = _fmt_pct(_pd.get('cdi_year'))
-    _prev_bal_y = _fmt_pct(_pd.get('balanced_year'))
+    _pd_cm = _pd.get('cdi_month')
+    _pd_bm = _pd.get('balanced_month')
+    _pd_cy = _pd.get('cdi_year')
+    _pd_by = _pd.get('balanced_year')
     _prev_block = (
         "*Prevdow " + _pd['data_base'] + "*\\n"
-        + "DI: " + _prev_di + " mes | " + _prev_di_y + " ano\\n"
-        + "Balanceada: " + _prev_bal + " mes | " + _prev_bal_y + " ano"
+        + "DI: " + _chg_emoji(_pd_cm) + " " + _fmt_pct(_pd_cm) + " mes | " + _chg_emoji(_pd_cy) + " " + _fmt_pct(_pd_cy) + " ano\\n"
+        + "Balanceada: " + _chg_emoji(_pd_bm) + " " + _fmt_pct(_pd_bm) + " mes | " + _chg_emoji(_pd_by) + " " + _fmt_pct(_pd_by) + " ano"
     )
     _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
@@ -2341,8 +2360,8 @@ def _render_briefing(T: dict) -> None:
     # bold no percentual que funciona de forma confiavel em todos os clientes.
     def _wa_asset_line(label: str, yf_name: str, locale: str, market: str) -> str:
         val = _wa_val(yf_name, locale)
-        chg = _wa_chg(yf_name) or "N/D"
-        line = f"{label:<10}{val:>12}  *{chg}*"
+        pct = _wa_chg_float(yf_name)
+        line = _dots_line(label + ":", val, pct)
         info = _market_info.get(market)
         if info and info["asym"]:
             _d, _nome = info["asym"]
@@ -2357,11 +2376,8 @@ def _render_briefing(T: dict) -> None:
         + _wa_asset_line('FTSE', 'FTSE', 'us', 'LSE')
     )
 
-    _comm_brent_pair = "Brent: US$ " + _wa_val('Brent')
-    _comm_wti_pair = "WTI: US$ " + _wa_val('WTI')
-    _comm_w = max(len(_comm_brent_pair), len(_comm_wti_pair))
-    _comm_brent_line = _comm_brent_pair.ljust(_comm_w) + "  *" + (_wa_chg('Brent') or "N/D") + "*"
-    _comm_wti_line = _comm_wti_pair.ljust(_comm_w) + "  *" + (_wa_chg('WTI') or "N/D") + "*"
+    _comm_brent_line = _dots_line("Brent:", "US$ " + _wa_val('Brent'), _wa_chg_float('Brent'))
+    _comm_wti_line = _dots_line("WTI:", "US$ " + _wa_val('WTI'), _wa_chg_float('WTI'))
 
     _body_block = (
         _juros_block + "\\n\\n"
@@ -2369,7 +2385,7 @@ def _render_briefing(T: dict) -> None:
         + _comm_brent_line + "\\n"
         + _comm_wti_line + "\\n\\n"
         + "*Dolar Comercial*\\n"
-        + "Venda: " + _fx_com + "  " + _fx_pct + "\\n\\n"
+        + _dots_line("Venda:", _fx_com, _fx_chg_val) + "\\n\\n"
         + _bolsas_block + "\\n\\n"
         + _prev_block + "\\n\\n"
         + _footer
