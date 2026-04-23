@@ -2342,7 +2342,7 @@ def _render_briefing(T: dict) -> None:
     def _wa_asset_line(label: str, yf_name: str, locale: str, market: str) -> str:
         val = _wa_val(yf_name, locale)
         chg = _wa_chg(yf_name) or "N/D"
-        line = f"{label}: {val}  *{chg}*"
+        line = f"{label:<10}{val:>12}  *{chg}*"
         info = _market_info.get(market)
         if info and info["asym"]:
             _d, _nome = info["asym"]
@@ -2357,11 +2357,17 @@ def _render_briefing(T: dict) -> None:
         + _wa_asset_line('FTSE', 'FTSE', 'us', 'LSE')
     )
 
+    _comm_brent_pair = "Brent: US$ " + _wa_val('Brent')
+    _comm_wti_pair = "WTI: US$ " + _wa_val('WTI')
+    _comm_w = max(len(_comm_brent_pair), len(_comm_wti_pair))
+    _comm_brent_line = _comm_brent_pair.ljust(_comm_w) + "  *" + (_wa_chg('Brent') or "N/D") + "*"
+    _comm_wti_line = _comm_wti_pair.ljust(_comm_w) + "  *" + (_wa_chg('WTI') or "N/D") + "*"
+
     _body_block = (
         _juros_block + "\\n\\n"
         + "*Commodities*\\n"
-        + "Brent: US$ " + _wa_val('Brent') + "  " + _wa_chg('Brent') + "\\n"
-        + "WTI: US$ " + _wa_val('WTI') + "  " + _wa_chg('WTI') + "\\n\\n"
+        + _comm_brent_line + "\\n"
+        + _comm_wti_line + "\\n\\n"
         + "*Dolar Comercial*\\n"
         + "Venda: " + _fx_com + "  " + _fx_pct + "\\n\\n"
         + _bolsas_block + "\\n\\n"
@@ -2386,8 +2392,8 @@ def _render_briefing(T: dict) -> None:
         _online_header = "*Online " + today + " " + _hora_online + " (Brasilia)*"
         _online_label = "Online " + _hora_online + " (Brasilia)"
     else:
-        _online_header = "*Fechamento " + _briefing_date + " · snap " + _hora_online + "*"
-        _online_label = "Fechamento " + _briefing_date + " (snap " + _hora_online + ")"
+        _online_header = "*Fechamento " + _briefing_date + "*"
+        _online_label = "Fechamento " + _briefing_date
 
     _online_msg = (
         "*Briefing Equity Guard*\\n"
