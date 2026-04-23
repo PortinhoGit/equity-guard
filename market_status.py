@@ -60,15 +60,21 @@ _MARKET_HOLIDAYS: Dict[str, Dict[date, str]] = {
     "LSE":  FERIADOS_LSE_2026_NAMED,
 }
 
-# Horario de fechamento (em Brasilia) — usado pra decidir se o pregao de "hoje"
-# ja terminou. Valores conservadores:
-#   B3:   20h (inclui after-market)
-#   NYSE: 18h (regular close 17h EST / 16h EDT + margem)
-#   LSE:  14h (16:30 Londres = 13:30-14:30 BRT conforme DST)
+# Horario de fechamento (em Brasilia) — referencia conservadora para decidir
+# quando o pregao do dia ENCERROU oficialmente (usado em get_status_mercado).
 _MARKET_CLOSE_BRT: Dict[str, time] = {
     "B3":   time(20, 0),
     "NYSE": time(18, 0),
     "LSE":  time(14, 0),
+}
+
+# Horario de abertura (em Brasilia) — a partir daqui o preco do dia corrente
+# ja e a referencia de mercado; usado em last_market_session para eliminar
+# o sufixo de assimetria assim que o pregao comecou (nao so quando encerrou).
+_MARKET_OPEN_BRT: Dict[str, time] = {
+    "B3":   time(10, 0),   # B3 abre 10h BRT
+    "NYSE": time(15, 0),   # NYSE abre 9:30 ET = ~14:30-15:30 BRT (EDT/EST)
+    "LSE":  time(13, 0),   # LSE abre 8h London = ~12-13h BRT (BST/GMT)
 }
 
 _MARKET_FLAG = {"B3": "🇧🇷", "NYSE": "🇺🇸", "LSE": "🇬🇧"}
@@ -87,12 +93,14 @@ def is_market_session(market: str, d: date) -> bool:
 
 
 def last_market_session(market: str, today: date, hora_brt: time) -> date:
-    """Ultima data com pregao efetivamente encerrado dessa bolsa.
-    Se hoje e dia util e o pregao ja fechou (hora_brt >= horario de corte do
-    mercado), retorna hoje; senao volta ate achar um dia util anterior."""
-    close_h = _MARKET_CLOSE_BRT.get(market, time(20, 0))
+    """Data para a qual os dados de mercado ja estao disponiveis.
+    Usa o horario de ABERTURA como limiar: a partir das 10h (B3), 15h (NYSE)
+    ou 13h (LSE) os precos do dia corrente sao a referencia — elimina o
+    sufixo de assimetria/feriado assim que o pregao comecou, sem esperar o
+    fechamento oficial (20h/18h/14h que e usado em get_status_mercado)."""
+    open_h = _MARKET_OPEN_BRT.get(market, time(10, 0))
     d = today
-    if is_market_session(market, d) and hora_brt >= close_h:
+    if is_market_session(market, d) and hora_brt >= open_h:
         return d
     d -= timedelta(days=1)
     while not is_market_session(market, d):
