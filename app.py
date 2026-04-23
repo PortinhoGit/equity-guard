@@ -2308,10 +2308,9 @@ def _render_briefing(T: dict) -> None:
         return f"{rotulo} {'.' * dots_n}{valor}{suffix}"
 
     def _prev_line(rotulo, pct_mes, pct_ano):
-        right = (f"{_chg_emoji(pct_mes)} {pct_mes:+.2f}% mes | "
-                 f"{_chg_emoji(pct_ano)} {pct_ano:+.2f}% ano")
-        # 2 emojis no valor → penalty de 2; Prevdow e inevitavelmente longo
-        dots_n = max(3, _LINE_W - len(rotulo) - 1 - 4)
+        right = f"{_chg_emoji(pct_mes)} {pct_mes:+.2f}% | {_chg_emoji(pct_ano)} {pct_ano:+.2f}%"
+        # Coluna fixa 21: ambos os rotulos comecam a parte direita na mesma coluna
+        dots_n = max(2, 21 - len(rotulo) - 1)
         return f"{rotulo} {'.' * dots_n}{right}"
 
     _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
@@ -2357,9 +2356,9 @@ def _render_briefing(T: dict) -> None:
     _pd_cy = _pd.get('cdi_year')
     _pd_by = _pd.get('balanced_year')
     _prev_block = (
-        "*Prevdow " + _pd['data_base'] + "*\\n"
+        "*Prevdow " + _pd['data_base'] + "* (mes | ano)\\n"
         + _prev_line("Carteira DI:", _pd_cm, _pd_cy) + "\\n"
-        + _prev_line("Carteira Balanceada:", _pd_bm, _pd_by)
+        + _prev_line("Cart. Balanceada:", _pd_bm, _pd_by)
     )
     _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
