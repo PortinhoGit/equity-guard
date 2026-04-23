@@ -2296,14 +2296,23 @@ def _render_briefing(T: dict) -> None:
 
     def _chg_emoji(pct):
         if pct is None: return "⚪"
-        return "🟢" if pct > 0 else "🔻" if pct < 0 else "⚪"
+        return "🟢" if pct > 0 else "🔴" if pct < 0 else "⚪"
 
-    _DOTS_W = 46
+    _LINE_W = 32  # largura total alvo — cabe no balao WhatsApp mobile sem quebrar
 
     def _dots_line(rotulo, valor, pct=None):
-        dots_n = max(3, _DOTS_W - len(rotulo) - 1 - len(valor))
-        suffix = f",  {_chg_emoji(pct)} {pct:+.1f}%" if pct is not None else ""
+        suffix = f", {_chg_emoji(pct)} {pct:+.1f}%" if pct is not None else ""
+        # emoji conta 1 em len() mas ocupa ~2 na tela; penalty de +1 por emoji
+        emoji_pen = 1 if pct is not None else 0
+        dots_n = max(3, _LINE_W - len(rotulo) - 1 - len(valor) - len(suffix) - emoji_pen)
         return f"{rotulo} {'.' * dots_n}{valor}{suffix}"
+
+    def _prev_line(rotulo, pct_mes, pct_ano):
+        right = (f"{_chg_emoji(pct_mes)} {pct_mes:+.2f}% mes | "
+                 f"{_chg_emoji(pct_ano)} {pct_ano:+.2f}% ano")
+        # 2 emojis no valor → penalty de 2; Prevdow e inevitavelmente longo
+        dots_n = max(3, _LINE_W - len(rotulo) - 1 - 4)
+        return f"{rotulo} {'.' * dots_n}{right}"
 
     _now_brt = pd.Timestamp.now(tz="America/Sao_Paulo")
     _hora_online = _now_brt.strftime("%H:%M:%S")
@@ -2349,8 +2358,8 @@ def _render_briefing(T: dict) -> None:
     _pd_by = _pd.get('balanced_year')
     _prev_block = (
         "*Prevdow " + _pd['data_base'] + "*\\n"
-        + "DI: " + _chg_emoji(_pd_cm) + " " + _fmt_pct(_pd_cm) + " mes | " + _chg_emoji(_pd_cy) + " " + _fmt_pct(_pd_cy) + " ano\\n"
-        + "Balanceada: " + _chg_emoji(_pd_bm) + " " + _fmt_pct(_pd_bm) + " mes | " + _chg_emoji(_pd_by) + " " + _fmt_pct(_pd_by) + " ano"
+        + _prev_line("Carteira DI:", _pd_cm, _pd_cy) + "\\n"
+        + _prev_line("Carteira Balanceada:", _pd_bm, _pd_by)
     )
     _footer = "_Cortesia YlvorixVHM_\\n*Equity Guard*\\nhttps://equityguard.streamlit.app"
 
