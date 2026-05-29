@@ -42,11 +42,11 @@ FED_NEXT_MEETING: str          = "2026-04-29"  # próxima reunião FOMC (28-29/0
 # Atualize os valores abaixo copiando do portal oficial uma vez por mês.
 PREVDOW_DATA: dict = {
     "url":          "https://www.portalprev.com.br/Prevdow/prevdow/Site/Public/Rentabilidade/",
-    "data_base":    "02/2026",          # mês/ano da rentabilidade divulgada
-    "cdi_month":    0.93,               # % último mês — Carteira DI
-    "balanced_month": 1.60,             # % último mês — Carteira Original Balanceada
-    "cdi_year":     2.03,               # % acumulado no ano — Carteira DI
-    "balanced_year": 2.94,              # % acumulado no ano — Carteira Original Balanceada
+    "data_base":    "04/2026",          # mês/ano da rentabilidade divulgada
+    "cdi_month":    1.02,               # % último mês — Carteira DI
+    "balanced_month": 1.66,             # % último mês — Carteira Original Balanceada
+    "cdi_year":     3.13,               # % acumulado no ano — Carteira DI (fev+mar+abr)
+    "balanced_year": 2.74,              # % acumulado no ano — Carteira Original Balanceada (fev+mar+abr)
 }
 
 # ── Nitro Prev (IFM Previdência / Votorantim) — atualização manual mensal ────
