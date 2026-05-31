@@ -112,6 +112,72 @@ def _send_email(to_email: str, subject: str, html: str) -> bool:
         return False
 
 
+def _auto_update_next_meeting(all_fomc: list, today: date) -> None:
+    """
+    Atualiza FED_NEXT_MEETING e SELIC_NEXT_MEETING no config.py para a
+    proxima reuniao futura e faz commit automatico via git.
+    Executado no D+1 de cada reuniao FOMC.
+    """
+    future = sorted(d for d in all_fomc if d > today)
+    if not future:
+        print("Nenhuma reuniao futura no calendario — config.py nao atualizado.")
+        return
+
+    proxima = future[0]
+    proxima_str = proxima.strftime("%Y-%m-%d")
+    label = proxima.strftime("%d/%m/%Y")
+
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.py")
+    with open(config_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    import re
+    # Atualiza FED_NEXT_MEETING
+    content = re.sub(
+        r'(FED_NEXT_MEETING:\s*str\s*=\s*")[^"]+(")',
+        rf'\g<1>{proxima_str}\g<2>',
+        content,
+    )
+    # Atualiza comentario da linha
+    content = re.sub(
+        r'(FED_NEXT_MEETING.*#\s*).*',
+        rf'\g<1>proxima reuniao FOMC ({label})',
+        content,
+    )
+    # Atualiza SELIC_NEXT_MEETING (COPOM coincide com FOMC nas datas)
+    content = re.sub(
+        r'(SELIC_NEXT_MEETING:\s*str\s*=\s*")[^"]+(")',
+        rf'\g<1>{proxima_str}\g<2>',
+        content,
+    )
+    content = re.sub(
+        r'(SELIC_NEXT_MEETING.*#\s*).*',
+        rf'\g<1>proxima reuniao COPOM ({label})',
+        content,
+    )
+
+    with open(config_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    print(f"config.py atualizado: proxima reuniao = {proxima_str}")
+
+    # Commit automatico via git
+    import subprocess
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        subprocess.run(["git", "config", "user.email", "actions@github.com"], cwd=repo_dir, check=True)
+        subprocess.run(["git", "config", "user.name",  "equity-guard-bot"],   cwd=repo_dir, check=True)
+        subprocess.run(["git", "add", "config.py"],                            cwd=repo_dir, check=True)
+        subprocess.run([
+            "git", "commit", "-m",
+            f"Auto: atualiza FED_NEXT_MEETING e SELIC_NEXT_MEETING para {proxima_str}"
+        ], cwd=repo_dir, check=True)
+        subprocess.run(["git", "push"], cwd=repo_dir, check=True)
+        print(f"Commit e push realizados — proxima reuniao: {proxima_str}")
+    except subprocess.CalledProcessError as e:
+        print(f"Falha no git: {e} — atualize manualmente.")
+
+
 def main() -> None:
     today = date.today()
     force = os.environ.get("FORCE_RUN", "").strip() in ("1", "true", "yes")
@@ -131,6 +197,9 @@ def main() -> None:
     if target not in all_fomc and not force:
         print(f"Ontem ({yesterday}) nao foi reuniao FOMC. Nada a fazer.")
         return
+
+    # ── Atualiza FED_NEXT_MEETING e SELIC_NEXT_MEETING no config.py ──────────
+    _auto_update_next_meeting(all_fomc, today)
 
     # Valor atual do config (so pra citar no e-mail)
     from config import FED_FUNDS_RATE
