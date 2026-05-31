@@ -588,6 +588,8 @@ def _fetch_prevdow_live() -> dict:
                     if v is not None:
                         merged[k] = float(v)
                 merged["_source"] = "supabase"
+                # Repassa inserted_at para o popup de novidade (3 dias)
+                merged["_inserted_at"] = row.get("inserted_at")
                 return merged
             else:
                 merged["_source"] = "config (supabase vazio)"
@@ -1661,20 +1663,63 @@ def _fmt_index_value(val: float, locale: str) -> str:
 
 def _maybe_pension_alert(T: dict) -> None:
     """
-    After the 15th, shows a clickable banner that opens the sidebar (pension).
-    Usa a data_base do Supabase (via _fetch_prevdow_live) para refletir o mes
-    mais recentemente capturado, nao o config estatico. Reset quando ref muda.
+    Exibe dois banners independentes:
+
+    1. NOVIDADE (verde) — aparece nos 3 dias seguintes a uma nova insercao no
+       Supabase (inserted_at). Mostra "✅ Atualizado Prevdow — 04/2026" e some
+       apos 10 s ou quando o usuario clica. Aparece apenas uma vez por sessao
+       para cada data_base.
+
+    2. ALERTA MENSAL (vermelho) — a partir do dia 15, indica que ha dados
+       novos disponíveis e convida o usuario a ver a previdencia no sidebar.
+       Comportamento original preservado.
     """
-    today = pd.Timestamp.now()
-    if today.day < 15:
-        return
+    import streamlit.components.v1 as _comp
+    from datetime import timezone
+
+    today = pd.Timestamp.now(tz="UTC")
     _live = _fetch_prevdow_live()
     ref = _live.get("data_base") if _live else PREVDOW_DATA.get("data_base", "")
+
+    # ── Banner 1: NOVIDADE — 3 dias apos insercao ─────────────────────────────
+    inserted_at_str = _live.get("_inserted_at") if _live else None
+    if ref and inserted_at_str:
+        try:
+            inserted_at = pd.Timestamp(inserted_at_str, tz="UTC")
+            age_days = (today - inserted_at).total_seconds() / 86400
+            new_seen_key = f"_prevdow_new_seen_{ref}"
+            if age_days <= 3 and not st.session_state.get(new_seen_key):
+                _comp.html(f"""
+                <script>
+                (function() {{
+                    var doc = window.parent.document;
+                    if (doc.getElementById('eg-prevdow-new')) return;
+                    var bar = doc.createElement('div');
+                    bar.id = 'eg-prevdow-new';
+                    bar.innerHTML = '✅ Atualizado Prevdow &mdash; {ref} &nbsp;<span style="opacity:.7;font-size:11px">(clique para fechar)</span>';
+                    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;'
+                        + 'background:linear-gradient(135deg,#1a7f4b,#27ae60);color:#fff;'
+                        + 'padding:9px 60px 9px 18px;font-size:13px;font-weight:700;'
+                        + 'text-align:center;cursor:pointer;'
+                        + 'font-family:Inter,system-ui,sans-serif;'
+                        + 'box-shadow:0 2px 8px rgba(0,0,0,.35);';
+                    bar.onclick = function() {{ bar.remove(); }};
+                    doc.body.appendChild(bar);
+                    setTimeout(function() {{ if (bar.parentNode) bar.remove(); }}, 10000);
+                }})();
+                </script>
+                """, height=0)
+                st.session_state[new_seen_key] = True
+        except Exception:
+            pass
+
+    # ── Banner 2: ALERTA MENSAL — a partir do dia 15 ─────────────────────────
+    if today.day < 15:
+        return
     seen_key = f"_pension_seen_{ref}"
     if not ref or st.session_state.get(seen_key):
         return
 
-    import streamlit.components.v1 as _comp
     _msg = T["pension_alert_toast"].format(ref=ref)
     _comp.html(f"""
     <script>

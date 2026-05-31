@@ -16,6 +16,9 @@ Variaveis de ambiente:
   (opcional) SMTP_* — para notificar admin quando achar atualizacao
   (opcional) NOTIFY_EMAIL — destino da notificacao
   (opcional) FORCE_RUN=1 — ignora o corte de dia 15 (util pra teste manual)
+  (opcional) MANUAL_DATA_BASE / MANUAL_CDI_MONTH / MANUAL_BALANCED_MONTH
+             — insere dados manualmente sem depender do scraper (via
+               workflow_dispatch com inputs no GitHub Actions)
 """
 
 import os
@@ -71,16 +74,45 @@ def _send_notification(subject: str, body: str) -> None:
         print(f"  Falha ao notificar: {e}")
 
 
+def _manual_input() -> dict | None:
+    """
+    Le MANUAL_DATA_BASE / MANUAL_CDI_MONTH / MANUAL_BALANCED_MONTH do ambiente.
+    Retorna dict compativel com o scraper, ou None se nao informado.
+    """
+    base = os.environ.get("MANUAL_DATA_BASE", "").strip()
+    cdi  = os.environ.get("MANUAL_CDI_MONTH", "").strip()
+    bal  = os.environ.get("MANUAL_BALANCED_MONTH", "").strip()
+    if not (base and cdi and bal):
+        return None
+    try:
+        return {
+            "data_base":     base,
+            "cdi_month":     float(cdi),
+            "balanced_month": float(bal),
+        }
+    except ValueError as e:
+        print(f"Input manual invalido: {e}")
+        return None
+
+
 def main() -> None:
     today = date.today()
     force = _is_force()
 
-    if today.day < 15 and not force:
-        print(f"Dia {today.day} < 15. Pulando (use FORCE_RUN=1 para ignorar).")
-        return
-
-    target = _target_month(today)
-    print(f"Mes-alvo: {target}")
+    # ── Modo manual: dados informados diretamente via workflow_dispatch ────────
+    manual = _manual_input()
+    if manual:
+        target = manual["data_base"]
+        print(f"Modo manual — data_base={target}, "
+              f"cdi_month={manual['cdi_month']}, "
+              f"balanced_month={manual['balanced_month']}")
+        force = True   # pula corte de dia 15 e idempotencia
+    else:
+        if today.day < 15 and not force:
+            print(f"Dia {today.day} < 15. Pulando (use FORCE_RUN=1 para ignorar).")
+            return
+        target = _target_month(today)
+        print(f"Mes-alvo: {target}")
 
     from supabase import create_client
     client = create_client(_env("SUPABASE_URL"), _env("SUPABASE_SERVICE_KEY"))
@@ -91,30 +123,33 @@ def main() -> None:
         print(f"{target} ja esta no banco. Nada a fazer.")
         return
 
-    # Scraper
-    try:
-        from data.prevdow_scraper import get_rentabilidade_prevdow
-    except Exception as e:
-        print(f"Falha ao importar scraper: {e}")
-        return
+    # ── Origem dos dados: manual ou scraper ───────────────────────────────────
+    if manual:
+        data = manual
+    else:
+        try:
+            from data.prevdow_scraper import get_rentabilidade_prevdow
+        except Exception as e:
+            print(f"Falha ao importar scraper: {e}")
+            return
 
-    print("Rodando scraper do portal PrevDow...")
-    data = get_rentabilidade_prevdow()
-    if not data:
-        print("Scraper retornou vazio — portal pode estar indisponivel ou sem dados ainda.")
-        return
+        print("Rodando scraper do portal PrevDow...")
+        data = get_rentabilidade_prevdow()
+        if not data:
+            print("Scraper retornou vazio — portal pode estar indisponivel ou sem dados ainda.")
+            return
 
-    fetched_base = data.get("data_base")
-    print(f"Scraper retornou data_base={fetched_base}, "
-          f"cdi_month={data.get('cdi_month')}, "
-          f"balanced_month={data.get('balanced_month')}")
+        fetched_base = data.get("data_base")
+        print(f"Scraper retornou data_base={fetched_base}, "
+              f"cdi_month={data.get('cdi_month')}, "
+              f"balanced_month={data.get('balanced_month')}")
 
-    if fetched_base != target:
-        print(f"Portal ainda mostra {fetched_base}, mes-alvo e {target}. "
-              f"Tentaremos de novo no proximo run.")
-        return
+        if fetched_base != target:
+            print(f"Portal ainda mostra {fetched_base}, mes-alvo e {target}. "
+                  f"Tentaremos de novo no proximo run.")
+            return
 
-    # Calcula ano acumulado a partir do historico do mesmo ano (se existir)
+    # ── Calcula ano acumulado a partir do historico do mesmo ano ──────────────
     year_prefix = target.split("/")[1]
     hist = (
         client.table("prevdow_history")
@@ -125,7 +160,6 @@ def main() -> None:
     cdi_year = None
     balanced_year = None
     if hist.data:
-        # Calcula acumulado composto: prod(1+r) - 1
         cdi_prod = 1.0
         bal_prod = 1.0
         for row in hist.data:
@@ -133,7 +167,6 @@ def main() -> None:
                 cdi_prod *= (1 + float(row["cdi_month"]) / 100)
             if row.get("balanced_month") is not None:
                 bal_prod *= (1 + float(row["balanced_month"]) / 100)
-        # Inclui o mes atual que estamos inserindo
         if data.get("cdi_month") is not None:
             cdi_prod *= (1 + float(data["cdi_month"]) / 100)
         if data.get("balanced_month") is not None:
@@ -142,23 +175,25 @@ def main() -> None:
         balanced_year = round((bal_prod - 1) * 100, 2)
 
     row = {
-        "data_base": target,
-        "cdi_month": data.get("cdi_month"),
+        "data_base":      target,
+        "cdi_month":      data.get("cdi_month"),
         "balanced_month": data.get("balanced_month"),
-        "cdi_year": cdi_year,
-        "balanced_year": balanced_year,
+        "cdi_year":       cdi_year,
+        "balanced_year":  balanced_year,
+        "inserted_at":    datetime.utcnow().isoformat() + "Z",
     }
     client.table("prevdow_history").upsert(row).execute()
     print(f"  Inserido no Supabase: {row}")
 
     # Notifica admin
+    source = "manual" if manual else "scraper"
     body = (
-        f"PrevDow atualizou com dados de {target}.\n\n"
+        f"PrevDow atualizou com dados de {target} [{source}].\n\n"
         f"Carteira DI: {data.get('cdi_month')}% no mes"
         + (f" / {cdi_year}% no ano" if cdi_year is not None else "") + "\n"
         f"Carteira Balanceada: {data.get('balanced_month')}% no mes"
         + (f" / {balanced_year}% no ano" if balanced_year is not None else "") + "\n\n"
-        f"Capturado automaticamente em {datetime.now().isoformat()}."
+        f"Capturado automaticamente em {datetime.utcnow().isoformat()}Z."
     )
     _send_notification(f"[Equity Guard] PrevDow {target} capturado", body)
 

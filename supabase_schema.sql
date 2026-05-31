@@ -41,5 +41,16 @@ alter table public.history   enable row level security;
 -- 5. Politica: anon nao acessa nada. service_role nao precisa de policy (bypassa).
 -- Quando migrarmos para magic-link, adicionamos policies per-user.
 
+-- 6. Historico PrevDow (previdencia complementar — atualizado mensalmente)
+create table if not exists public.prevdow_history (
+    data_base       text primary key,   -- 'MM/YYYY'
+    cdi_month       numeric,            -- % rentabilidade Carteira DI no mes
+    balanced_month  numeric,            -- % rentabilidade Carteira Balanceada no mes
+    cdi_year        numeric,            -- % acumulado Carteira DI no ano
+    balanced_year   numeric,            -- % acumulado Carteira Balanceada no ano
+    inserted_at     timestamptz not null default now()
+);
+alter table public.prevdow_history enable row level security;
+
 -- Confirmacao
-select 'Schema OK: users / favorites / history criados com RLS ativado' as status;
+select 'Schema OK: users / favorites / history / prevdow_history criados com RLS ativado' as status;

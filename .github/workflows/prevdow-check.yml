@@ -16,6 +16,22 @@ on:
         required: false
         type: boolean
         default: false
+      # ── Entrada manual de dados (quando scraper nao consegue extrair) ──────
+      manual_data_base:
+        description: 'Data base manual ex: 04/2026 (deixe vazio para usar scraper)'
+        required: false
+        type: string
+        default: ''
+      manual_cdi_month:
+        description: 'Carteira DI — rentabilidade do mes (%) ex: 1.02'
+        required: false
+        type: string
+        default: ''
+      manual_balanced_month:
+        description: 'Carteira Balanceada — rentabilidade do mes (%) ex: 1.66'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   check:
@@ -37,13 +53,16 @@ jobs:
 
       - name: Check PrevDow
         env:
-          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          SMTP_HOST:            ${{ secrets.SMTP_HOST }}
-          SMTP_PORT:            ${{ secrets.SMTP_PORT }}
-          SMTP_USER:            ${{ secrets.SMTP_USER }}
-          SMTP_PASS:            ${{ secrets.SMTP_PASS }}
-          SMTP_FROM:            ${{ secrets.SMTP_FROM }}
-          NOTIFY_EMAIL:         ${{ secrets.SMTP_USER }}
-          FORCE_RUN:            ${{ inputs.force && '1' || '' }}
+          SUPABASE_URL:          ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY:  ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SMTP_HOST:             ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:             ${{ secrets.SMTP_PORT }}
+          SMTP_USER:             ${{ secrets.SMTP_USER }}
+          SMTP_PASS:             ${{ secrets.SMTP_PASS }}
+          SMTP_FROM:             ${{ secrets.SMTP_FROM }}
+          NOTIFY_EMAIL:          ${{ secrets.SMTP_USER }}
+          FORCE_RUN:             ${{ inputs.force && '1' || '' }}
+          MANUAL_DATA_BASE:      ${{ inputs.manual_data_base }}
+          MANUAL_CDI_MONTH:      ${{ inputs.manual_cdi_month }}
+          MANUAL_BALANCED_MONTH: ${{ inputs.manual_balanced_month }}
         run: python check_prevdow.py
