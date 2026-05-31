@@ -1,24 +1,53 @@
 name: PrevDow Monthly Check
 
-# 4 horarios por dia, em BRT: 06h, 12h, 18h, 24h (0h).
-# BRT = UTC-3, entao: 9h, 15h, 21h, 3h UTC.
-# O script so faz algo a partir do dia 15 do mes (corte interno).
+# Estrategia de disparo:
+#
+#   Dia 21 (BRT) — varredura de hora em hora (06h-23h BRT) com FORCE_RUN=1.
+#   O script e idempotente: se o mes-alvo ja esta no Supabase, encerra sem
+#   fazer nada. Assim que o portal publicar os dados, a proxima rodada captura.
+#
+#   Dias 22-28 (BRT) — 1 tentativa diaria as 09h BRT (fallback caso o portal
+#   tenha atrasado ou o scraper tenha falhado no dia 21).
+#
+#   workflow_dispatch — disparo manual com inputs para inserir dados
+#   quando o scraper nao conseguir extrair do portal.
+#
+# BRT = UTC-3.
+
 on:
   schedule:
-    - cron: '0 9 * * *'    # 06h BRT
-    - cron: '0 15 * * *'   # 12h BRT
-    - cron: '0 21 * * *'   # 18h BRT
-    - cron: '0 3 * * *'    # 00h BRT
+    # ── Dia 21: varredura de hora em hora (06h-23h BRT) ─────────────────────
+    - cron: '0 9  21 * *'   # 06h BRT
+    - cron: '0 10 21 * *'   # 07h BRT
+    - cron: '0 11 21 * *'   # 08h BRT
+    - cron: '0 12 21 * *'   # 09h BRT
+    - cron: '0 13 21 * *'   # 10h BRT
+    - cron: '0 14 21 * *'   # 11h BRT
+    - cron: '0 15 21 * *'   # 12h BRT
+    - cron: '0 16 21 * *'   # 13h BRT
+    - cron: '0 17 21 * *'   # 14h BRT
+    - cron: '0 18 21 * *'   # 15h BRT
+    - cron: '0 19 21 * *'   # 16h BRT
+    - cron: '0 20 21 * *'   # 17h BRT
+    - cron: '0 21 21 * *'   # 18h BRT
+    - cron: '0 22 21 * *'   # 19h BRT
+    - cron: '0 23 21 * *'   # 20h BRT
+    - cron: '0 0  22 * *'   # 21h BRT (vira dia 22 UTC)
+    - cron: '0 1  22 * *'   # 22h BRT
+    - cron: '0 2  22 * *'   # 23h BRT
+    # ── Dias 22-28: 1 tentativa diaria as 09h BRT (fallback) ─────────────────
+    - cron: '0 12 22-28 * *'
+
   workflow_dispatch:
     inputs:
       force:
-        description: 'Ignorar corte de dia 15 (testar agora)'
+        description: 'Ignorar idempotencia (reprocessar mesmo se ja existir)'
         required: false
         type: boolean
         default: false
-      # ── Entrada manual de dados (quando scraper nao consegue extrair) ──────
+      # ── Entrada manual (quando scraper nao consegue extrair do portal) ──────
       manual_data_base:
-        description: 'Data base manual ex: 04/2026 (deixe vazio para usar scraper)'
+        description: 'Data base manual ex: 05/2026 (vazio = usar scraper)'
         required: false
         type: string
         default: ''
@@ -61,7 +90,9 @@ jobs:
           SMTP_PASS:             ${{ secrets.SMTP_PASS }}
           SMTP_FROM:             ${{ secrets.SMTP_FROM }}
           NOTIFY_EMAIL:          ${{ secrets.SMTP_USER }}
-          FORCE_RUN:             ${{ inputs.force && '1' || '' }}
+          # Cron sempre roda com FORCE_RUN=1 (script e idempotente — safe)
+          # workflow_dispatch usa o input do usuario
+          FORCE_RUN:             ${{ github.event_name == 'schedule' && '1' || (inputs.force && '1' || '') }}
           MANUAL_DATA_BASE:      ${{ inputs.manual_data_base }}
           MANUAL_CDI_MONTH:      ${{ inputs.manual_cdi_month }}
           MANUAL_BALANCED_MONTH: ${{ inputs.manual_balanced_month }}
