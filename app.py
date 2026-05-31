@@ -551,7 +551,7 @@ def _fetch_fundamentals_24h(ticker: str) -> dict:
     return funds
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def _fetch_prevdow_live() -> dict:
     """
     Busca rentabilidade PrevDow. Prioridade:
