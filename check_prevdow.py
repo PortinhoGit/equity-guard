@@ -29,7 +29,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def _env(name: str, default: str = "") -> str:
-    v = os.environ.get(name, default)
+    # .strip() evita falha de DNS quando o secret tem espaco/quebra de linha
+    v = os.environ.get(name, default).strip()
     if not v:
         raise RuntimeError(f"Variavel obrigatoria ausente: {name}")
     return v
@@ -123,7 +124,14 @@ def main() -> None:
         print(f"Mes-alvo: {target}")
 
     from supabase import create_client
-    client = create_client(_env("SUPABASE_URL"), _env("SUPABASE_SERVICE_KEY"))
+    supa_url = _env("SUPABASE_URL")
+    # Diagnostico: mostra so o host (sem chave) para depurar falhas de DNS
+    try:
+        from urllib.parse import urlparse
+        print(f"Supabase host: {urlparse(supa_url).netloc!r}")
+    except Exception:
+        pass
+    client = create_client(supa_url, _env("SUPABASE_SERVICE_KEY"))
 
     # Ja temos?
     existing = client.table("prevdow_history").select("data_base").eq("data_base", target).execute()
