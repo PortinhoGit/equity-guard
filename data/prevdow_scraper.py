@@ -64,16 +64,23 @@ def get_rentabilidade_prevdow() -> Optional[Dict]:
         return None
     series_raw = match.group(1)
 
-    def _extrair(nome: str) -> Optional[float]:
+    def _extrair(nome: str) -> Optional[list]:
+        """Retorna a lista 'data' do indice: [1mes, 6m, 12m, 24m, 36m, Ano]."""
         pattern = rf'name:\s*"{re.escape(nome)}"[\s\S]*?data:\s*\[([\d\s,.\-]+)\]'
         m = re.search(pattern, series_raw)
         if m:
             valores = [float(v.strip()) for v in m.group(1).split(",") if v.strip()]
-            return valores[0] if valores else None
+            return valores or None
         return None
 
-    cdi_month = _extrair("Carteira DI")
-    balanced_month = _extrair("Carteira Original Balanceada")
+    cdi = _extrair("Carteira DI")
+    balanced = _extrair("Carteira Original Balanceada")
+
+    # Posicao 0 = mes; ultima posicao = "Ano" (ver categoriasOriginal no portal).
+    cdi_month = cdi[0] if cdi else None
+    balanced_month = balanced[0] if balanced else None
+    cdi_year = cdi[-1] if cdi and len(cdi) >= 2 else None
+    balanced_year = balanced[-1] if balanced and len(balanced) >= 2 else None
 
     db_match = re.search(r"Data Base:\s*([\d/]+)", html)
     data_base = db_match.group(1) if db_match else None
@@ -86,6 +93,8 @@ def get_rentabilidade_prevdow() -> Optional[Dict]:
         "data_base": data_base,
         "cdi_month": cdi_month,
         "balanced_month": balanced_month,
+        "cdi_year": cdi_year,
+        "balanced_year": balanced_year,
     }
     logger.info(f"PrevDow scraper: {result}")
     return result

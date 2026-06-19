@@ -61,6 +61,16 @@ on:
         required: false
         type: string
         default: ''
+      manual_cdi_year:
+        description: 'Carteira DI — acumulado no ano (%) ex: 5.32 (vazio = recalcula)'
+        required: false
+        type: string
+        default: ''
+      manual_balanced_year:
+        description: 'Carteira Balanceada — acumulado no ano (%) ex: 4.12 (vazio = recalcula)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   check:
@@ -96,4 +106,6 @@ jobs:
           MANUAL_DATA_BASE:      ${{ inputs.manual_data_base }}
           MANUAL_CDI_MONTH:      ${{ inputs.manual_cdi_month }}
           MANUAL_BALANCED_MONTH: ${{ inputs.manual_balanced_month }}
+          MANUAL_CDI_YEAR:       ${{ inputs.manual_cdi_year }}
+          MANUAL_BALANCED_YEAR:  ${{ inputs.manual_balanced_year }}
         run: python check_prevdow.py
