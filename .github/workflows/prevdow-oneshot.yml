@@ -3,6 +3,7 @@ name: PrevDow One-shot
 # Workflow temporario: roda check_prevdow.py uma vez quando este arquivo e
 # alterado/empurrado para a main. Usado para capturar um mes especifico sem
 # depender do cron ou de workflow_dispatch. Remover apos o uso.
+# retry: strip de secrets + diagnostico de host (Maio/2026)
 
 on:
   push:
