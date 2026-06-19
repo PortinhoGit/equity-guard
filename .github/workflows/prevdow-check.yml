@@ -2,12 +2,12 @@ name: PrevDow Monthly Check
 
 # Estrategia de disparo:
 #
-#   Dia 21 (BRT) — varredura de hora em hora (06h-23h BRT) com FORCE_RUN=1.
+#   Dia 15 (BRT) — varredura de hora em hora (06h-23h BRT) com FORCE_RUN=1.
 #   O script e idempotente: se o mes-alvo ja esta no Supabase, encerra sem
 #   fazer nada. Assim que o portal publicar os dados, a proxima rodada captura.
 #
-#   Dias 22-28 (BRT) — 1 tentativa diaria as 09h BRT (fallback caso o portal
-#   tenha atrasado ou o scraper tenha falhado no dia 21).
+#   Dias 16-28 (BRT) — 1 tentativa diaria as 09h BRT (fallback caso o portal
+#   tenha atrasado ou o scraper tenha falhado no dia 15).
 #
 #   workflow_dispatch — disparo manual com inputs para inserir dados
 #   quando o scraper nao conseguir extrair do portal.
@@ -16,27 +16,27 @@ name: PrevDow Monthly Check
 
 on:
   schedule:
-    # ── Dia 21: varredura de hora em hora (06h-23h BRT) ─────────────────────
-    - cron: '0 9  21 * *'   # 06h BRT
-    - cron: '0 10 21 * *'   # 07h BRT
-    - cron: '0 11 21 * *'   # 08h BRT
-    - cron: '0 12 21 * *'   # 09h BRT
-    - cron: '0 13 21 * *'   # 10h BRT
-    - cron: '0 14 21 * *'   # 11h BRT
-    - cron: '0 15 21 * *'   # 12h BRT
-    - cron: '0 16 21 * *'   # 13h BRT
-    - cron: '0 17 21 * *'   # 14h BRT
-    - cron: '0 18 21 * *'   # 15h BRT
-    - cron: '0 19 21 * *'   # 16h BRT
-    - cron: '0 20 21 * *'   # 17h BRT
-    - cron: '0 21 21 * *'   # 18h BRT
-    - cron: '0 22 21 * *'   # 19h BRT
-    - cron: '0 23 21 * *'   # 20h BRT
-    - cron: '0 0  22 * *'   # 21h BRT (vira dia 22 UTC)
-    - cron: '0 1  22 * *'   # 22h BRT
-    - cron: '0 2  22 * *'   # 23h BRT
-    # ── Dias 22-28: 1 tentativa diaria as 09h BRT (fallback) ─────────────────
-    - cron: '0 12 22-28 * *'
+    # ── Dia 15: varredura de hora em hora (06h-23h BRT) ─────────────────────
+    - cron: '0 9  15 * *'   # 06h BRT
+    - cron: '0 10 15 * *'   # 07h BRT
+    - cron: '0 11 15 * *'   # 08h BRT
+    - cron: '0 12 15 * *'   # 09h BRT
+    - cron: '0 13 15 * *'   # 10h BRT
+    - cron: '0 14 15 * *'   # 11h BRT
+    - cron: '0 15 15 * *'   # 12h BRT
+    - cron: '0 16 15 * *'   # 13h BRT
+    - cron: '0 17 15 * *'   # 14h BRT
+    - cron: '0 18 15 * *'   # 15h BRT
+    - cron: '0 19 15 * *'   # 16h BRT
+    - cron: '0 20 15 * *'   # 17h BRT
+    - cron: '0 21 15 * *'   # 18h BRT
+    - cron: '0 22 15 * *'   # 19h BRT
+    - cron: '0 23 15 * *'   # 20h BRT
+    - cron: '0 0  16 * *'   # 21h BRT (vira dia 16 UTC)
+    - cron: '0 1  16 * *'   # 22h BRT
+    - cron: '0 2  16 * *'   # 23h BRT
+    # ── Dias 16-28: 1 tentativa diaria as 09h BRT (fallback) ─────────────────
+    - cron: '0 12 16-28 * *'
 
   workflow_dispatch:
     inputs:
@@ -58,6 +58,16 @@ on:
         default: ''
       manual_balanced_month:
         description: 'Carteira Balanceada — rentabilidade do mes (%) ex: 1.66'
+        required: false
+        type: string
+        default: ''
+      manual_cdi_year:
+        description: 'Carteira DI — acumulado no ano (%) ex: 5.32 (vazio = recalcula)'
+        required: false
+        type: string
+        default: ''
+      manual_balanced_year:
+        description: 'Carteira Balanceada — acumulado no ano (%) ex: 4.12 (vazio = recalcula)'
         required: false
         type: string
         default: ''
@@ -96,4 +106,6 @@ jobs:
           MANUAL_DATA_BASE:      ${{ inputs.manual_data_base }}
           MANUAL_CDI_MONTH:      ${{ inputs.manual_cdi_month }}
           MANUAL_BALANCED_MONTH: ${{ inputs.manual_balanced_month }}
+          MANUAL_CDI_YEAR:       ${{ inputs.manual_cdi_year }}
+          MANUAL_BALANCED_YEAR:  ${{ inputs.manual_balanced_year }}
         run: python check_prevdow.py

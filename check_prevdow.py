@@ -84,12 +84,20 @@ def _manual_input() -> dict | None:
     bal  = os.environ.get("MANUAL_BALANCED_MONTH", "").strip()
     if not (base and cdi and bal):
         return None
+    cdi_y = os.environ.get("MANUAL_CDI_YEAR", "").strip()
+    bal_y = os.environ.get("MANUAL_BALANCED_YEAR", "").strip()
     try:
-        return {
+        out = {
             "data_base":     base,
             "cdi_month":     float(cdi),
             "balanced_month": float(bal),
         }
+        # Ano opcional: se informado, usa o numero do portal direto (sem recompor)
+        if cdi_y:
+            out["cdi_year"] = float(cdi_y)
+        if bal_y:
+            out["balanced_year"] = float(bal_y)
+        return out
     except ValueError as e:
         print(f"Input manual invalido: {e}")
         return None
@@ -149,30 +157,37 @@ def main() -> None:
                   f"Tentaremos de novo no proximo run.")
             return
 
-    # ── Calcula ano acumulado a partir do historico do mesmo ano ──────────────
-    year_prefix = target.split("/")[1]
-    hist = (
-        client.table("prevdow_history")
-        .select("data_base, cdi_month, balanced_month")
-        .like("data_base", f"%/{year_prefix}")
-        .execute()
-    )
-    cdi_year = None
-    balanced_year = None
-    if hist.data:
-        cdi_prod = 1.0
-        bal_prod = 1.0
-        for row in hist.data:
-            if row.get("cdi_month") is not None:
-                cdi_prod *= (1 + float(row["cdi_month"]) / 100)
-            if row.get("balanced_month") is not None:
-                bal_prod *= (1 + float(row["balanced_month"]) / 100)
-        if data.get("cdi_month") is not None:
-            cdi_prod *= (1 + float(data["cdi_month"]) / 100)
-        if data.get("balanced_month") is not None:
-            bal_prod *= (1 + float(data["balanced_month"]) / 100)
-        cdi_year = round((cdi_prod - 1) * 100, 2)
-        balanced_year = round((bal_prod - 1) * 100, 2)
+    # ── Ano acumulado: prioridade para o valor do proprio portal ──────────────
+    # Regra do projeto: usar SEMPRE o numero do portal, sem substituicoes. O
+    # scraper ja extrai o "Ano" (ultima coluna de seriesOriginal). So recompoe
+    # a partir do historico quando o portal nao informar (fallback).
+    cdi_year = data.get("cdi_year")
+    balanced_year = data.get("balanced_year")
+
+    if cdi_year is None or balanced_year is None:
+        year_prefix = target.split("/")[1]
+        hist = (
+            client.table("prevdow_history")
+            .select("data_base, cdi_month, balanced_month")
+            .like("data_base", f"%/{year_prefix}")
+            .execute()
+        )
+        if hist.data:
+            cdi_prod = 1.0
+            bal_prod = 1.0
+            for row in hist.data:
+                if row.get("cdi_month") is not None:
+                    cdi_prod *= (1 + float(row["cdi_month"]) / 100)
+                if row.get("balanced_month") is not None:
+                    bal_prod *= (1 + float(row["balanced_month"]) / 100)
+            if data.get("cdi_month") is not None:
+                cdi_prod *= (1 + float(data["cdi_month"]) / 100)
+            if data.get("balanced_month") is not None:
+                bal_prod *= (1 + float(data["balanced_month"]) / 100)
+            if cdi_year is None:
+                cdi_year = round((cdi_prod - 1) * 100, 2)
+            if balanced_year is None:
+                balanced_year = round((bal_prod - 1) * 100, 2)
 
     row = {
         "data_base":      target,
