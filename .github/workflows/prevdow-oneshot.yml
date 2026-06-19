@@ -5,6 +5,7 @@ name: PrevDow One-shot
 # depender do cron ou de workflow_dispatch. Remover apos o uso.
 # retry: strip de secrets + diagnostico de host (Maio/2026)
 # retry 2: apos resume do projeto Supabase
+# retry 3: modo manual (portal bloqueia runner com 403) — valores do portal
 
 on:
   push:
@@ -41,4 +42,10 @@ jobs:
           SMTP_FROM:             ${{ secrets.SMTP_FROM }}
           NOTIFY_EMAIL:          ${{ secrets.SMTP_USER }}
           FORCE_RUN:             '1'
+          # Portal bloqueia o runner (403); insere Maio/2026 com os numeros do portal
+          MANUAL_DATA_BASE:      '05/2026'
+          MANUAL_CDI_MONTH:      '1.01'
+          MANUAL_BALANCED_MONTH: '0.04'
+          MANUAL_CDI_YEAR:       '5.32'
+          MANUAL_BALANCED_YEAR:  '4.12'
         run: python check_prevdow.py
