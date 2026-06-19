@@ -4,6 +4,7 @@ name: PrevDow One-shot
 # alterado/empurrado para a main. Usado para capturar um mes especifico sem
 # depender do cron ou de workflow_dispatch. Remover apos o uso.
 # retry: strip de secrets + diagnostico de host (Maio/2026)
+# retry 2: apos resume do projeto Supabase
 
 on:
   push:
