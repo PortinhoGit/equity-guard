@@ -28,7 +28,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def _env(name: str, default: str = "") -> str:
     v = os.environ.get(name, default)
     if not v:
-        raise RuntimeError(f"Variavel obrigatoria ausente: {name}")
+        raise RuntimeError(
+            f"Variavel obrigatoria ausente: {name}. "
+            f"Configure o secret '{name}' em GitHub → Settings → Secrets and "
+            f"variables → Actions, e confirme que o workflow "
+            f".github/workflows/daily-briefing.yml mapeia "
+            f"'{name}: ${{{{ secrets.{name} }}}}' no passo 'Send daily briefing'."
+        )
     return v
 
 
