@@ -86,6 +86,13 @@ body{
   content:"";position:absolute;inset:0 0 auto 0;height:6px;
   background:linear-gradient(90deg,var(--v1),var(--v2),var(--v3),var(--v4));
 }
+.lang-switch{position:absolute;top:16px;right:16px;display:flex;gap:3px;z-index:6}
+.lang-switch button{
+  border:0;background:#f3effc;border-radius:8px;font-size:1.05rem;line-height:1;
+  padding:5px 7px;cursor:pointer;opacity:.45;transition:opacity .15s,transform .1s;
+}
+.lang-switch button:hover{opacity:.8}
+.lang-switch button.active{opacity:1;transform:scale(1.15);box-shadow:0 3px 10px rgba(124,58,237,.35)}
 
 /* ---------- Cabeçalho / professora ---------- */
 .brand{display:flex;align-items:center;gap:16px;margin-bottom:6px}
@@ -204,46 +211,49 @@ body{
 <div class="wrap">
   <div class="card">
 
+    <!-- Seletor de idioma -->
+    <div class="lang-switch" id="lang-switch">
+      <button data-lang="pt" title="Português">🇧🇷</button>
+      <button data-lang="en" title="English">🇬🇧</button>
+      <button data-lang="de" title="Deutsch">🇩🇪</button>
+    </div>
+
     <!-- ============ TELA 1: CADASTRO ============ -->
     <section id="screen-register" class="screen on">
       <div class="brand">
         <img id="prof-avatar" class="avatar" alt="Profª Catarina Portinho">
         <div>
           <h1>Wortsuche <span class="flag">🇩🇪</span></h1>
-          <div class="sub">Caça-Palavras de Alemão · <span id="prof-name"></span></div>
+          <div class="sub"><span data-i18n="subtitle">Caça-Palavras de Alemão</span> · <span id="prof-name"></span></div>
         </div>
       </div>
-      <p class="hint" style="margin-top:4px">
-        Encontre as palavras em alemão o mais rápido que conseguir. ⏱️ O tempo é curto
-        <b>de propósito</b>: aqui é <b>você e seu cérebro</b> 🧠 — nada de tradutor,
-        Google ou ChatGPT! Pense rápido, confie no que aprendeu e suba no ranking.
-      </p>
+      <p class="hint" style="margin-top:4px" data-i18n="intro"></p>
 
       <div class="field">
-        <label for="in-name">Seu nome</label>
-        <input id="in-name" type="text" placeholder="Ex.: Maria Silva" autocomplete="name" maxlength="40">
+        <label for="in-name" data-i18n="label_name">Seu nome</label>
+        <input id="in-name" type="text" data-i18n-ph="ph_name" autocomplete="name" maxlength="40">
       </div>
       <div class="field">
-        <label for="in-email">Seu e-mail</label>
-        <input id="in-email" type="email" placeholder="voce@email.com" autocomplete="email" maxlength="80">
+        <label for="in-email" data-i18n="label_email">Seu e-mail</label>
+        <input id="in-email" type="email" data-i18n-ph="ph_email" autocomplete="email" maxlength="80">
       </div>
       <div class="field">
-        <label for="in-country">Seu país / Your country</label>
-        <select id="in-country"><option value="">Selecione… / Select…</option></select>
+        <label for="in-country" data-i18n="label_country">Seu país</label>
+        <select id="in-country"><option value="" data-i18n="opt_select">Selecione…</option></select>
       </div>
       <div class="err" id="reg-err"></div>
-      <button class="btn" id="btn-start">Começar ▶</button>
-      <p class="hint">Ao começar você concorda em registrar seu nome, e-mail, país e pontuação para o ranking da turma.</p>
+      <button class="btn" id="btn-start" data-i18n="btn_start">Começar ▶</button>
+      <p class="hint" data-i18n="consent"></p>
     </section>
 
     <!-- ============ TELA 2: JOGO ============ -->
     <section id="screen-game" class="screen">
       <div class="hud">
         <div class="pill">🏆 <span class="n" id="hud-score">0</span></div>
-        <div class="pill">📚 Rodada <span class="n" id="hud-round">1</span>/<span id="hud-total">4</span></div>
+        <div class="pill">📚 <span data-i18n="round">Rodada</span> <span class="n" id="hud-round">1</span>/<span id="hud-total">4</span></div>
         <div class="pill timer" id="hud-timer">⏱️ 75</div>
       </div>
-      <div class="theme-title" id="theme-title">Tema<small id="theme-sub"></small></div>
+      <div class="theme-title" id="theme-title"><span id="theme-name"></span><small id="theme-sub"></small></div>
       <div class="grid" id="grid"></div>
       <div class="words" id="words"></div>
     </section>
@@ -253,25 +263,25 @@ body{
       <div class="medal" id="end-medal">🏅</div>
       <div class="final-score" id="end-score">0</div>
       <div class="center" id="end-nota-wrap" style="display:none;margin:-6px 0 2px">
-        <span class="nota-badge">Nota <b id="end-nota">0</b><small> / 10</small></span>
+        <span class="nota-badge"><span data-i18n="grade">Nota</span> <b id="end-nota">0</b><small> / 10</small></span>
       </div>
       <p class="center" id="end-msg" style="color:var(--muted);font-weight:600;margin-top:2px"></p>
 
-      <h3 style="margin:18px 0 4px">Ranking da turma</h3>
+      <h3 style="margin:18px 0 4px" data-i18n="ranking_title">Ranking da turma</h3>
       <table class="rank-table">
-        <thead><tr><th>#</th><th>Aluno</th><th>Nota</th><th>Pontos</th></tr></thead>
+        <thead><tr><th>#</th><th data-i18n="th_student">Aluno</th><th data-i18n="th_grade">Nota</th><th data-i18n="th_points">Pontos</th></tr></thead>
         <tbody id="rank-body"></tbody>
       </table>
 
       <div class="row2">
-        <button class="btn ghost mini" id="btn-csv" style="flex:1">⬇️ Baixar CSV</button>
-        <button class="btn mini" id="btn-again" style="flex:1">🔁 Jogar de novo</button>
+        <button class="btn ghost mini" id="btn-csv" style="flex:1" data-i18n="btn_csv">⬇️ Baixar CSV</button>
+        <button class="btn mini" id="btn-again" style="flex:1" data-i18n="btn_again">🔁 Jogar de novo</button>
       </div>
     </section>
 
   </div>
   <div class="foot">
-    Feito com 💜 para as aulas da <span id="foot-prof"></span> ·
+    <span data-i18n="foot">Feito com 💜 para as aulas da</span> <span id="foot-prof"></span> ·
     <a href="https://portinho.me" target="_blank" rel="noopener">portinho.me</a>
   </div>
 </div>
@@ -284,33 +294,40 @@ body{
    Formato: { tema, dica, palavras:[[ALEMAO, "tradução"], ...] }
    Use MAIÚSCULAS. Umlauts (Ä Ö Ü) e ß contam como 1 letra.
    ===================================================================== */
+// Cada palavra: [ALEMÃO, tradução PT, tradução EN]. nome/dica por idioma.
 const TEMAS = [
-  { tema:"Farben — Cores", dica:"As cores em alemão",
-    palavras:[["ROT","vermelho"],["BLAU","azul"],["GELB","amarelo"],["GRÜN","verde"],
-              ["WEISS","branco"],["BRAUN","marrom"],["ROSA","rosa"]] },
-  { tema:"Zahlen — Números", dica:"Números de 1 a 10",
-    palavras:[["EINS","um"],["ZWEI","dois"],["DREI","três"],["VIER","quatro"],
-              ["FÜNF","cinco"],["SECHS","seis"],["ACHT","oito"],["ZEHN","dez"]] },
-  { tema:"Tiere — Animais", dica:"Bichos comuns",
-    palavras:[["HUND","cachorro"],["KATZE","gato"],["VOGEL","pássaro"],["PFERD","cavalo"],
-              ["FISCH","peixe"],["MAUS","rato"],["KUH","vaca"]] },
-  { tema:"Essen — Comida", dica:"Comidas e bebidas",
-    palavras:[["BROT","pão"],["KÄSE","queijo"],["APFEL","maçã"],["MILCH","leite"],
-              ["WASSER","água"],["SUPPE","sopa"],["EI","ovo"]] },
-  { tema:"Begrüßung — Saudações", dica:"Dia a dia e família",
-    palavras:[["HALLO","olá"],["DANKE","obrigado"],["MUTTER","mãe"],["VATER","pai"],
-              ["BRUDER","irmão"],["TAG","dia"],["NACHT","noite"]] },
-  { tema:"Körper — Corpo", dica:"Partes do corpo",
-    palavras:[["KOPF","cabeça"],["HAND","mão"],["FUSS","pé"],["AUGE","olho"],
-              ["MUND","boca"],["NASE","nariz"],["OHR","orelha"]] }
+  { nome:{pt:"Farben — Cores", en:"Farben — Colours", de:"Farben"},
+    dica:{pt:"As cores em alemão", en:"Colours in German", de:"Die Farben"},
+    palavras:[["ROT","vermelho","red"],["BLAU","azul","blue"],["GELB","amarelo","yellow"],
+              ["GRÜN","verde","green"],["WEISS","branco","white"],["BRAUN","marrom","brown"],["ROSA","rosa","pink"]] },
+  { nome:{pt:"Zahlen — Números", en:"Zahlen — Numbers", de:"Zahlen"},
+    dica:{pt:"Números de 1 a 10", en:"Numbers 1 to 10", de:"Zahlen 1 bis 10"},
+    palavras:[["EINS","um","one"],["ZWEI","dois","two"],["DREI","três","three"],["VIER","quatro","four"],
+              ["FÜNF","cinco","five"],["SECHS","seis","six"],["ACHT","oito","eight"],["ZEHN","dez","ten"]] },
+  { nome:{pt:"Tiere — Animais", en:"Tiere — Animals", de:"Tiere"},
+    dica:{pt:"Bichos comuns", en:"Common animals", de:"Häufige Tiere"},
+    palavras:[["HUND","cachorro","dog"],["KATZE","gato","cat"],["VOGEL","pássaro","bird"],["PFERD","cavalo","horse"],
+              ["FISCH","peixe","fish"],["MAUS","rato","mouse"],["KUH","vaca","cow"]] },
+  { nome:{pt:"Essen — Comida", en:"Essen — Food", de:"Essen"},
+    dica:{pt:"Comidas e bebidas", en:"Food and drinks", de:"Essen und Trinken"},
+    palavras:[["BROT","pão","bread"],["KÄSE","queijo","cheese"],["APFEL","maçã","apple"],["MILCH","leite","milk"],
+              ["WASSER","água","water"],["SUPPE","sopa","soup"],["EI","ovo","egg"]] },
+  { nome:{pt:"Begrüßung — Saudações", en:"Begrüßung — Greetings", de:"Begrüßung"},
+    dica:{pt:"Dia a dia e família", en:"Everyday and family", de:"Alltag und Familie"},
+    palavras:[["HALLO","olá","hello"],["DANKE","obrigado","thank you"],["MUTTER","mãe","mother"],["VATER","pai","father"],
+              ["BRUDER","irmão","brother"],["TAG","dia","day"],["NACHT","noite","night"]] },
+  { nome:{pt:"Körper — Corpo", en:"Körper — Body", de:"Körper"},
+    dica:{pt:"Partes do corpo", en:"Body parts", de:"Körperteile"},
+    palavras:[["KOPF","cabeça","head"],["HAND","mão","hand"],["FUSS","pé","foot"],["AUGE","olho","eye"],
+              ["MUND","boca","mouth"],["NASE","nariz","nose"],["OHR","orelha","ear"]] }
 ];
 
 /* =====================================================================
    ESTADO
    ===================================================================== */
 const S = {
-  name:"", email:"", score:0, round:0,
-  temas:[], grid:[], size:CONFIG.TAMANHO_GRID,
+  name:"", email:"", country:"", lang:"pt", score:0, round:0,
+  temas:[], curTema:null, grid:[], size:CONFIG.TAMANHO_GRID,
   placed:[], foundSet:new Set(),
   timer:null, timeLeft:0, dragging:false, selection:[],
   stats:{ total:0, found:0, speedSum:0, errors:0 }, // para a nota 0-10
@@ -378,6 +395,99 @@ const COUNTRIES = [
 })();
 
 /* =====================================================================
+   IDIOMAS (i18n) — PT / EN / DE
+   ===================================================================== */
+const STRINGS = {
+  pt:{
+    subtitle:"Caça-Palavras de Alemão",
+    intro:"Encontre as palavras em alemão o mais rápido que conseguir. ⏱️ O tempo é curto <b>de propósito</b>: aqui é <b>você e seu cérebro</b> 🧠 — nada de tradutor, Google ou ChatGPT! Pense rápido e suba no ranking.",
+    label_name:"Seu nome", ph_name:"Ex.: Maria Silva",
+    label_email:"Seu e-mail", ph_email:"voce@email.com",
+    label_country:"Seu país", opt_select:"Selecione…",
+    btn_start:"Começar ▶",
+    consent:"Ao começar você concorda em registrar seu nome, e-mail, país e pontuação para o ranking da turma.",
+    round:"Rodada", find_words:"Ache {n} palavras", round_bonus:"Rodada! +{x}",
+    grade:"Nota", ranking_title:"Ranking da turma",
+    th_student:"Aluno", th_grade:"Nota", th_points:"Pontos",
+    btn_csv:"⬇️ Baixar CSV", btn_again:"🔁 Jogar de novo",
+    foot:"Feito com 💜 para as aulas da",
+    err_name:"Digite seu nome completo.", err_email:"Digite um e-mail válido.", err_country:"Selecione seu país.",
+    rank_empty:"Seja o primeiro do ranking!",
+    msg_gold:"Ausgezeichnet! Vocabulário afiado!", msg_silver:"Sehr gut! Você mandou bem.",
+    msg_bronze:"Gut gemacht! Já está no caminho.", msg_base:"Boa partida! Continue treinando."
+  },
+  en:{
+    subtitle:"German Word Search",
+    intro:"Find the German words as fast as you can. ⏱️ The timer is short <b>on purpose</b>: it's just <b>you and your brain</b> 🧠 — no translator, Google or ChatGPT! Think fast and climb the ranking.",
+    label_name:"Your name", ph_name:"E.g. John Smith",
+    label_email:"Your email", ph_email:"you@email.com",
+    label_country:"Your country", opt_select:"Select…",
+    btn_start:"Start ▶",
+    consent:"By starting you agree to record your name, email, country and score for the class ranking.",
+    round:"Round", find_words:"Find {n} words", round_bonus:"Round! +{x}",
+    grade:"Grade", ranking_title:"Class ranking",
+    th_student:"Student", th_grade:"Grade", th_points:"Points",
+    btn_csv:"⬇️ Download CSV", btn_again:"🔁 Play again",
+    foot:"Made with 💜 for the classes of",
+    err_name:"Enter your full name.", err_email:"Enter a valid email.", err_country:"Select your country.",
+    rank_empty:"Be the first on the ranking!",
+    msg_gold:"Ausgezeichnet! Sharp vocabulary!", msg_silver:"Sehr gut! Well done.",
+    msg_bronze:"Gut gemacht! You're on your way.", msg_base:"Good game! Keep practising."
+  },
+  de:{
+    subtitle:"Deutsch-Wörtersuche",
+    intro:"Finde die deutschen Wörter so schnell wie möglich. ⏱️ Die Zeit ist <b>absichtlich</b> knapp: nur <b>du und dein Kopf</b> 🧠 — kein Übersetzer, kein Google, kein ChatGPT! Denk schnell und komm in die Rangliste.",
+    label_name:"Dein Name", ph_name:"z. B. Anna Müller",
+    label_email:"Deine E-Mail", ph_email:"du@email.com",
+    label_country:"Dein Land", opt_select:"Auswählen…",
+    btn_start:"Los geht's ▶",
+    consent:"Mit dem Start stimmst du zu, Name, E-Mail, Land und Punktzahl für die Rangliste zu speichern.",
+    round:"Runde", find_words:"Finde {n} Wörter", round_bonus:"Runde! +{x}",
+    grade:"Note", ranking_title:"Rangliste der Klasse",
+    th_student:"Schüler", th_grade:"Note", th_points:"Punkte",
+    btn_csv:"⬇️ CSV herunterladen", btn_again:"🔁 Nochmal spielen",
+    foot:"Mit 💜 für den Unterricht von",
+    err_name:"Gib deinen vollen Namen ein.", err_email:"Gib eine gültige E-Mail ein.", err_country:"Wähle dein Land.",
+    rank_empty:"Sei die/der Erste in der Rangliste!",
+    msg_gold:"Ausgezeichnet! Starker Wortschatz!", msg_silver:"Sehr gut! Gut gemacht.",
+    msg_bronze:"Gut gemacht! Du bist auf dem Weg.", msg_base:"Gutes Spiel! Übe weiter."
+  }
+};
+function T(key){ return (STRINGS[S.lang] && STRINGS[S.lang][key]) || STRINGS.en[key] || key; }
+// tradução da palavra conforme idioma: PT usa índice 1; EN e DE usam índice 2 (inglês como apoio).
+function wtrans(p){ return S.lang==="pt" ? p[1] : p[2]; }
+// formata a nota com vírgula (PT/DE) ou ponto (EN)
+function fmtNota(n){ const s=n.toFixed(1); return S.lang==="en" ? s : s.replace(".",","); }
+
+function applyLang(){
+  document.querySelectorAll("[data-i18n]").forEach(el=>{ el.innerHTML = T(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el=>{ el.setAttribute("placeholder", T(el.dataset.i18nPh)); });
+  document.querySelectorAll("#lang-switch button").forEach(b=>b.classList.toggle("active", b.dataset.lang===S.lang));
+  document.documentElement.lang = S.lang;
+}
+function setLang(l){
+  if(!STRINGS[l]) return;
+  S.lang = l;
+  try{ localStorage.setItem("wortsuche_lang", l); }catch(e){}
+  applyLang();
+  // re-renderiza os textos dinâmicos se uma rodada estiver ativa
+  if(S.curTema && $("screen-game").classList.contains("on")){
+    renderTheme(S.curTema);
+    renderWords(S.curTema.palavras);
+  }
+}
+function detectLang(){
+  try{ const saved=localStorage.getItem("wortsuche_lang"); if(saved && STRINGS[saved]) return saved; }catch(e){}
+  const n=(navigator.language||"pt").toLowerCase();
+  if(n.startsWith("de")) return "de";
+  if(n.startsWith("pt")) return "pt";
+  return "en";
+}
+document.querySelectorAll("#lang-switch button").forEach(b=>b.addEventListener("click",()=>setLang(b.dataset.lang)));
+S.lang = detectLang();
+applyLang();
+
+/* =====================================================================
    NAVEGAÇÃO DE TELAS
    ===================================================================== */
 function show(screen){
@@ -394,9 +504,9 @@ $("btn-start").addEventListener("click", ()=>{
   const email = $("in-email").value.trim();
   const country = $("in-country").value;
   const err = $("reg-err");
-  if(name.length < 2){ err.textContent="Digite seu nome completo."; return; }
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent="Digite um e-mail válido."; return; }
-  if(!country){ err.textContent="Selecione seu país / Select your country."; return; }
+  if(name.length < 2){ err.textContent=T("err_name"); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent=T("err_email"); return; }
+  if(!country){ err.textContent=T("err_country"); return; }
   err.textContent="";
   S.name=name; S.email=email; S.country=country; S.score=0; S.round=0;
   S.stats={ total:0, found:0, speedSum:0, errors:0 };
@@ -416,8 +526,8 @@ function nextRound(){
   S.round++;
   $("hud-round").textContent = S.round;
   $("hud-score").textContent = S.score;
-  $("theme-title").childNodes[0].nodeValue = tema.tema + " ";
-  $("theme-sub").textContent = "Ache " + tema.palavras.length + " palavras · " + tema.dica;
+  S.curTema = tema;
+  renderTheme(tema);
 
   buildPuzzle(tema.palavras.map(p=>p[0]));
   S.stats.total += S.placed.length; // palavras realmente colocadas nesta rodada
@@ -477,12 +587,20 @@ function renderGrid(){
   attachDrag(g);
 }
 
-function renderWords(pairs){
+function renderTheme(tema){
+  $("theme-name").textContent = (tema.nome[S.lang] || tema.nome.en) + " ";
+  const dica = tema.dica[S.lang] || tema.dica.en;
+  $("theme-sub").textContent = T("find_words").replace("{n}", tema.palavras.length) + " · " + dica;
+}
+
+function renderWords(list){
   const w=$("words"); w.innerHTML="";
-  for(const [de,pt] of pairs){
+  for(const p of list){
+    const de=p[0];
     const chip=document.createElement("div");
     chip.className="word-chip"; chip.dataset.word=de;
-    chip.innerHTML=`${de}<small>${pt}</small>`;
+    chip.innerHTML=`${de}<small>${wtrans(p)}</small>`;
+    if(S.foundSet.has(de)) chip.classList.add("done"); // mantém marcação ao trocar idioma
     w.appendChild(chip);
   }
 }
@@ -548,7 +666,7 @@ function checkSelection(){
     addScore(gained, "+"+gained);
     document.querySelector(`.word-chip[data-word="${cssEsc(hit.word)}"]`)?.classList.add("done");
     if(S.foundSet.size === S.placed.length){
-      addScore(CONFIG.BONUS_RODADA_COMPLETA, "Rodada! +"+CONFIG.BONUS_RODADA_COMPLETA, true);
+      addScore(CONFIG.BONUS_RODADA_COMPLETA, T("round_bonus").replace("{x}", CONFIG.BONUS_RODADA_COMPLETA), true);
       clearInterval(S.timer);
       setTimeout(nextRound, 900);
     }
@@ -618,13 +736,13 @@ function endGame(){
   $("end-score").textContent = S.score;
   const nota = calcNota();
   if(CONFIG.MOSTRAR_NOTA){
-    $("end-nota").textContent = nota.toFixed(1).replace(".",",");
+    $("end-nota").textContent = fmtNota(nota);
     $("end-nota-wrap").style.display="";
   }
-  let medal="🏅", msg="Boa partida! Continue treinando.";
-  if(nota>=9){ medal="🥇"; msg="Ausgezeichnet! Vocabulário afiado!"; }
-  else if(nota>=7){ medal="🥈"; msg="Sehr gut! Você mandou bem."; }
-  else if(nota>=5){ medal="🥉"; msg="Gut gemacht! Já está no caminho."; }
+  let medal="🏅", msg=T("msg_base");
+  if(nota>=9){ medal="🥇"; msg=T("msg_gold"); }
+  else if(nota>=7){ medal="🥈"; msg=T("msg_silver"); }
+  else if(nota>=5){ medal="🥉"; msg=T("msg_bronze"); }
   $("end-medal").textContent=medal;
   $("end-msg").textContent=msg;
 
@@ -658,11 +776,11 @@ function renderRank(mine){
   rank.forEach((r,i)=>{
     const tr=document.createElement("tr");
     if(r.email.toLowerCase()===mine.email.toLowerCase() && r.score===mine.score) tr.className="me";
-    const nota = (r.nota!=null) ? String(r.nota).replace(".",",") : "—";
+    const nota = (r.nota!=null) ? fmtNota(Number(r.nota)) : "—";
     tr.innerHTML=`<td>${i+1}</td><td>${escapeHtml(r.name)}</td><td>${nota}</td><td>${r.score}</td>`;
     body.appendChild(tr);
   });
-  if(!rank.length) body.innerHTML=`<tr><td colspan="4" style="color:#999">Seja o primeiro do ranking!</td></tr>`;
+  if(!rank.length) body.innerHTML=`<tr><td colspan="4" style="color:#999">${T("rank_empty")}</td></tr>`;
 }
 function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
