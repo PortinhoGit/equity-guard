@@ -31,7 +31,13 @@ const CONFIG = {
   PONTOS_POR_PALAVRA: 100,   // base por palavra encontrada
   BONUS_VELOCIDADE: 5,       // pontos extras por segundo restante ao achar a palavra
   PENALIDADE_ERRO: 40,       // desconto por seleção errada (desestimula chute/consulta)
-  BONUS_RODADA_COMPLETA: 150 // bônus se achar TODAS as palavras da rodada
+  BONUS_RODADA_COMPLETA: 150,// bônus se achar TODAS as palavras da rodada
+
+  // ---- Nota 0 a 10 (acerto + velocidade) ----------------------------
+  MOSTRAR_NOTA: true,        // mostra a nota de 0 a 10 na tela final e salva junto
+  NOTA_PESO_ACERTO: 0.5,     // quanto a proporção de palavras achadas pesa (0..1)
+  NOTA_PESO_VELOCIDADE: 0.5, // quanto a velocidade pesa (0..1) — a soma ideal dá 1
+  NOTA_DESCONTO_ERRO: 0.1    // quanto cada erro tira da nota (em pontos de 0 a 10)
 };
 </script>
 
@@ -158,6 +164,12 @@ body{
   -webkit-background-clip:text;background-clip:text;color:transparent;
 }
 .medal{text-align:center;font-size:3rem}
+.nota-badge{
+  display:inline-block;padding:8px 18px;border-radius:999px;font-size:1.15rem;font-weight:800;
+  color:#fff;background:linear-gradient(135deg,var(--v1),var(--v4));box-shadow:0 8px 20px rgba(124,58,237,.35);
+}
+.nota-badge b{font-size:1.5rem}
+.nota-badge small{opacity:.85;font-weight:700}
 .rank-table{width:100%;border-collapse:collapse;margin-top:14px;font-size:.9rem}
 .rank-table th,.rank-table td{padding:8px 10px;text-align:left;border-bottom:1px solid #eee}
 .rank-table th{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}
@@ -216,11 +228,14 @@ body{
     <section id="screen-end" class="screen">
       <div class="medal" id="end-medal">🏅</div>
       <div class="final-score" id="end-score">0</div>
-      <p class="center" id="end-msg" style="color:var(--muted);font-weight:600;margin-top:-6px"></p>
+      <div class="center" id="end-nota-wrap" style="display:none;margin:-6px 0 2px">
+        <span class="nota-badge">Nota <b id="end-nota">0</b><small> / 10</small></span>
+      </div>
+      <p class="center" id="end-msg" style="color:var(--muted);font-weight:600;margin-top:2px"></p>
 
       <h3 style="margin:18px 0 4px">Ranking da turma</h3>
       <table class="rank-table">
-        <thead><tr><th>#</th><th>Aluno</th><th>Pontos</th></tr></thead>
+        <thead><tr><th>#</th><th>Aluno</th><th>Nota</th><th>Pontos</th></tr></thead>
         <tbody id="rank-body"></tbody>
       </table>
 
@@ -274,6 +289,7 @@ const S = {
   temas:[], grid:[], size:CONFIG.TAMANHO_GRID,
   placed:[], foundSet:new Set(),
   timer:null, timeLeft:0, dragging:false, selection:[],
+  stats:{ total:0, found:0, speedSum:0, errors:0 }, // para a nota 0-10
 };
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜ";
 const $ = id => document.getElementById(id);
@@ -320,6 +336,7 @@ $("btn-start").addEventListener("click", ()=>{
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent="Digite um e-mail válido."; return; }
   err.textContent="";
   S.name=name; S.email=email; S.score=0; S.round=0;
+  S.stats={ total:0, found:0, speedSum:0, errors:0 };
   // sorteia os temas da partida
   S.temas = shuffle([...TEMAS]).slice(0, CONFIG.TOTAL_RODADAS);
   show("screen-game");
@@ -339,6 +356,7 @@ function nextRound(){
   $("theme-sub").textContent = "Ache " + tema.palavras.length + " palavras · " + tema.dica;
 
   buildPuzzle(tema.palavras.map(p=>p[0]));
+  S.stats.total += S.placed.length; // palavras realmente colocadas nesta rodada
   renderGrid();
   renderWords(tema.palavras);
   startTimer();
@@ -460,6 +478,8 @@ function checkSelection(){
       el.classList.remove("sel"); el.classList.add("found");
     });
     S.selection=[];
+    S.stats.found++;
+    S.stats.speedSum += S.timeLeft / CONFIG.SEGUNDOS_POR_RODADA; // 0..1 (quanto mais rápido, maior)
     const gained = CONFIG.PONTOS_POR_PALAVRA + CONFIG.BONUS_VELOCIDADE*S.timeLeft;
     addScore(gained, "+"+gained);
     document.querySelector(`.word-chip[data-word="${cssEsc(hit.word)}"]`)?.classList.add("done");
@@ -476,6 +496,7 @@ function checkSelection(){
       setTimeout(()=>el.classList.remove("flash-bad"),300);
     });
     S.selection=[];
+    S.stats.errors++;
     addScore(-CONFIG.PENALIDADE_ERRO, "-"+CONFIG.PENALIDADE_ERRO);
   }
 }
@@ -516,17 +537,35 @@ function updateTimer(){
 /* =====================================================================
    FIM DE JOGO + RANKING + ENVIO
    ===================================================================== */
+// Nota 0 a 10: mistura proporção de palavras achadas (acerto) e velocidade,
+// descontando um pouco por erro. speedSum já vem acoplado à cobertura.
+function calcNota(){
+  const st=S.stats;
+  if(st.total<=0) return 0;
+  const coverage = st.found/st.total;      // 0..1  (acerto)
+  const speed    = st.speedSum/st.total;   // 0..1  (velocidade, só conta o que foi achado)
+  let nota = 10*(CONFIG.NOTA_PESO_ACERTO*coverage + CONFIG.NOTA_PESO_VELOCIDADE*speed)
+             - CONFIG.NOTA_DESCONTO_ERRO*st.errors;
+  return Math.max(0, Math.min(10, nota));
+}
+
 function endGame(){
   clearInterval(S.timer);
   $("end-score").textContent = S.score;
+  const nota = calcNota();
+  if(CONFIG.MOSTRAR_NOTA){
+    $("end-nota").textContent = nota.toFixed(1).replace(".",",");
+    $("end-nota-wrap").style.display="";
+  }
   let medal="🏅", msg="Boa partida! Continue treinando.";
-  if(S.score>=1500){ medal="🥇"; msg="Ausgezeichnet! Vocabulário afiado!"; }
-  else if(S.score>=900){ medal="🥈"; msg="Sehr gut! Você mandou bem."; }
-  else if(S.score>=400){ medal="🥉"; msg="Gut gemacht! Já está no caminho."; }
+  if(nota>=9){ medal="🥇"; msg="Ausgezeichnet! Vocabulário afiado!"; }
+  else if(nota>=7){ medal="🥈"; msg="Sehr gut! Você mandou bem."; }
+  else if(nota>=5){ medal="🥉"; msg="Gut gemacht! Já está no caminho."; }
   $("end-medal").textContent=medal;
   $("end-msg").textContent=msg;
 
-  const rec={name:S.name,email:S.email,score:S.score,date:new Date().toISOString()};
+  const rec={name:S.name,email:S.email,score:S.score,
+             nota:Number(nota.toFixed(1)),date:new Date().toISOString()};
   saveLocal(rec);
   sendToSheets(rec);
   renderRank(rec);
@@ -554,10 +593,11 @@ function renderRank(mine){
   rank.forEach((r,i)=>{
     const tr=document.createElement("tr");
     if(r.email.toLowerCase()===mine.email.toLowerCase() && r.score===mine.score) tr.className="me";
-    tr.innerHTML=`<td>${i+1}</td><td>${escapeHtml(r.name)}</td><td>${r.score}</td>`;
+    const nota = (r.nota!=null) ? String(r.nota).replace(".",",") : "—";
+    tr.innerHTML=`<td>${i+1}</td><td>${escapeHtml(r.name)}</td><td>${nota}</td><td>${r.score}</td>`;
     body.appendChild(tr);
   });
-  if(!rank.length) body.innerHTML=`<tr><td colspan="3" style="color:#999">Seja o primeiro do ranking!</td></tr>`;
+  if(!rank.length) body.innerHTML=`<tr><td colspan="4" style="color:#999">Seja o primeiro do ranking!</td></tr>`;
 }
 function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
@@ -576,8 +616,8 @@ function sendToSheets(rec){
 /* ---------- CSV ---------- */
 $("btn-csv").addEventListener("click", ()=>{
   const all=JSON.parse(localStorage.getItem(LS_KEY)||"[]");
-  const rows=[["nome","email","pontos","data"],
-    ...all.map(r=>[r.name,r.email,r.score,r.date])];
+  const rows=[["nome","email","nota","pontos","data"],
+    ...all.map(r=>[r.name,r.email,(r.nota!=null?r.nota:""),r.score,r.date])];
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");
@@ -586,6 +626,7 @@ $("btn-csv").addEventListener("click", ()=>{
 
 $("btn-again").addEventListener("click", ()=>{
   S.score=0; S.round=0;
+  S.stats={ total:0, found:0, speedSum:0, errors:0 };
   S.temas = shuffle([...TEMAS]).slice(0, CONFIG.TOTAL_RODADAS);
   show("screen-game");
   nextRound();

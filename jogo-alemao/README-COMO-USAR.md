@@ -114,7 +114,7 @@ Assim **cada partida de cada aluno** cai automaticamente numa planilha sua.
 function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
   var d = JSON.parse(e.postData.contents);
-  sheet.appendRow([new Date(), d.name, d.email, d.score, d.date]);
+  sheet.appendRow([new Date(), d.name, d.email, d.nota, d.score, d.date]);
   return ContentService.createTextOutput("ok");
 }
 ```
