@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#6d28d9">
+<title>Wortsuche · Caça-Palavras de Alemão · Profª Catarina Portinho</title>
+<meta name="description" content="Caça-palavras de alemão com tempo cronometrado. Cadastre-se, jogue rápido e suba no ranking! Profª Catarina Portinho.">
+
+<!-- ==================================================================== -->
+<!--  ⚙️  CONFIGURAÇÃO RÁPIDA — edite só o que estiver aqui embaixo         -->
+<!-- ==================================================================== -->
+<script>
+const CONFIG = {
+  // Nome e foto da professora.
+  // Troque FOTO por um arquivo (ex.: "catarina.jpg" na mesma pasta) ou um link.
+  // Se não existir, aparece um avatar bonito automaticamente.
+  PROFESSORA: "Profª Catarina Portinho",
+  FOTO: "catarina.jpg",
+
+  // ---- Coleta de cadastros/pontuações -------------------------------
+  // Deixe "" (vazio) para funcionar só no navegador (ranking local + CSV).
+  // Para centralizar tudo numa PLANILHA sua, cole aqui a URL do Google
+  // Apps Script (passo a passo no arquivo README-COMO-USAR.md).
+  SHEETS_URL: "",
+
+  // ---- Regras do jogo -----------------------------------------------
+  SEGUNDOS_POR_RODADA: 75,   // tempo curto de propósito (evita consulta em IA/Google)
+  TOTAL_RODADAS: 4,          // quantos temas o aluno joga por partida
+  TAMANHO_GRID: 12,          // grade 12x12
+  PONTOS_POR_PALAVRA: 100,   // base por palavra encontrada
+  BONUS_VELOCIDADE: 5,       // pontos extras por segundo restante ao achar a palavra
+  PENALIDADE_ERRO: 40,       // desconto por seleção errada (desestimula chute/consulta)
+  BONUS_RODADA_COMPLETA: 150 // bônus se achar TODAS as palavras da rodada
+};
+</script>
+
+<style>
+:root{
+  --v1:#7c3aed; --v2:#db2777; --v3:#2563eb; --v4:#06b6d4;
+  --ink:#1e1033; --muted:#6b5b8a; --card:#ffffff;
+  --good:#16a34a; --bad:#e11d48; --gold:#f59e0b;
+  --shadow:0 20px 60px rgba(70,20,120,.25);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  color:var(--ink);
+  min-height:100vh;
+  background:linear-gradient(135deg,#4c1d95 0%,#7c3aed 22%,#db2777 55%,#f472b6 78%,#fb923c 100%);
+  background-attachment:fixed;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:18px;
+}
+.wrap{width:100%;max-width:920px}
+.card{
+  background:var(--card);border-radius:24px;box-shadow:var(--shadow);
+  padding:26px;position:relative;overflow:hidden;
+}
+.card::before{
+  content:"";position:absolute;inset:0 0 auto 0;height:6px;
+  background:linear-gradient(90deg,var(--v1),var(--v2),var(--v3),var(--v4));
+}
+
+/* ---------- Cabeçalho / professora ---------- */
+.brand{display:flex;align-items:center;gap:16px;margin-bottom:6px}
+.avatar{
+  width:84px;height:84px;border-radius:50%;flex:0 0 auto;object-fit:cover;
+  background:linear-gradient(135deg,var(--v1),var(--v2));
+  box-shadow:0 6px 20px rgba(124,58,237,.45);border:3px solid #fff;
+}
+.brand h1{font-size:1.35rem;margin:0;line-height:1.15}
+.brand .sub{color:var(--muted);font-size:.85rem;margin-top:2px}
+.flag{font-size:1.1rem}
+
+/* ---------- Botões ---------- */
+.btn{
+  border:0;cursor:pointer;font-weight:700;border-radius:14px;
+  padding:14px 22px;font-size:1rem;color:#fff;
+  background:linear-gradient(135deg,var(--v1),var(--v2));
+  box-shadow:0 10px 24px rgba(219,39,119,.35);transition:transform .12s,box-shadow .12s;
+  width:100%;
+}
+.btn:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(219,39,119,.45)}
+.btn:active{transform:translateY(0)}
+.btn.ghost{background:#f3effc;color:var(--v1);box-shadow:none}
+.btn.mini{width:auto;padding:10px 16px;font-size:.9rem}
+
+/* ---------- Cadastro ---------- */
+.field{margin:14px 0}
+.field label{display:block;font-weight:600;font-size:.9rem;margin-bottom:6px}
+.field input{
+  width:100%;padding:14px 16px;border-radius:14px;border:2px solid #e7defc;
+  font-size:1rem;outline:none;transition:border .15s;background:#faf7ff;
+}
+.field input:focus{border-color:var(--v1);background:#fff}
+.hint{font-size:.8rem;color:var(--muted);margin-top:14px;line-height:1.5}
+.err{color:var(--bad);font-size:.85rem;margin-top:8px;min-height:1em;font-weight:600}
+
+/* ---------- HUD do jogo ---------- */
+.hud{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.pill{
+  background:#f3effc;border-radius:999px;padding:8px 14px;font-weight:700;
+  font-size:.9rem;color:var(--v1);display:flex;align-items:center;gap:6px;
+}
+.pill .n{font-variant-numeric:tabular-nums}
+.timer{margin-left:auto;font-size:1.05rem}
+.timer.warn{color:#fff;background:linear-gradient(135deg,var(--gold),var(--v2));animation:pulse .8s infinite}
+@keyframes pulse{50%{transform:scale(1.06)}}
+.theme-title{font-size:1.1rem;font-weight:800;margin:2px 0 10px}
+.theme-title small{color:var(--muted);font-weight:600;font-size:.8rem;display:block}
+
+/* ---------- Grid ---------- */
+.grid{
+  display:grid;gap:4px;touch-action:none;user-select:none;margin:0 auto;
+  width:100%;max-width:520px;
+}
+.cell{
+  aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
+  background:#f3effc;border-radius:8px;font-weight:800;
+  font-size:clamp(.8rem,3.6vw,1.25rem);color:var(--ink);cursor:pointer;
+  transition:background .08s,transform .08s;
+}
+.cell.sel{background:linear-gradient(135deg,var(--v3),var(--v4));color:#fff;transform:scale(.96)}
+.cell.found{background:linear-gradient(135deg,var(--good),#4ade80);color:#fff}
+.cell.flash-bad{background:linear-gradient(135deg,var(--bad),#fb7185);color:#fff}
+
+/* ---------- Lista de palavras ---------- */
+.words{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.word-chip{
+  background:#faf7ff;border:2px solid #e7defc;border-radius:12px;
+  padding:8px 12px;font-size:.88rem;font-weight:700;line-height:1.1;
+}
+.word-chip small{display:block;color:var(--muted);font-weight:500;font-size:.72rem}
+.word-chip.done{background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-color:#86efac;text-decoration:line-through;opacity:.75}
+
+/* ---------- Toast de pontos ---------- */
+.toast{
+  position:fixed;left:50%;top:22%;transform:translateX(-50%);
+  font-weight:900;font-size:2rem;pointer-events:none;z-index:50;
+  text-shadow:0 3px 12px rgba(0,0,0,.3);opacity:0;
+}
+.toast.plus{color:#bbf7d0}
+.toast.minus{color:#fecaca}
+.toast.show{animation:pop 1s ease-out}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,10px) scale(.6)}20%{opacity:1;transform:translate(-50%,-4px) scale(1.1)}100%{opacity:0;transform:translate(-50%,-40px) scale(1)}}
+
+/* ---------- Telas ---------- */
+.screen{display:none}
+.screen.on{display:block;animation:fade .3s ease}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ---------- Fim ---------- */
+.final-score{
+  text-align:center;font-size:3.4rem;font-weight:900;margin:6px 0;
+  background:linear-gradient(135deg,var(--v1),var(--v2),var(--v4));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.medal{text-align:center;font-size:3rem}
+.rank-table{width:100%;border-collapse:collapse;margin-top:14px;font-size:.9rem}
+.rank-table th,.rank-table td{padding:8px 10px;text-align:left;border-bottom:1px solid #eee}
+.rank-table th{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}
+.rank-table tr.me{background:#faf3ff;font-weight:800}
+.row2{display:flex;gap:10px;margin-top:12px}
+.center{text-align:center}
+.foot{text-align:center;color:rgba(255,255,255,.85);font-size:.8rem;margin-top:16px;text-shadow:0 1px 4px rgba(0,0,0,.2)}
+.foot a{color:#fff}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+
+    <!-- ============ TELA 1: CADASTRO ============ -->
+    <section id="screen-register" class="screen on">
+      <div class="brand">
+        <img id="prof-avatar" class="avatar" alt="Profª Catarina Portinho">
+        <div>
+          <h1>Wortsuche <span class="flag">🇩🇪</span></h1>
+          <div class="sub">Caça-Palavras de Alemão · <span id="prof-name"></span></div>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:4px">
+        Encontre as palavras em alemão o mais rápido que conseguir. ⏱️ O tempo é curto
+        <b>de propósito</b>: aqui é <b>você e seu cérebro</b> 🧠 — nada de tradutor,
+        Google ou ChatGPT! Pense rápido, confie no que aprendeu e suba no ranking.
+      </p>
+
+      <div class="field">
+        <label for="in-name">Seu nome</label>
+        <input id="in-name" type="text" placeholder="Ex.: Maria Silva" autocomplete="name" maxlength="40">
+      </div>
+      <div class="field">
+        <label for="in-email">Seu e-mail</label>
+        <input id="in-email" type="email" placeholder="voce@email.com" autocomplete="email" maxlength="80">
+      </div>
+      <div class="err" id="reg-err"></div>
+      <button class="btn" id="btn-start">Começar ▶</button>
+      <p class="hint">Ao começar você concorda em registrar seu nome, e-mail e pontuação para o ranking da turma.</p>
+    </section>
+
+    <!-- ============ TELA 2: JOGO ============ -->
+    <section id="screen-game" class="screen">
+      <div class="hud">
+        <div class="pill">🏆 <span class="n" id="hud-score">0</span></div>
+        <div class="pill">📚 Rodada <span class="n" id="hud-round">1</span>/<span id="hud-total">4</span></div>
+        <div class="pill timer" id="hud-timer">⏱️ 75</div>
+      </div>
+      <div class="theme-title" id="theme-title">Tema<small id="theme-sub"></small></div>
+      <div class="grid" id="grid"></div>
+      <div class="words" id="words"></div>
+    </section>
+
+    <!-- ============ TELA 3: FIM ============ -->
+    <section id="screen-end" class="screen">
+      <div class="medal" id="end-medal">🏅</div>
+      <div class="final-score" id="end-score">0</div>
+      <p class="center" id="end-msg" style="color:var(--muted);font-weight:600;margin-top:-6px"></p>
+
+      <h3 style="margin:18px 0 4px">Ranking da turma</h3>
+      <table class="rank-table">
+        <thead><tr><th>#</th><th>Aluno</th><th>Pontos</th></tr></thead>
+        <tbody id="rank-body"></tbody>
+      </table>
+
+      <div class="row2">
+        <button class="btn ghost mini" id="btn-csv" style="flex:1">⬇️ Baixar CSV</button>
+        <button class="btn mini" id="btn-again" style="flex:1">🔁 Jogar de novo</button>
+      </div>
+    </section>
+
+  </div>
+  <div class="foot">
+    Feito com 💜 para as aulas da <span id="foot-prof"></span> ·
+    <a href="https://portinho.me" target="_blank" rel="noopener">portinho.me</a>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   BANCO DE PALAVRAS (temas A1). Edite/expanda à vontade.
+   Formato: { tema, dica, palavras:[[ALEMAO, "tradução"], ...] }
+   Use MAIÚSCULAS. Umlauts (Ä Ö Ü) e ß contam como 1 letra.
+   ===================================================================== */
+const TEMAS = [
+  { tema:"Farben — Cores", dica:"As cores em alemão",
+    palavras:[["ROT","vermelho"],["BLAU","azul"],["GELB","amarelo"],["GRÜN","verde"],
+              ["WEISS","branco"],["BRAUN","marrom"],["ROSA","rosa"]] },
+  { tema:"Zahlen — Números", dica:"Números de 1 a 10",
+    palavras:[["EINS","um"],["ZWEI","dois"],["DREI","três"],["VIER","quatro"],
+              ["FÜNF","cinco"],["SECHS","seis"],["ACHT","oito"],["ZEHN","dez"]] },
+  { tema:"Tiere — Animais", dica:"Bichos comuns",
+    palavras:[["HUND","cachorro"],["KATZE","gato"],["VOGEL","pássaro"],["PFERD","cavalo"],
+              ["FISCH","peixe"],["MAUS","rato"],["KUH","vaca"]] },
+  { tema:"Essen — Comida", dica:"Comidas e bebidas",
+    palavras:[["BROT","pão"],["KÄSE","queijo"],["APFEL","maçã"],["MILCH","leite"],
+              ["WASSER","água"],["SUPPE","sopa"],["EI","ovo"]] },
+  { tema:"Begrüßung — Saudações", dica:"Dia a dia e família",
+    palavras:[["HALLO","olá"],["DANKE","obrigado"],["MUTTER","mãe"],["VATER","pai"],
+              ["BRUDER","irmão"],["TAG","dia"],["NACHT","noite"]] },
+  { tema:"Körper — Corpo", dica:"Partes do corpo",
+    palavras:[["KOPF","cabeça"],["HAND","mão"],["FUSS","pé"],["AUGE","olho"],
+              ["MUND","boca"],["NASE","nariz"],["OHR","orelha"]] }
+];
+
+/* =====================================================================
+   ESTADO
+   ===================================================================== */
+const S = {
+  name:"", email:"", score:0, round:0,
+  temas:[], grid:[], size:CONFIG.TAMANHO_GRID,
+  placed:[], foundSet:new Set(),
+  timer:null, timeLeft:0, dragging:false, selection:[],
+};
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜ";
+const $ = id => document.getElementById(id);
+
+/* ---------- Setup de marca ---------- */
+$("prof-name").textContent = CONFIG.PROFESSORA;
+$("foot-prof").textContent = CONFIG.PROFESSORA;
+$("hud-total").textContent = CONFIG.TOTAL_RODADAS;
+(function loadAvatar(){
+  const img = $("prof-avatar");
+  img.src = CONFIG.FOTO;
+  img.onerror = () => {
+    // Avatar SVG de fallback (iniciais) em gradiente
+    const initials = CONFIG.PROFESSORA.replace(/^Profª?\.?\s*/i,"").split(/\s+/)
+                     .map(w=>w[0]).slice(0,2).join("").toUpperCase() || "CP";
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='144' height='144'>
+      <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+      <stop offset='0' stop-color='#7c3aed'/><stop offset='1' stop-color='#db2777'/></linearGradient></defs>
+      <rect width='144' height='144' fill='url(#g)'/>
+      <text x='50%' y='54%' font-family='Segoe UI,Arial' font-size='58' font-weight='800'
+      fill='#fff' text-anchor='middle' dominant-baseline='middle'>${initials}</text></svg>`;
+    img.onerror = null;
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+  };
+})();
+
+/* =====================================================================
+   NAVEGAÇÃO DE TELAS
+   ===================================================================== */
+function show(screen){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  $(screen).classList.add("on");
+  window.scrollTo(0,0);
+}
+
+/* =====================================================================
+   CADASTRO
+   ===================================================================== */
+$("btn-start").addEventListener("click", ()=>{
+  const name = $("in-name").value.trim();
+  const email = $("in-email").value.trim();
+  const err = $("reg-err");
+  if(name.length < 2){ err.textContent="Digite seu nome completo."; return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent="Digite um e-mail válido."; return; }
+  err.textContent="";
+  S.name=name; S.email=email; S.score=0; S.round=0;
+  // sorteia os temas da partida
+  S.temas = shuffle([...TEMAS]).slice(0, CONFIG.TOTAL_RODADAS);
+  show("screen-game");
+  nextRound();
+});
+
+/* =====================================================================
+   RODADAS
+   ===================================================================== */
+function nextRound(){
+  if(S.round >= S.temas.length){ endGame(); return; }
+  const tema = S.temas[S.round];
+  S.round++;
+  $("hud-round").textContent = S.round;
+  $("hud-score").textContent = S.score;
+  $("theme-title").childNodes[0].nodeValue = tema.tema + " ";
+  $("theme-sub").textContent = "Ache " + tema.palavras.length + " palavras · " + tema.dica;
+
+  buildPuzzle(tema.palavras.map(p=>p[0]));
+  renderGrid();
+  renderWords(tema.palavras);
+  startTimer();
+}
+
+/* ---------- Geração do tabuleiro ---------- */
+function buildPuzzle(words){
+  const n = S.size;
+  S.grid = Array.from({length:n},()=>Array(n).fill(""));
+  S.placed = [];
+  S.foundSet = new Set();
+  const dirs = [[1,0],[0,1],[1,1],[-1,1],[-1,0],[0,-1],[-1,-1],[1,-1]];
+  // Coloca as maiores primeiro (mais fácil de encaixar)
+  const sorted = [...words].sort((a,b)=>[...b].length-[...a].length);
+  for(const w of sorted){
+    const letters = [...w]; // respeita Ä Ö Ü como 1 caractere
+    let done=false;
+    for(let tries=0; tries<220 && !done; tries++){
+      const d = dirs[(Math.random()*dirs.length)|0];
+      const r0=(Math.random()*n)|0, c0=(Math.random()*n)|0;
+      const rEnd=r0+d[0]*(letters.length-1), cEnd=c0+d[1]*(letters.length-1);
+      if(rEnd<0||rEnd>=n||cEnd<0||cEnd>=n) continue;
+      let ok=true;
+      for(let i=0;i<letters.length;i++){
+        const r=r0+d[0]*i, c=c0+d[1]*i, cur=S.grid[r][c];
+        if(cur!=="" && cur!==letters[i]){ ok=false; break; }
+      }
+      if(!ok) continue;
+      const cells=[];
+      for(let i=0;i<letters.length;i++){
+        const r=r0+d[0]*i, c=c0+d[1]*i;
+        S.grid[r][c]=letters[i]; cells.push(r*n+c);
+      }
+      S.placed.push({word:w, cells});
+      done=true;
+    }
+  }
+  // Preenche o resto com letras aleatórias
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++)
+    if(S.grid[r][c]==="") S.grid[r][c]=ALPHABET[(Math.random()*ALPHABET.length)|0];
+}
+
+/* ---------- Render da grade ---------- */
+function renderGrid(){
+  const g = $("grid");
+  g.style.gridTemplateColumns = `repeat(${S.size},1fr)`;
+  g.innerHTML="";
+  for(let r=0;r<S.size;r++)for(let c=0;c<S.size;c++){
+    const d=document.createElement("div");
+    d.className="cell"; d.textContent=S.grid[r][c];
+    d.dataset.idx=r*S.size+c;
+    g.appendChild(d);
+  }
+  attachDrag(g);
+}
+
+function renderWords(pairs){
+  const w=$("words"); w.innerHTML="";
+  for(const [de,pt] of pairs){
+    const chip=document.createElement("div");
+    chip.className="word-chip"; chip.dataset.word=de;
+    chip.innerHTML=`${de}<small>${pt}</small>`;
+    w.appendChild(chip);
+  }
+}
+
+/* =====================================================================
+   SELEÇÃO POR ARRASTO (mouse + toque)
+   ===================================================================== */
+function attachDrag(g){
+  const cellAt = (x,y)=>{ const el=document.elementFromPoint(x,y);
+    return el && el.classList.contains("cell") ? el : null; };
+
+  const start=(x,y)=>{ S.dragging=true; S.selection=[]; const c=cellAt(x,y); if(c) addToSel(c); };
+  const move =(x,y)=>{ if(!S.dragging) return; const c=cellAt(x,y); if(c) addToSel(c); };
+  const end  =()=>{ if(!S.dragging) return; S.dragging=false; checkSelection(); };
+
+  g.addEventListener("mousedown", e=>{e.preventDefault();start(e.clientX,e.clientY);});
+  window.addEventListener("mousemove", e=>move(e.clientX,e.clientY));
+  window.addEventListener("mouseup", end);
+  g.addEventListener("touchstart", e=>{e.preventDefault();const t=e.touches[0];start(t.clientX,t.clientY);},{passive:false});
+  g.addEventListener("touchmove", e=>{e.preventDefault();const t=e.touches[0];move(t.clientX,t.clientY);},{passive:false});
+  g.addEventListener("touchend", end);
+}
+
+function addToSel(cell){
+  const idx=+cell.dataset.idx;
+  if(S.selection.length && S.selection[S.selection.length-1]===idx) return;
+  // permite recuar 1 passo
+  if(S.selection.length>1 && S.selection[S.selection.length-2]===idx){
+    const last=S.selection.pop();
+    document.querySelector(`.cell[data-idx="${last}"]`)?.classList.remove("sel");
+    return;
+  }
+  if(S.selection.includes(idx)) return;
+  S.selection.push(idx);
+  cell.classList.add("sel");
+}
+
+function clearSel(){
+  S.selection.forEach(i=>document.querySelector(`.cell[data-idx="${i}"]`)?.classList.remove("sel"));
+  S.selection=[];
+}
+
+function checkSelection(){
+  if(S.selection.length<2){ clearSel(); return; }
+  const fwd=S.selection.join(",");
+  const rev=[...S.selection].reverse().join(",");
+  let hit=null;
+  for(const p of S.placed){
+    if(S.foundSet.has(p.word)) continue;
+    const key=p.cells.join(",");
+    if(key===fwd || key===rev){ hit=p; break; }
+  }
+  if(hit){
+    S.foundSet.add(hit.word);
+    S.selection.forEach(i=>{
+      const el=document.querySelector(`.cell[data-idx="${i}"]`);
+      el.classList.remove("sel"); el.classList.add("found");
+    });
+    S.selection=[];
+    const gained = CONFIG.PONTOS_POR_PALAVRA + CONFIG.BONUS_VELOCIDADE*S.timeLeft;
+    addScore(gained, "+"+gained);
+    document.querySelector(`.word-chip[data-word="${cssEsc(hit.word)}"]`)?.classList.add("done");
+    if(S.foundSet.size === S.placed.length){
+      addScore(CONFIG.BONUS_RODADA_COMPLETA, "Rodada! +"+CONFIG.BONUS_RODADA_COMPLETA, true);
+      clearInterval(S.timer);
+      setTimeout(nextRound, 900);
+    }
+  } else {
+    // seleção errada → penalidade + flash vermelho
+    S.selection.forEach(i=>{
+      const el=document.querySelector(`.cell[data-idx="${i}"]`);
+      el.classList.remove("sel"); el.classList.add("flash-bad");
+      setTimeout(()=>el.classList.remove("flash-bad"),300);
+    });
+    S.selection=[];
+    addScore(-CONFIG.PENALIDADE_ERRO, "-"+CONFIG.PENALIDADE_ERRO);
+  }
+}
+function cssEsc(s){ return (window.CSS&&CSS.escape)?CSS.escape(s):s.replace(/["\\]/g,"\\$&"); }
+
+/* =====================================================================
+   PONTOS + TOAST
+   ===================================================================== */
+function addScore(delta, label, big){
+  S.score = Math.max(0, S.score + delta);
+  $("hud-score").textContent = S.score;
+  const t=$("toast");
+  t.textContent=label;
+  t.className="toast " + (delta>=0?"plus":"minus");
+  if(big) t.style.fontSize="2.6rem"; else t.style.fontSize="2rem";
+  void t.offsetWidth; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),1000);
+}
+
+/* =====================================================================
+   TIMER
+   ===================================================================== */
+function startTimer(){
+  clearInterval(S.timer);
+  S.timeLeft = CONFIG.SEGUNDOS_POR_RODADA;
+  updateTimer();
+  S.timer=setInterval(()=>{
+    S.timeLeft--; updateTimer();
+    if(S.timeLeft<=0){ clearInterval(S.timer); setTimeout(nextRound, 500); }
+  },1000);
+}
+function updateTimer(){
+  const el=$("hud-timer");
+  el.textContent="⏱️ "+Math.max(0,S.timeLeft);
+  el.classList.toggle("warn", S.timeLeft<=15);
+}
+
+/* =====================================================================
+   FIM DE JOGO + RANKING + ENVIO
+   ===================================================================== */
+function endGame(){
+  clearInterval(S.timer);
+  $("end-score").textContent = S.score;
+  let medal="🏅", msg="Boa partida! Continue treinando.";
+  if(S.score>=1500){ medal="🥇"; msg="Ausgezeichnet! Vocabulário afiado!"; }
+  else if(S.score>=900){ medal="🥈"; msg="Sehr gut! Você mandou bem."; }
+  else if(S.score>=400){ medal="🥉"; msg="Gut gemacht! Já está no caminho."; }
+  $("end-medal").textContent=medal;
+  $("end-msg").textContent=msg;
+
+  const rec={name:S.name,email:S.email,score:S.score,date:new Date().toISOString()};
+  saveLocal(rec);
+  sendToSheets(rec);
+  renderRank(rec);
+  show("screen-end");
+}
+
+const LS_KEY="wortsuche_ranking";
+function saveLocal(rec){
+  const all=JSON.parse(localStorage.getItem(LS_KEY)||"[]");
+  all.push(rec);
+  localStorage.setItem(LS_KEY, JSON.stringify(all));
+}
+function bestPerPlayer(list){
+  const map=new Map();
+  for(const r of list){
+    const k=r.email.toLowerCase();
+    if(!map.has(k) || r.score>map.get(k).score) map.set(k,r);
+  }
+  return [...map.values()].sort((a,b)=>b.score-a.score);
+}
+function renderRank(mine){
+  const all=JSON.parse(localStorage.getItem(LS_KEY)||"[]");
+  const rank=bestPerPlayer(all).slice(0,10);
+  const body=$("rank-body"); body.innerHTML="";
+  rank.forEach((r,i)=>{
+    const tr=document.createElement("tr");
+    if(r.email.toLowerCase()===mine.email.toLowerCase() && r.score===mine.score) tr.className="me";
+    tr.innerHTML=`<td>${i+1}</td><td>${escapeHtml(r.name)}</td><td>${r.score}</td>`;
+    body.appendChild(tr);
+  });
+  if(!rank.length) body.innerHTML=`<tr><td colspan="3" style="color:#999">Seja o primeiro do ranking!</td></tr>`;
+}
+function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---------- Envio p/ Google Sheets (opcional) ---------- */
+function sendToSheets(rec){
+  if(!CONFIG.SHEETS_URL) return;
+  try{
+    fetch(CONFIG.SHEETS_URL,{
+      method:"POST", mode:"no-cors",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify(rec)
+    }).catch(()=>{});
+  }catch(e){}
+}
+
+/* ---------- CSV ---------- */
+$("btn-csv").addEventListener("click", ()=>{
+  const all=JSON.parse(localStorage.getItem(LS_KEY)||"[]");
+  const rows=[["nome","email","pontos","data"],
+    ...all.map(r=>[r.name,r.email,r.score,r.date])];
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download="ranking-wortsuche.csv"; a.click();
+});
+
+$("btn-again").addEventListener("click", ()=>{
+  S.score=0; S.round=0;
+  S.temas = shuffle([...TEMAS]).slice(0, CONFIG.TOTAL_RODADAS);
+  show("screen-game");
+  nextRound();
+});
+
+/* ---------- util ---------- */
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];} return a; }
+</script>
+</body>
+</html>
