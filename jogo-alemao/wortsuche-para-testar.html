@@ -20,9 +20,13 @@ const CONFIG = {
 
   // ---- Coleta de cadastros/pontuações -------------------------------
   // Deixe "" (vazio) para funcionar só no navegador (ranking local + CSV).
-  // Para centralizar tudo numa PLANILHA sua, cole aqui a URL do Google
-  // Apps Script (passo a passo no arquivo README-COMO-USAR.md).
+  // Para centralizar tudo numa PLANILHA (da Catarina), cole aqui a URL do
+  // Google Apps Script (passo a passo no arquivo README-COMO-USAR.md).
   SHEETS_URL: "",
+
+  // ---- Google Analytics (GA4) ---------------------------------------
+  // Cole o ID de medição do GA4 (ex.: "G-XXXXXXXXXX"). Vazio = desligado.
+  GA_ID: "",
 
   // ---- Regras do jogo -----------------------------------------------
   SEGUNDOS_POR_RODADA: 75,   // tempo curto de propósito (evita consulta em IA/Google)
@@ -39,6 +43,20 @@ const CONFIG = {
   NOTA_PESO_VELOCIDADE: 0.5, // quanto a velocidade pesa (0..1) — a soma ideal dá 1
   NOTA_DESCONTO_ERRO: 0.1    // quanto cada erro tira da nota (em pontos de 0 a 10)
 };
+
+// Google Analytics 4 — carrega só se CONFIG.GA_ID estiver preenchido.
+window.dataLayer = window.dataLayer || [];
+function gtag(){ dataLayer.push(arguments); }
+if (CONFIG.GA_ID) {
+  const ga = document.createElement("script");
+  ga.async = true;
+  ga.src = "https://www.googletagmanager.com/gtag/js?id=" + CONFIG.GA_ID;
+  document.head.appendChild(ga);
+  gtag("js", new Date());
+  gtag("config", CONFIG.GA_ID);
+}
+// Helper para registrar eventos (não quebra se o GA estiver desligado).
+function track(evt, params){ try{ if(CONFIG.GA_ID) gtag("event", evt, params||{}); }catch(e){} }
 </script>
 
 <style>
@@ -96,11 +114,13 @@ body{
 /* ---------- Cadastro ---------- */
 .field{margin:14px 0}
 .field label{display:block;font-weight:600;font-size:.9rem;margin-bottom:6px}
-.field input{
+.field input,.field select{
   width:100%;padding:14px 16px;border-radius:14px;border:2px solid #e7defc;
   font-size:1rem;outline:none;transition:border .15s;background:#faf7ff;
+  color:var(--ink);appearance:none;-webkit-appearance:none;
 }
-.field input:focus{border-color:var(--v1);background:#fff}
+.field select{cursor:pointer}
+.field input:focus,.field select:focus{border-color:var(--v1);background:#fff}
 .hint{font-size:.8rem;color:var(--muted);margin-top:14px;line-height:1.5}
 .err{color:var(--bad);font-size:.85rem;margin-top:8px;min-height:1em;font-weight:600}
 
@@ -207,9 +227,13 @@ body{
         <label for="in-email">Seu e-mail</label>
         <input id="in-email" type="email" placeholder="voce@email.com" autocomplete="email" maxlength="80">
       </div>
+      <div class="field">
+        <label for="in-country">Seu país / Your country</label>
+        <select id="in-country"><option value="">Selecione… / Select…</option></select>
+      </div>
       <div class="err" id="reg-err"></div>
       <button class="btn" id="btn-start">Começar ▶</button>
-      <p class="hint">Ao começar você concorda em registrar seu nome, e-mail e pontuação para o ranking da turma.</p>
+      <p class="hint">Ao começar você concorda em registrar seu nome, e-mail, país e pontuação para o ranking da turma.</p>
     </section>
 
     <!-- ============ TELA 2: JOGO ============ -->
@@ -317,6 +341,43 @@ $("hud-total").textContent = CONFIG.TOTAL_RODADAS;
 })();
 
 /* =====================================================================
+   LISTA DE PAÍSES (bandeira + nome PT/EN) — para o cadastro internacional
+   ===================================================================== */
+const COUNTRIES = [
+["🇩🇪","Alemanha / Germany"],["🇧🇷","Brasil / Brazil"],["🇵🇹","Portugal"],
+["🇦🇷","Argentina"],["🇦🇺","Austrália / Australia"],["🇦🇹","Áustria / Austria"],
+["🇧🇪","Bélgica / Belgium"],["🇧🇴","Bolívia / Bolivia"],["🇧🇬","Bulgária / Bulgaria"],
+["🇨🇦","Canadá / Canada"],["🇨🇱","Chile"],["🇨🇳","China"],["🇨🇴","Colômbia / Colombia"],
+["🇨🇷","Costa Rica"],["🇭🇷","Croácia / Croatia"],["🇨🇿","Tchéquia / Czechia"],
+["🇩🇰","Dinamarca / Denmark"],["🇪🇨","Equador / Ecuador"],["🇪🇬","Egito / Egypt"],
+["🇸🇻","El Salvador"],["🇪🇪","Estônia / Estonia"],["🇫🇮","Finlândia / Finland"],
+["🇫🇷","França / France"],["🇬🇷","Grécia / Greece"],["🇬🇹","Guatemala"],
+["🇳🇱","Holanda / Netherlands"],["🇭🇺","Hungria / Hungary"],["🇮🇳","Índia / India"],
+["🇮🇩","Indonésia / Indonesia"],["🇮🇪","Irlanda / Ireland"],["🇮🇱","Israel"],
+["🇮🇹","Itália / Italy"],["🇯🇵","Japão / Japan"],["🇱🇻","Letônia / Latvia"],
+["🇱🇹","Lituânia / Lithuania"],["🇱🇺","Luxemburgo / Luxembourg"],["🇲🇽","México / Mexico"],
+["🇲🇦","Marrocos / Morocco"],["🇳🇿","Nova Zelândia / New Zealand"],["🇳🇮","Nicarágua / Nicaragua"],
+["🇳🇴","Noruega / Norway"],["🇵🇦","Panamá / Panama"],["🇵🇾","Paraguai / Paraguay"],
+["🇵🇪","Peru"],["🇵🇭","Filipinas / Philippines"],["🇵🇱","Polônia / Poland"],
+["🇷🇴","Romênia / Romania"],["🇷🇺","Rússia / Russia"],["🇸🇦","Arábia Saudita / Saudi Arabia"],
+["🇷🇸","Sérvia / Serbia"],["🇸🇬","Singapura / Singapore"],["🇸🇰","Eslováquia / Slovakia"],
+["🇸🇮","Eslovênia / Slovenia"],["🇿🇦","África do Sul / South Africa"],["🇰🇷","Coreia do Sul / South Korea"],
+["🇪🇸","Espanha / Spain"],["🇸🇪","Suécia / Sweden"],["🇨🇭","Suíça / Switzerland"],
+["🇹🇭","Tailândia / Thailand"],["🇹🇷","Turquia / Türkiye"],["🇺🇦","Ucrânia / Ukraine"],
+["🇬🇧","Reino Unido / United Kingdom"],["🇺🇸","Estados Unidos / United States"],
+["🇺🇾","Uruguai / Uruguay"],["🇻🇪","Venezuela"],["🇻🇳","Vietnã / Vietnam"],
+["🌍","Outro / Other"]
+];
+(function fillCountries(){
+  const sel = $("in-country");
+  for(const [flag,name] of COUNTRIES){
+    const o = document.createElement("option");
+    o.value = name; o.textContent = flag + " " + name;
+    sel.appendChild(o);
+  }
+})();
+
+/* =====================================================================
    NAVEGAÇÃO DE TELAS
    ===================================================================== */
 function show(screen){
@@ -331,14 +392,17 @@ function show(screen){
 $("btn-start").addEventListener("click", ()=>{
   const name = $("in-name").value.trim();
   const email = $("in-email").value.trim();
+  const country = $("in-country").value;
   const err = $("reg-err");
   if(name.length < 2){ err.textContent="Digite seu nome completo."; return; }
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent="Digite um e-mail válido."; return; }
+  if(!country){ err.textContent="Selecione seu país / Select your country."; return; }
   err.textContent="";
-  S.name=name; S.email=email; S.score=0; S.round=0;
+  S.name=name; S.email=email; S.country=country; S.score=0; S.round=0;
   S.stats={ total:0, found:0, speedSum:0, errors:0 };
   // sorteia os temas da partida
   S.temas = shuffle([...TEMAS]).slice(0, CONFIG.TOTAL_RODADAS);
+  track("game_start", { country });
   show("screen-game");
   nextRound();
 });
@@ -564,8 +628,9 @@ function endGame(){
   $("end-medal").textContent=medal;
   $("end-msg").textContent=msg;
 
-  const rec={name:S.name,email:S.email,score:S.score,
+  const rec={name:S.name,email:S.email,country:S.country||"",score:S.score,
              nota:Number(nota.toFixed(1)),date:new Date().toISOString()};
+  track("game_end", { country:rec.country, score:rec.score, nota:rec.nota });
   saveLocal(rec);
   sendToSheets(rec);
   renderRank(rec);
@@ -616,8 +681,8 @@ function sendToSheets(rec){
 /* ---------- CSV ---------- */
 $("btn-csv").addEventListener("click", ()=>{
   const all=JSON.parse(localStorage.getItem(LS_KEY)||"[]");
-  const rows=[["nome","email","nota","pontos","data"],
-    ...all.map(r=>[r.name,r.email,(r.nota!=null?r.nota:""),r.score,r.date])];
+  const rows=[["nome","email","pais","nota","pontos","data"],
+    ...all.map(r=>[r.name,r.email,(r.country||""),(r.nota!=null?r.nota:""),r.score,r.date])];
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");
