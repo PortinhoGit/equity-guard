@@ -1,0 +1,49 @@
+name: PrevDow One-shot
+
+# Workflow temporario: roda check_prevdow.py uma vez quando este arquivo e
+# alterado/empurrado para a main. Insere um mes especifico em modo manual
+# (o portal bloqueia o runner com 403). Remover apos o uso.
+# Junho/2026: DI 1,06%/6,44% · Balanceada -0,73%/3,37%
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/prevdow-oneshot.yml'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install supabase requests beautifulsoup4
+
+      - name: Run PrevDow check (force)
+        env:
+          SUPABASE_URL:          ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY:  ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SMTP_HOST:             ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:             ${{ secrets.SMTP_PORT }}
+          SMTP_USER:             ${{ secrets.SMTP_USER }}
+          SMTP_PASS:             ${{ secrets.SMTP_PASS }}
+          SMTP_FROM:             ${{ secrets.SMTP_FROM }}
+          NOTIFY_EMAIL:          ${{ secrets.SMTP_USER }}
+          FORCE_RUN:             '1'
+          # Portal bloqueia o runner (403); insere Junho/2026 com os numeros do portal
+          MANUAL_DATA_BASE:      '06/2026'
+          MANUAL_CDI_MONTH:      '1.06'
+          MANUAL_BALANCED_MONTH: '-0.73'
+          MANUAL_CDI_YEAR:       '6.44'
+          MANUAL_BALANCED_YEAR:  '3.37'
+        run: python check_prevdow.py
