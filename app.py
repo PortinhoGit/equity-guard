@@ -551,6 +551,19 @@ def _fetch_fundamentals_24h(ticker: str) -> dict:
     return funds
 
 
+def _prevdow_mes_key(data_base) -> tuple:
+    """
+    'MM/YYYY' -> (ano, mes), para comparar meses corretamente.
+    Ordenar a string crua quebra na virada de ano ("12/2026" > "01/2027").
+    Valor invalido vira (0, 0), que perde de qualquer data real.
+    """
+    try:
+        mm, yyyy = str(data_base).strip().split("/")
+        return (int(yyyy), int(mm))
+    except Exception:
+        return (0, 0)
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def _fetch_prevdow_live() -> dict:
     """
@@ -576,12 +589,12 @@ def _fetch_prevdow_live() -> dict:
             res = (
                 client.table("prevdow_history")
                 .select("*")
-                .order("data_base", desc=True)
-                .limit(1)
                 .execute()
             )
             if res.data:
-                row = res.data[0]
+                # Ordena por (ano, mes). A tabela e pequena (1 linha por mes),
+                # entao ordenar no cliente e mais seguro que .order() na string.
+                row = max(res.data, key=lambda r: _prevdow_mes_key(r.get("data_base")))
                 merged["data_base"] = row.get("data_base") or merged["data_base"]
                 for k in ("cdi_month", "balanced_month", "cdi_year", "balanced_year"):
                     v = row.get(k)
@@ -602,14 +615,18 @@ def _fetch_prevdow_live() -> dict:
         live = get_rentabilidade_prevdow()
     except Exception:
         live = None
-    if live:
-        if live.get("data_base"):
+    if live and live.get("data_base"):
+        # So aceita se o portal estiver a frente do fallback. Se estiver atras
+        # (ou empatado), o config ja tem o mesmo mes conferido a mao.
+        if _prevdow_mes_key(live["data_base"]) > _prevdow_mes_key(merged.get("data_base")):
+            # Mes novo: TODOS os campos vem do scraper. O que ele nao trouxer
+            # vira None — nunca herda o numero do mes anterior, que produziria
+            # uma linha meio nova, meio velha.
             merged["data_base"] = live["data_base"]
-        if live.get("cdi_month") is not None:
-            merged["cdi_month"] = live["cdi_month"]
-        if live.get("balanced_month") is not None:
-            merged["balanced_month"] = live["balanced_month"]
-        merged["_source"] = "scraper"
+            for k in ("cdi_month", "balanced_month", "cdi_year", "balanced_year"):
+                v = live.get(k)
+                merged[k] = float(v) if v is not None else None
+            merged["_source"] = "scraper"
 
     return merged
 

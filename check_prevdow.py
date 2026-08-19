@@ -1,7 +1,11 @@
 """
 check_prevdow.py — Equity Guard
-Job que verifica se o portal PrevDow ja publicou os indices do mes anterior
-e, se sim, salva no Supabase (tabela prevdow_history).
+Job que verifica se o portal PrevDow publicou um mes mais recente que o
+ultimo gravado e, se sim, salva no Supabase (tabela prevdow_history).
+
+O mes-alvo vem do PORTAL, nao do calendario: se o portal atrasar e so soltar
+junho em agosto, a regra antiga ("mes anterior a hoje") pularia junho para
+sempre.
 
 Regra: so faz varredura a partir do dia 15 de cada mes (portal libera dados
 do mes anterior tipicamente entre dia 10-20 do mes seguinte). Em dias < 15
@@ -23,7 +27,7 @@ Variaveis de ambiente:
 
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -36,11 +40,13 @@ def _env(name: str, default: str = "") -> str:
     return v
 
 
-def _target_month(today: date) -> str:
-    """Retorna 'MM/YYYY' do mes anterior ao de hoje."""
-    first_of_this = today.replace(day=1)
-    last_of_prev = first_of_this - timedelta(days=1)
-    return last_of_prev.strftime("%m/%Y")
+def _mes_key(data_base) -> tuple:
+    """'MM/YYYY' -> (ano, mes). Invalido vira (0, 0)."""
+    try:
+        mm, yyyy = str(data_base).strip().split("/")
+        return (int(yyyy), int(mm))
+    except Exception:
+        return (0, 0)
 
 
 def _is_force() -> bool:
@@ -120,8 +126,12 @@ def main() -> None:
         if today.day < 15 and not force:
             print(f"Dia {today.day} < 15. Pulando (use FORCE_RUN=1 para ignorar).")
             return
-        target = _target_month(today)
-        print(f"Mes-alvo: {target}")
+        # O alvo NAO vem mais do calendario. Vale o que o portal publicar: se ele
+        # atrasar e so soltar junho em agosto, o mes anterior a hoje ja seria
+        # julho e junho nunca entraria. Agora o alvo sai do proprio scraper e e
+        # comparado com o mes mais recente no banco.
+        target = None
+        print(f"Mes de referencia: definido pelo portal (hoje: {today.isoformat()})")
 
     from supabase import create_client
     supa_url = _env("SUPABASE_URL")
@@ -133,11 +143,23 @@ def main() -> None:
         pass
     client = create_client(supa_url, _env("SUPABASE_SERVICE_KEY"))
 
-    # Ja temos?
-    existing = client.table("prevdow_history").select("data_base").eq("data_base", target).execute()
-    if existing.data and not force:
-        print(f"{target} ja esta no banco. Nada a fazer.")
-        return
+    # Mes mais recente ja gravado — referencia para decidir se ha novidade.
+    todos = client.table("prevdow_history").select("data_base").execute()
+    ultimo_no_banco = None
+    if todos.data:
+        ultimo_no_banco = max(
+            (r.get("data_base") for r in todos.data), key=_mes_key, default=None
+        )
+    print(f"Mes mais recente no banco: {ultimo_no_banco or '(tabela vazia)'}")
+
+    if target is not None and not force:
+        existing = (
+            client.table("prevdow_history")
+            .select("data_base").eq("data_base", target).execute()
+        )
+        if existing.data:
+            print(f"{target} ja esta no banco. Nada a fazer.")
+            return
 
     # ── Origem dos dados: manual ou scraper ───────────────────────────────────
     if manual:
@@ -160,10 +182,17 @@ def main() -> None:
               f"cdi_month={data.get('cdi_month')}, "
               f"balanced_month={data.get('balanced_month')}")
 
-        if fetched_base != target:
-            print(f"Portal ainda mostra {fetched_base}, mes-alvo e {target}. "
-                  f"Tentaremos de novo no proximo run.")
+        if not fetched_base:
+            print("Scraper nao informou a data base. Nada a fazer.")
             return
+
+        if ultimo_no_banco is not None and _mes_key(fetched_base) <= _mes_key(ultimo_no_banco):
+            print(f"Portal mostra {fetched_base}, banco ja tem {ultimo_no_banco}. "
+                  f"Nada novo.")
+            return
+
+        target = fetched_base
+        print(f"Novidade no portal: {target}")
 
     # ── Ano acumulado: prioridade para o valor do proprio portal ──────────────
     # Regra do projeto: usar SEMPRE o numero do portal, sem substituicoes. O
