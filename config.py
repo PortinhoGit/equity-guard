@@ -33,24 +33,26 @@ DEMO_TICKER: str = "BBAS3"
 
 # ── Taxas de juros (atualização manual baseada em decisões dos BCs) ──────────
 # Atualize estes valores após cada decisão do COPOM / FOMC.
-SELIC_RATE: float              = 14.75         # % a.a. — última decisão COPOM (atual)
+SELIC_RATE: float              = 14.00         # % a.a. — COPOM 280ª (04-05/08/2026), vigente desde 06/08/2026 · BCB SGS 432
 SELIC_NEXT_MEETING: str        = "2026-09-16"  # proxima reuniao COPOM (16/09/2026)
 FED_FUNDS_RATE: float          = 3.75          # % a.a. — Fed upper bound (3,50-3,75)
 FED_NEXT_MEETING: str          = "2026-09-16"  # proxima reuniao FOMC (16/09/2026)
 
 # ── Prevdow — Previdência Complementar (atualização manual mensal) ───────────
 # Atualize os valores abaixo copiando do portal oficial uma vez por mês.
-# Conferido no portal em 19/08/2026: data base 06/2026 (o portal ainda não
-# publicou julho). Números da coluna "Ano", não recompostos.
+# Conferido no portal em 19/08/2026 (noite): data base 07/2026 — o portal publicou
+# julho no fim daquele dia. Números da coluna "Ano", não recompostos.
+# Capturas do portal: 2. equity-guard/fontes/prevdow/{carteira DI Julho 2026.png,
+# Carteira Balanceada Julho 2026.png}.
 # ATENÇÃO: hoje este dict é a ÚNICA fonte que chega ao ar — o projeto Supabase
 # está fora (NXDOMAIN) e o portal passou a bloquear o scraper (Akamai 403).
 PREVDOW_DATA: dict = {
     "url":          "https://www.portalprev.com.br/Prevdow/prevdow/Site/Public/Rentabilidade/",
-    "data_base":    "06/2026",          # mês/ano da rentabilidade divulgada
-    "cdi_month":    1.06,               # % último mês — Carteira DI
-    "balanced_month": -0.73,            # % último mês — Carteira Original Balanceada
-    "cdi_year":     6.44,               # % acumulado no ano — Carteira DI (coluna "Ano" do portal)
-    "balanced_year": 3.37,              # % acumulado no ano — Carteira Original Balanceada (coluna "Ano" do portal)
+    "data_base":    "07/2026",          # mês/ano da rentabilidade divulgada
+    "cdi_month":    1.15,               # % último mês — Carteira DI
+    "balanced_month": 1.04,             # % último mês — Carteira Original Balanceada
+    "cdi_year":     7.66,               # % acumulado no ano — Carteira DI (coluna "Ano" do portal)
+    "balanced_year": 4.45,              # % acumulado no ano — Carteira Original Balanceada (coluna "Ano" do portal)
 }
 
 # ── Nitro Prev (IFM Previdência / Votorantim) — atualização manual mensal ────
@@ -76,4 +78,4 @@ NITRO_DATA: dict = {
 APP_NAME: str = "Equity Guard"
 APP_TAGLINE: str = "Análise Fundamentalista + Técnica · B3"
 APP_ICON: str = "⚡"
-APP_VERSION: str = "2.15.34"
+APP_VERSION: str = "2.15.35"
