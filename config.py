@@ -34,9 +34,9 @@ DEMO_TICKER: str = "BBAS3"
 # ── Taxas de juros (atualização manual baseada em decisões dos BCs) ──────────
 # Atualize estes valores após cada decisão do COPOM / FOMC.
 SELIC_RATE: float              = 14.00         # % a.a. — COPOM 280ª (04-05/08/2026), vigente desde 06/08/2026 · BCB SGS 432
-SELIC_NEXT_MEETING: str        = "2026-09-16"  # proxima reuniao COPOM (16/09/2026)
+SELIC_NEXT_MEETING: str        = "2026-11-04"  # proxima reuniao COPOM (04/11/2026)
 FED_FUNDS_RATE: float          = 3.75          # % a.a. — Fed upper bound (3,50-3,75)
-FED_NEXT_MEETING: str          = "2026-09-16"  # proxima reuniao FOMC (16/09/2026)
+FED_NEXT_MEETING: str          = "2026-11-04"  # proxima reuniao FOMC (04/11/2026)
 
 # ── Prevdow — Previdência Complementar (atualização manual mensal) ───────────
 # Atualize os valores abaixo copiando do portal oficial uma vez por mês.
