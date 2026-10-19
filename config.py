@@ -43,16 +43,16 @@ FED_NEXT_MEETING: str          = "2026-11-04"  # proxima reuniao FOMC (04/11/202
 # Conferido no portal em 20/09/2026: data base 08/2026. Números da coluna "Ano",
 # não recompostos.
 # Capturas do portal: 2. equity-guard/fontes/prevdow/{Captura de Tela 2026-09-20
-# às 06.05.15.png (Carteira DI), Captura de Tela 2026-09-20 às 06.05.23.png (Balanceada)}.
+# às 06.05.15.png (Carteira DI), Captura de Tela 2026-09-20 às 06.05.23.png (Balanceada)}; setembro: rentabilidade setembro 2026.png.
 # ATENÇÃO: hoje este dict é a ÚNICA fonte que chega ao ar — o projeto Supabase
 # está fora (NXDOMAIN) e o portal passou a bloquear o scraper (Akamai 403).
 PREVDOW_DATA: dict = {
     "url":          "https://www.portalprev.com.br/Prevdow/prevdow/Site/Public/Rentabilidade/",
-    "data_base":    "08/2026",          # mês/ano da rentabilidade divulgada
-    "cdi_month":    1.03,               # % último mês — Carteira DI
-    "balanced_month": 1.52,             # % último mês — Carteira Original Balanceada
-    "cdi_year":     8.77,               # % acumulado no ano — Carteira DI (coluna "Ano" do portal)
-    "balanced_year": 6.04,              # % acumulado no ano — Carteira Original Balanceada (coluna "Ano" do portal)
+    "data_base":    "09/2026",          # mês/ano da rentabilidade divulgada
+    "cdi_month":    1.02,               # % último mês — Carteira DI
+    "balanced_month": 2.77,             # % último mês — Carteira Original Balanceada
+    "cdi_year":     9.88,               # % acumulado no ano — Carteira DI (coluna "Ano" do portal)
+    "balanced_year": 8.97,              # % acumulado no ano — Carteira Original Balanceada (coluna "Ano" do portal)
 }
 
 # ── Nitro Prev (IFM Previdência / Votorantim) — atualização manual mensal ────
@@ -78,4 +78,4 @@ NITRO_DATA: dict = {
 APP_NAME: str = "Equity Guard"
 APP_TAGLINE: str = "Análise Fundamentalista + Técnica · B3"
 APP_ICON: str = "⚡"
-APP_VERSION: str = "2.15.36"
+APP_VERSION: str = "2.15.39"
