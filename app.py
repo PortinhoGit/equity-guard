@@ -1877,31 +1877,77 @@ def _fetch_market_movers(tickers: tuple) -> dict:
     return {"gainers": gainers, "losers": losers, "actives": actives}
 
 
+# Os graficos do Panorama Economico ficam 24h em cache, mas uma falha do BCB
+# (503/timeout) devolve lista vazia e, se ela fosse cacheada, o grafico sumiria
+# por um dia inteiro. Por isso a funcao de 24h lanca excecao quando vem vazio
+# (st.cache_data nao guarda excecao) e a camada externa, com TTL curto, devolve
+# [] para o chamador — a lista vazia fica em cache por 5 min, nao 24h.
+
 @st.cache_data(ttl=86400, show_spinner=False)
-def _fetch_ipca_chart_data() -> list:
-    """IPCA 12m — lista de dicts ordenada cronologicamente. Cache 24h."""
+def _fetch_ipca_chart_data_ok() -> list:
+    """IPCA 12m — lista de dicts ordenada cronologicamente. Cache 24h (so se preenchida)."""
     from rates import get_ipca_12m_history
-    return get_ipca_12m_history(n=15)
+    data = get_ipca_12m_history(n=15)
+    if not data:
+        raise RuntimeError("BCB sem dados de IPCA")
+    return data
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_ipca_chart_data() -> list:
+    try:
+        return _fetch_ipca_chart_data_ok()
+    except Exception:
+        return []
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def _fetch_selic_chart_data() -> list:
-    """Serie Selic meta — cache 24h."""
+def _fetch_selic_chart_data_ok() -> list:
+    """Serie Selic meta — cache 24h (so se preenchida)."""
     from rates import get_selic_history_range
-    return get_selic_history_range(days=400)
+    data = get_selic_history_range(days=400)
+    if not data:
+        raise RuntimeError("BCB sem dados de Selic")
+    return data
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_selic_chart_data() -> list:
+    try:
+        return _fetch_selic_chart_data_ok()
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _fetch_fed_chart_data_ok() -> list:
+    """Teto do Fed Funds (FRED DFEDTARU ou lista fixa) — cache 24h (so se preenchida)."""
+    from rates import get_fed_funds_history_range
+    data = get_fed_funds_history_range(days=400)
+    if not data:
+        raise RuntimeError("Sem dados de Fed Funds")
+    return data
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_fed_chart_data() -> list:
+    try:
+        return _fetch_fed_chart_data_ok()
+    except Exception:
+        return []
 
 
 def _render_economy_overview(T: dict) -> None:
     """
-    Panorama Econômico: dois botoes (IPCA e Selic) em expanders com graficos
-    historicos do BCB. Similar ao painel da homepage do bcb.gov.br.
+    Panorama Econômico: dois botoes (IPCA; Selic e Fed Funds) em expanders com
+    graficos historicos do BCB e do Fed. Similar ao painel da homepage do bcb.gov.br.
     """
     st.markdown(
         "<div style='display:flex;align-items:center;justify-content:space-between;"
         "margin:14px 0 8px;'>"
         "<span style='font-size:.82rem;font-weight:800;letter-spacing:1.5px;"
         "text-transform:uppercase;color:#d4af37;'>📈 Panorama Econômico</span>"
-        "<span style='font-size:.68rem;color:#6e7681;'>Fonte: Banco Central do Brasil</span>"
+        "<span style='font-size:.68rem;color:#6e7681;'>Fonte: Banco Central do Brasil e Federal Reserve</span>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -1980,50 +2026,76 @@ def _render_economy_overview(T: dict) -> None:
                 )
 
     with _ec2:
-        with st.expander("🏦 Meta Selic", expanded=True):
+        with st.expander("🏦 Juros: Selic e Fed Funds", expanded=True):
             _data = _fetch_selic_chart_data()
+            _data_fed = _fetch_fed_chart_data()
             if not _data:
                 st.caption("Dados do BCB indisponíveis no momento.")
             else:
                 import plotly.graph_objects as go
-                import math
                 _MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
                              "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+
                 # Resample diario -> mensal usando "fim de mes" (convencao BCB:
                 # taxa vigente no ultimo dia do mes). Equivalente ao que o BCB
-                # mostra no Panorama Economico.
-                _df_raw = pd.DataFrame(
-                    {"data": pd.to_datetime([r["data"] for r in _data], format="%d/%m/%Y"),
-                     "valor": [r["valor"] for r in _data]}
-                )
-                _df = (_df_raw.set_index("data")
-                              .resample("ME")
-                              .last()
-                              .dropna()
-                              .reset_index())
+                # mostra no Panorama Economico. Mesma regra para o Fed Funds.
+                def _monthly(_rows):
+                    _df_raw = pd.DataFrame(
+                        {"data": pd.to_datetime([r["data"] for r in _rows], format="%d/%m/%Y"),
+                         "valor": [r["valor"] for r in _rows]}
+                    )
+                    return (_df_raw.set_index("data")
+                                   .resample("ME")
+                                   .last()
+                                   .dropna()
+                                   .reset_index())
+
+                def _fmt(v):
+                    return f"{v:.2f}".replace(".", ",")
+
+                _df = _monthly(_data)
                 _x = _df["data"].tolist()
                 _y = _df["valor"].tolist()
-                _labels = [[f"{_MESES_PT[d.month - 1]} {d.year}", f"{v:.2f}".replace(".", ",")]
-                           for d, v in zip(_x, _y)]
+                # Fed alinhado aos meses da Selic (None = mes sem dado -> lacuna)
+                _fed_by_month = {}
+                if _data_fed:
+                    _df_fed = _monthly(_data_fed)
+                    _fed_by_month = {(d.year, d.month): v
+                                     for d, v in zip(_df_fed["data"], _df_fed["valor"])}
+                _y_fed = [_fed_by_month.get((d.year, d.month)) for d in _x]
+                _has_fed = any(v is not None for v in _y_fed)
+                _labels = [[f"{_MESES_PT[d.month - 1]} {d.year}", _fmt(v),
+                            _fmt(f) if f is not None else "—"]
+                           for d, v, f in zip(_x, _y, _y_fed)]
                 _tickvals, _ticktext = _month_ticks(_x)
                 _last = _y[-1]
                 _last_ym = f"{_MESES_PT[_x[-1].month - 1]} {_x[-1].year}"
-                _y_min = math.floor(min(_y) * 2) / 2 - 0.5
-                _y_max = math.ceil(max(_y) * 2) / 2 + 0.5
+                _hover = ("<b>%{customdata[0]}</b><br>Selic: <b>%{customdata[1]}%</b>"
+                          "<br>Fed Funds: <b>%{customdata[2]}%</b><extra></extra>")
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
-                    x=_x, y=_y, mode="lines+markers",
+                    x=_x, y=_y, mode="lines+markers", name="Selic",
                     line=dict(color="#3fb950", width=2.5, shape="hv"),
                     marker=dict(size=6, color="#3fb950"),
                     customdata=_labels,
-                    hovertemplate="<b>%{customdata[0]}</b><br>Meta Selic: <b>%{customdata[1]}</b><extra></extra>",
+                    hovertemplate=_hover,
                 ))
+                if _has_fed:
+                    fig.add_trace(go.Scatter(
+                        x=_x, y=_y_fed, mode="lines+markers", name="Fed Funds",
+                        line=dict(color="#58a6ff", width=2.5, shape="hv"),
+                        marker=dict(size=6, color="#58a6ff"),
+                        customdata=_labels,
+                        hovertemplate=_hover,
+                    ))
                 fig.update_layout(
                     height=280, margin=dict(l=10, r=10, t=30, b=10),
                     paper_bgcolor="#0d1117", plot_bgcolor="#0d1117",
                     font=dict(color="#e6edf3", family="Inter, system-ui, sans-serif", size=11),
                     yaxis_title="% a.a.", xaxis_title="",
-                    showlegend=False,
+                    showlegend=True,
+                    legend=dict(orientation="h", x=1, xanchor="right", y=1.02, yanchor="bottom",
+                                font=dict(size=10, color="#8b949e"), bgcolor="rgba(0,0,0,0)"),
                     hoverlabel=dict(bgcolor="#161b22", bordercolor="#30363d",
                                     font=dict(color="#e6edf3", size=12)),
                 )
@@ -2036,18 +2108,35 @@ def _render_economy_overview(T: dict) -> None:
                     tickmode="array", tickvals=_tickvals, ticktext=_ticktext,
                     tickangle=-35, tickfont=dict(size=10),
                 )
+                # Escala unica e fixa (0 a 16% a.a.) para as duas taxas.
                 fig.update_yaxes(
                     gridcolor="#21262d", zerolinecolor="#21262d",
                     showline=True, linecolor="#30363d", linewidth=1, mirror=False,
-                    range=[_y_min, _y_max],
+                    range=[0, 16], dtick=2,
                 )
                 st.plotly_chart(fig, use_container_width=True,
                                 config={"displayModeBar": False, "displaylogo": False})
+                _sep = "<span style='color:#8b949e;'> · </span>"
+                if _has_fed:
+                    _last_fed = next(v for v in reversed(_y_fed) if v is not None)
+                    _diff = _last - _last_fed
+                    _linha = (
+                        f"<span style='color:#3fb950;'>Selic {_fmt(_last)}%</span>{_sep}"
+                        f"<span style='color:#58a6ff;'>Fed {_fmt(_last_fed)}%</span>{_sep}"
+                        f"<span style='color:#e6edf3;'>diferencial {_fmt(_diff)} p.p.</span>"
+                    )
+                    _base = f"Meta Selic e teto do Fed Funds · base {_last_ym}"
+                else:
+                    _linha = (
+                        f"<span style='color:#3fb950;'>Selic {_fmt(_last)}%</span>{_sep}"
+                        f"<span style='color:#8b949e;'>Fed Funds indisponível</span>"
+                    )
+                    _base = f"Meta Selic · base {_last_ym}"
                 st.markdown(
-                    f"<div style='text-align:center;font-size:1.15rem;font-weight:900;"
-                    f"color:#3fb950;'>{_last:.2f}%</div>"
+                    f"<div style='text-align:center;font-size:.95rem;font-weight:900;'>"
+                    f"{_linha}</div>"
                     f"<div style='text-align:center;font-size:.7rem;color:#8b949e;'>"
-                    f"Meta Selic · {_last_ym}</div>",
+                    f"{_base}</div>",
                     unsafe_allow_html=True,
                 )
 

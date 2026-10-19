@@ -5,6 +5,7 @@ Busca automatica de taxas de juros e proximas reunioes.
 Estrategia:
   * Selic vigente  -> BCB SGS API (serie 432), cache 6h, fallback config.
   * Fed Funds      -> config.py (manual), com aviso de desatualizado.
+  * Fed Funds hist -> FRED (DFEDTARU), fallback lista fixa FED_FUNDS_DECISIONS.
   * COPOM meeting  -> calendario hardcoded, helper retorna proxima futura.
   * FOMC meeting   -> calendario hardcoded, helper retorna proxima futura.
 
@@ -40,6 +41,7 @@ COPOM_2027: List[date] = [
 
 # ═══ Calendario oficial FOMC 2026 (datas de DECISAO, geralmente quarta) ═════
 # Fonte: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+# Conferido em 19/10/2026 (pagina com Last Update: October 07, 2026).
 FOMC_2026: List[date] = [
     date(2026, 1, 28),
     date(2026, 3, 18),
@@ -47,18 +49,18 @@ FOMC_2026: List[date] = [
     date(2026, 6, 17),
     date(2026, 7, 29),
     date(2026, 9, 16),
-    date(2026, 11, 4),
+    date(2026, 10, 28),
     date(2026, 12, 9),
 ]
 FOMC_2027: List[date] = [
     date(2027, 1, 27),
     date(2027, 3, 17),
     date(2027, 4, 28),
-    date(2027, 6, 16),
+    date(2027, 6, 9),
     date(2027, 7, 28),
     date(2027, 9, 15),
-    date(2027, 11, 3),
-    date(2027, 12, 15),
+    date(2027, 10, 27),
+    date(2027, 12, 8),
 ]
 
 
@@ -239,3 +241,104 @@ def get_selic_history_range(days: int = 400) -> list:
         return out
     except Exception:
         return []
+
+
+# ═══ Fed Funds (teto do intervalo) — historico para o grafico do Panorama ═════
+# Primeira fonte: FRED, serie DFEDTARU (Federal Funds Target Range - Upper Limit),
+# diaria. O Streamlit Cloud pode bloquear o FRED; nesse caso vale a lista fixa
+# abaixo, conferida comunicado a comunicado em federalreserve.gov (HTML salvos em
+# iCloud, 2. equity-guard/fontes/fed/). Atualizar a cada reuniao do FOMC, junto
+# com FED_FUNDS_RATE em config.py.
+# Pares (data da DECISAO, teto do intervalo em % a.a.). O teto novo vigora a
+# partir do dia seguinte a decisao (mesma convencao do FRED).
+FED_FUNDS_DECISIONS: List[Tuple[date, float]] = [
+    (date(2025, 1, 29), 4.50),   # mantem 4,25-4,50 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20250129a.htm
+    (date(2025, 3, 19), 4.50),   # mantem 4,25-4,50 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20250319a.htm
+    (date(2025, 5, 7), 4.50),    # mantem 4,25-4,50 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20250507a.htm
+    (date(2025, 6, 18), 4.50),   # mantem 4,25-4,50 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20250618a.htm
+    (date(2025, 7, 30), 4.50),   # mantem 4,25-4,50 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20250730a.htm
+    (date(2025, 9, 17), 4.25),   # corta 0,25 -> 4,00-4,25 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20250917a.htm
+    (date(2025, 10, 29), 4.00),  # corta 0,25 -> 3,75-4,00 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20251029a.htm
+    (date(2025, 12, 10), 3.75),  # corta 0,25 -> 3,50-3,75 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20251210a.htm
+    (date(2026, 1, 28), 3.75),   # mantem 3,50-3,75 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20260128a.htm
+    (date(2026, 3, 18), 3.75),   # mantem 3,50-3,75 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20260318a.htm
+    (date(2026, 4, 29), 3.75),   # mantem 3,50-3,75 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20260429a.htm
+    (date(2026, 6, 17), 3.75),   # mantem 3,50-3,75 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm
+    (date(2026, 7, 29), 3.75),   # mantem 3,50-3,75 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm
+    (date(2026, 9, 16), 4.00),   # eleva 0,25 -> 3,75-4,00 · https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm
+]
+
+
+def _fed_funds_from_fred(start: date, end: date) -> list:
+    """Teto do Fed Funds dia a dia via FRED (DFEDTARU), entre start e end."""
+    import csv
+    import io
+    import requests
+    url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFEDTARU"
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()
+    out = []
+    for row in csv.DictReader(io.StringIO(r.text)):
+        try:
+            d = date.fromisoformat((row.get("observation_date") or row.get("DATE") or "").strip())
+            val = float(row.get("DFEDTARU", ""))
+        except (ValueError, TypeError):
+            continue  # "." = sem observacao
+        if start <= d <= end:
+            out.append({"data": d.strftime("%d/%m/%Y"), "valor": val})
+    return out
+
+
+def _fed_funds_from_decisions(start: date, end: date) -> list:
+    """
+    Serie diaria do teto do Fed Funds a partir de FED_FUNDS_DECISIONS.
+    Antes da primeira decisao da lista usa o teto dela (a reuniao de
+    29/01/2025 manteve o intervalo que ja vigorava).
+    """
+    from datetime import timedelta as _td
+    decisions = sorted(FED_FUNDS_DECISIONS)
+    if not decisions:
+        return []
+    out = []
+    d = start
+    while d <= end:
+        val = decisions[0][1]
+        for dec_date, teto in decisions:
+            if dec_date < d:      # vigora a partir do dia seguinte a decisao
+                val = teto
+            else:
+                break
+        out.append({"data": d.strftime("%d/%m/%Y"), "valor": val})
+        d += _td(days=1)
+    return out
+
+
+def get_fed_funds_history_range(days: int = 400) -> list:
+    """
+    Teto do intervalo do Fed Funds nos ultimos N dias, diario, no mesmo
+    formato da Selic: [{'data': 'DD/MM/YYYY', 'valor': float}, ...].
+    FRED primeiro; se falhar, lista fixa FED_FUNDS_DECISIONS.
+    Cache 24h se preenchida, 5 min se vazia.
+    """
+    key = f"fed_funds_range_{days}"
+    cached = _history_cache.get(key)
+    if cached:
+        rows, fetched_at = cached
+        ttl = 24 * 3600 if rows else 5 * 60
+        if (datetime.now() - fetched_at).total_seconds() < ttl:
+            return rows
+    from datetime import timedelta as _td
+    end = date.today()
+    start = end - _td(days=days)
+    out: list = []
+    try:
+        out = _fed_funds_from_fred(start, end)
+    except Exception:
+        out = []
+    if not out:
+        try:
+            out = _fed_funds_from_decisions(start, end)
+        except Exception:
+            out = []
+    _history_cache[key] = (out, datetime.now())
+    return out
