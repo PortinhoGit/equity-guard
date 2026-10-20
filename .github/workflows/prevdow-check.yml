@@ -88,7 +88,9 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install supabase requests beautifulsoup4
+          pip install supabase requests beautifulsoup4 playwright
+          # Chromium para furar o Akamai Bot Manager do portal (403 em requests cru)
+          python -m playwright install --with-deps chromium
 
       - name: Check PrevDow
         env:
