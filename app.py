@@ -566,6 +566,27 @@ def _fetch_prevdow_live() -> dict:
     merged = dict(PREVDOW_DATA)
     merged["_source"] = "config"   # default: fallback
 
+    # 0) Arquivo versionado data/prevdow_latest.json — fonte primaria.
+    #    Alimentado pelo scraper via GitHub Actions (update_prevdow_file.py) e
+    #    commitado no repo; o app passa a atualizar sem depender do Supabase.
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+        _f = _Path(__file__).parent / "data" / "prevdow_latest.json"
+        if _f.exists():
+            _row = _json.loads(_f.read_text(encoding="utf-8"))
+            if _row.get("data_base"):
+                merged["data_base"] = _row["data_base"]
+                for k in ("cdi_month", "balanced_month", "cdi_year", "balanced_year"):
+                    v = _row.get(k)
+                    if v is not None:
+                        merged[k] = float(v)
+                merged["_source"] = "file"
+                merged["_inserted_at"] = _row.get("inserted_at")
+                return merged
+    except Exception as e:
+        merged["_source"] = f"config (file erro: {type(e).__name__})"
+
     # 1) Tenta Supabase — pega a linha mais recente (data_base maior)
     try:
         from auth.supabase_client import get_client
