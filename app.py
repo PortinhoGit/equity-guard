@@ -1877,18 +1877,46 @@ def _fetch_market_movers(tickers: tuple) -> dict:
     return {"gainers": gainers, "losers": losers, "actives": actives}
 
 
+# Os graficos do Panorama Economico ficam 24h em cache, mas uma falha do BCB
+# (503/timeout) devolve lista vazia e, se ela fosse cacheada, o grafico sumiria
+# por um dia inteiro. Por isso a funcao de 24h lanca excecao quando vem vazio
+# (st.cache_data nao guarda excecao) e a camada externa, com TTL curto, devolve
+# [] para o chamador — a lista vazia fica em cache por 5 min, nao 24h.
+
 @st.cache_data(ttl=86400, show_spinner=False)
-def _fetch_ipca_chart_data() -> list:
-    """IPCA 12m — lista de dicts ordenada cronologicamente. Cache 24h."""
+def _fetch_ipca_chart_data_ok() -> list:
+    """IPCA 12m — lista de dicts ordenada cronologicamente. Cache 24h (so se preenchida)."""
     from rates import get_ipca_12m_history
-    return get_ipca_12m_history(n=15)
+    data = get_ipca_12m_history(n=15)
+    if not data:
+        raise RuntimeError("BCB sem dados de IPCA")
+    return data
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_ipca_chart_data() -> list:
+    try:
+        return _fetch_ipca_chart_data_ok()
+    except Exception:
+        return []
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def _fetch_selic_chart_data() -> list:
-    """Serie Selic meta — cache 24h."""
+def _fetch_selic_chart_data_ok() -> list:
+    """Serie Selic meta — cache 24h (so se preenchida)."""
     from rates import get_selic_history_range
-    return get_selic_history_range(days=400)
+    data = get_selic_history_range(days=400)
+    if not data:
+        raise RuntimeError("BCB sem dados de Selic")
+    return data
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_selic_chart_data() -> list:
+    try:
+        return _fetch_selic_chart_data_ok()
+    except Exception:
+        return []
 
 
 def _render_economy_overview(T: dict) -> None:

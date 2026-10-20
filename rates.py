@@ -40,6 +40,7 @@ COPOM_2027: List[date] = [
 
 # ═══ Calendario oficial FOMC 2026 (datas de DECISAO, geralmente quarta) ═════
 # Fonte: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+# Conferido em 19/10/2026 (pagina com Last Update: October 07, 2026).
 FOMC_2026: List[date] = [
     date(2026, 1, 28),
     date(2026, 3, 18),
@@ -47,18 +48,18 @@ FOMC_2026: List[date] = [
     date(2026, 6, 17),
     date(2026, 7, 29),
     date(2026, 9, 16),
-    date(2026, 11, 4),
+    date(2026, 10, 28),
     date(2026, 12, 9),
 ]
 FOMC_2027: List[date] = [
     date(2027, 1, 27),
     date(2027, 3, 17),
     date(2027, 4, 28),
-    date(2027, 6, 16),
+    date(2027, 6, 9),
     date(2027, 7, 28),
     date(2027, 9, 15),
-    date(2027, 11, 3),
-    date(2027, 12, 15),
+    date(2027, 10, 27),
+    date(2027, 12, 8),
 ]
 
 

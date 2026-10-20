@@ -112,20 +112,32 @@ def _send_email(to_email: str, subject: str, html: str) -> bool:
         return False
 
 
-def _auto_update_next_meeting(all_fomc: list, today: date) -> None:
+def _auto_update_next_meeting(all_fomc: list, all_copom: list, today: date) -> None:
     """
     Atualiza FED_NEXT_MEETING e SELIC_NEXT_MEETING no config.py para a
-    proxima reuniao futura e faz commit automatico via git.
+    proxima reuniao futura de cada calendario e faz commit automatico via git.
     Executado no D+1 de cada reuniao FOMC.
+
+    FED_NEXT_MEETING vem do calendario FOMC; SELIC_NEXT_MEETING vem do
+    calendario COPOM (rates.py). Os dois calendarios NAO coincidem: em
+    29/10/2026, por exemplo, a proxima FOMC e 09/12/2026 e a proxima COPOM
+    e 04/11/2026.
     """
-    future = sorted(d for d in all_fomc if d > today)
-    if not future:
-        print("Nenhuma reuniao futura no calendario — config.py nao atualizado.")
+    future_fomc = sorted(d for d in all_fomc if d > today)
+    if not future_fomc:
+        print("Nenhuma reuniao FOMC futura no calendario — config.py nao atualizado.")
+        return
+    future_copom = sorted(d for d in all_copom if d > today)
+    if not future_copom:
+        print("Nenhuma reuniao COPOM futura no calendario — config.py nao atualizado.")
         return
 
-    proxima = future[0]
+    proxima = future_fomc[0]
     proxima_str = proxima.strftime("%Y-%m-%d")
     label = proxima.strftime("%d/%m/%Y")
+    proxima_copom = future_copom[0]
+    proxima_copom_str = proxima_copom.strftime("%Y-%m-%d")
+    label_copom = proxima_copom.strftime("%d/%m/%Y")
 
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.py")
     with open(config_path, "r", encoding="utf-8") as f:
@@ -144,22 +156,23 @@ def _auto_update_next_meeting(all_fomc: list, today: date) -> None:
         rf'\g<1>proxima reuniao FOMC ({label})',
         content,
     )
-    # Atualiza SELIC_NEXT_MEETING (COPOM coincide com FOMC nas datas)
+    # Atualiza SELIC_NEXT_MEETING a partir do calendario COPOM
+    # (as datas do COPOM nao coincidem com as do FOMC)
     content = re.sub(
         r'(SELIC_NEXT_MEETING:\s*str\s*=\s*")[^"]+(")',
-        rf'\g<1>{proxima_str}\g<2>',
+        rf'\g<1>{proxima_copom_str}\g<2>',
         content,
     )
     content = re.sub(
         r'(SELIC_NEXT_MEETING.*#\s*).*',
-        rf'\g<1>proxima reuniao COPOM ({label})',
+        rf'\g<1>proxima reuniao COPOM ({label_copom})',
         content,
     )
 
     with open(config_path, "w", encoding="utf-8") as f:
         f.write(content)
 
-    print(f"config.py atualizado: proxima reuniao = {proxima_str}")
+    print(f"config.py atualizado: proxima FOMC = {proxima_str}, proxima COPOM = {proxima_copom_str}")
 
     # Commit automatico via git
     import subprocess
@@ -170,10 +183,10 @@ def _auto_update_next_meeting(all_fomc: list, today: date) -> None:
         subprocess.run(["git", "add", "config.py"],                            cwd=repo_dir, check=True)
         subprocess.run([
             "git", "commit", "-m",
-            f"Auto: atualiza FED_NEXT_MEETING e SELIC_NEXT_MEETING para {proxima_str}"
+            f"Auto: atualiza FED_NEXT_MEETING para {proxima_str} e SELIC_NEXT_MEETING para {proxima_copom_str}"
         ], cwd=repo_dir, check=True)
         subprocess.run(["git", "push"], cwd=repo_dir, check=True)
-        print(f"Commit e push realizados — proxima reuniao: {proxima_str}")
+        print(f"Commit e push realizados — proxima FOMC: {proxima_str}, proxima COPOM: {proxima_copom_str}")
     except subprocess.CalledProcessError as e:
         print(f"Falha no git: {e} — atualize manualmente.")
 
@@ -184,9 +197,10 @@ def main() -> None:
 
     yesterday = today - timedelta(days=1)
 
-    # Le calendario FOMC de rates.py
-    from rates import FOMC_2026, FOMC_2027
+    # Le calendarios FOMC e COPOM de rates.py
+    from rates import FOMC_2026, FOMC_2027, COPOM_2026, COPOM_2027
     all_fomc = FOMC_2026 + FOMC_2027
+    all_copom = COPOM_2026 + COPOM_2027
 
     target = yesterday
     if force:
@@ -199,7 +213,7 @@ def main() -> None:
         return
 
     # ── Atualiza FED_NEXT_MEETING e SELIC_NEXT_MEETING no config.py ──────────
-    _auto_update_next_meeting(all_fomc, today)
+    _auto_update_next_meeting(all_fomc, all_copom, today)
 
     # Valor atual do config (so pra citar no e-mail)
     from config import FED_FUNDS_RATE
