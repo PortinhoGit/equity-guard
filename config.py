@@ -36,7 +36,7 @@ DEMO_TICKER: str = "BBAS3"
 SELIC_RATE: float              = 13.75         # % a.a. — COPOM 281ª (15-16/09/2026), vigente desde 17/09/2026 · BCB SGS 432
 SELIC_NEXT_MEETING: str        = "2026-11-04"  # proxima reuniao COPOM (04/11/2026)
 FED_FUNDS_RATE: float          = 4.00          # % a.a. — Fed upper bound (3,75-4,00), FOMC 16/09/2026
-FED_NEXT_MEETING: str          = "2026-10-28"  # proxima reuniao FOMC (28/10/2026)
+FED_NEXT_MEETING: str          = "2026-12-09"  # proxima reuniao FOMC (09/12/2026)
 
 # ── Prevdow — Previdência Complementar (atualização manual mensal) ───────────
 # Atualize os valores abaixo copiando do portal oficial uma vez por mês.
