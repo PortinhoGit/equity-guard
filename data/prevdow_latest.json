@@ -1,8 +1,8 @@
 {
-  "data_base": "09/2026",
-  "cdi_month": 1.02,
-  "balanced_month": 2.77,
-  "cdi_year": 9.88,
-  "balanced_year": 8.97,
-  "inserted_at": "2026-10-20T10:30:00Z"
+  "data_base": "10/2026",
+  "cdi_month": 1.01,
+  "balanced_month": -1.37,
+  "cdi_year": 10.99,
+  "balanced_year": 7.48,
+  "inserted_at": "2026-11-17T20:41:13.777317Z"
 }
